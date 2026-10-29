@@ -71,9 +71,12 @@ summary{color:var(--mu);font-size:.85rem;padding:4px 0}
 <div id="modal"><div id="mbox"></div></div>
 <div id="toast"></div>
 <script>
-/* Plak hier het Client ID van je Google-project (zie de handleiding). Je kan het ook in de app invullen bij Meer > Geavanceerd. */
-const GOOGLE_CLIENT_ID='965258565656-gslnafrvbhgd4qnlfr442v9dshvsq77k.apps.googleusercontent.com';
-const SCOPE='https://www.googleapis.com/auth/spreadsheets';
+/* Gegevens van het Google-project (zie de handleiding). Ze mogen openbaar staan. Je kan ze ook in de app invullen bij Meer > Geavanceerd. */
+const GOOGLE_CLIENT_ID='';
+const GOOGLE_API_KEY='';
+const GOOGLE_APP_ID='';
+/* Enkel toegang tot spreadsheets die de app zelf aanmaakt of die de gebruiker zelf kiest. */
+const SCOPE='https://www.googleapis.com/auth/drive.file';
 const TAB_B='Boekingen',TAB_L='Leden';
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip'];
 
@@ -91,10 +94,11 @@ try{const r=localStorage.getItem(K);if(r)S=JSON.parse(r)}catch(e){}
 if(!S)S=DEF();
 function norm(){
  if(Array.isArray(S.cats)){const o=S.cats;S.cats={h:o.map(c=>c.h),s:[...new Set(o.flatMap(c=>c.s))]}}
- S.club=Object.assign({gid:'',gok:false,gcreated:false,catTab:'Categorieën',cid:'',gmode:'new',gurl:''},S.club);
- S.sync=Object.assign({last:0,err:'',auth:false},S.sync||{});
+ S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:''},S.club);
+ if(S.club.gscope!==SCOPE){if(S.club.gid||S.club.gok){S.club.gok=false;if(S.club.gmode==='existing')S.club.gpicked=false;try{sessionStorage.removeItem('qg')}catch(e){}}S.club.gscope=SCOPE}
+ S.sync=Object.assign({last:0,err:'',auth:false,pick:false},S.sync||{});
  S.members=S.members||[];S.tx=S.tx||[];delete S.opening}
-norm();
+norm();save();
 function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){toast('Opslaan op dit toestel lukt niet')}}
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2800)}
 function modal(h){$('#mbox').innerHTML=h;$('#modal').classList.add('on')}
@@ -108,6 +112,8 @@ function theme(){const c=S.club,r=document.documentElement;r.style.setProperty('
 let TOKEN=null,TEXP=0,SYNCING=false,SI=false,ENS='',LASTPULL=0,QT=null;
 try{const q=JSON.parse(sessionStorage.getItem('qg')||'null');if(q&&q.exp>Date.now()){TOKEN=q.t;TEXP=q.exp}}catch(e){}
 const cid=()=>(S.club.cid||GOOGLE_CLIENT_ID||'').trim();
+const apiKey=()=>(S.club.akey||GOOGLE_API_KEY||'').trim();
+const appId=()=>(S.club.appid||GOOGLE_APP_ID||'').trim();
 const haveTok=()=>TOKEN&&Date.now()<TEXP-60000;
 const autoOk=()=>S.club.gok&&S.club.gid;
 const authErr=m=>{const e=new Error(m);e.auth=true;return e};
@@ -126,8 +132,19 @@ async function api(path,opt){opt=opt||{};
  if(!haveTok()){if(!SI)throw authErr('Opnieuw verbinden nodig.');await getToken()}
  const r=await fetch('https://sheets.googleapis.com/v4/spreadsheets'+path,{...opt,headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'}});
  if(r.status===401){TOKEN=null;try{sessionStorage.removeItem('qg')}catch(e){}throw authErr('Sessie verlopen. Tik op de status bovenaan om opnieuw te verbinden.')}
- if(!r.ok){let m='';try{m=(await r.json()).error.message}catch(e){}throw new Error(m||('Google-fout '+r.status))}
+ if(!r.ok){let m='';try{m=(await r.json()).error.message}catch(e){}
+  if((r.status===403||r.status===404)&&path.indexOf('/'+S.club.gid)===0&&!/not been used|disabled|API has/i.test(m)){const e=new Error('Geen toegang tot deze spreadsheet. Ga naar Meer en kies de spreadsheet opnieuw met Spreadsheet kiezen.');e.pick=true;throw e}
+  throw new Error(m||('Google-fout '+r.status))}
  return r.json()}
+function loadPicker(){return new Promise((res,rej)=>{if(window.google&&google.picker)return res();
+ const go=()=>gapi.load('picker',{callback:res,onerror:()=>rej(new Error('De Google-keuzelijst kon niet geladen worden.'))});
+ if(window.gapi&&gapi.load)return go();
+ const s=document.createElement('script');s.src='https://apis.google.com/js/api.js';s.onload=go;s.onerror=()=>rej(new Error('Google kon niet geladen worden. Controleer je internetverbinding.'));document.head.appendChild(s)})}
+function pickFile(tok){return new Promise(res=>{const v=new google.picker.View(google.picker.ViewId.SPREADSHEETS);
+ new google.picker.PickerBuilder().setAppId(appId()).setDeveloperKey(apiKey()).setOAuthToken(tok).setLocale('nl').setTitle('Kies je spreadsheet').addView(v)
+  .setCallback(d=>{const a=d[google.picker.Response.ACTION];
+   if(a===google.picker.Action.PICKED){const x=d[google.picker.Response.DOCUMENTS][0];res({id:x[google.picker.Document.ID],name:x[google.picker.Document.NAME]})}
+   else if(a===google.picker.Action.CANCEL)res(null)}).build().setVisible(true)})}
 const parseId=u=>{const m=String(u||'').match(/\/d\/([a-zA-Z0-9_-]+)/)||String(u||'').trim().match(/^([a-zA-Z0-9_-]{25,})$/);return m?m[1]:''};
 const rng=(tab,a)=>`'${tab.replace(/'/g,"''")}'!${a}`;
 const enc=encodeURIComponent;
@@ -144,7 +161,7 @@ async function ensureSheet(){const c=S.club;let created=[];
  if([TAB_B,TAB_L].includes(c.catTab))throw new Error('Het tabblad voor categorieën mag niet Boekingen of Leden heten.');
  if(c.gmode==='new'&&!c.gcreated){
   const r=await api('',{method:'POST',body:JSON.stringify({properties:{title:(c.name||'Club')+' – betalingen'},sheets:[TAB_B,TAB_L,c.catTab].map(t=>({properties:{title:t}}))})});
-  c.gid=r.spreadsheetId;c.gcreated=true;S.tx.forEach(t=>t.synced=false);save();created=[c.catTab]}
+  c.gid=r.spreadsheetId;c.gcreated=true;c.gpicked=false;c.gname='';S.tx.forEach(t=>t.synced=false);save();created=[c.catTab]}
  else{
   const m=await api(`/${c.gid}?fields=sheets.properties.title`),titles=(m.sheets||[]).map(s=>s.properties.title);
   const need=[TAB_B,TAB_L,c.catTab].filter((t,i,a)=>!titles.includes(t)&&a.indexOf(t)===i);
@@ -177,31 +194,43 @@ async function sync(manual,force){
   if(ENS!==key){await ensureSheet();ENS=c.gmode+'|'+c.gid+'|'+c.catTab;LASTPULL=0}
   if(manual||Date.now()-LASTPULL>120000){changed=await pullCats()||changed;changed=await syncMembers()||changed;LASTPULL=Date.now()}
   await pushTx();
-  S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;save();
+  S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;S.sync.pick=false;save();
   if(manual)toast('Gesynchroniseerd')}
- catch(e){S.sync.err=e.message||'Onbekende fout';S.sync.auth=!!e.auth;if(!e.auth)ENS='';save();if(manual)toast(S.sync.err)}
+ catch(e){S.sync.err=e.message||'Onbekende fout';S.sync.auth=!!e.auth;S.sync.pick=!!e.pick;if(!e.auth)ENS='';save();if(manual)toast(S.sync.err)}
  finally{SYNCING=false;SI=false}
  if(changed&&tab!=='boek'&&role)render();else refreshSt()}
 function queueSync(){clearTimeout(QT);QT=setTimeout(()=>sync(false),1500)}
 function statusTap(){sync(true)}
-function stText(){const c=S.club;if(!autoOk())return '';const un=S.tx.filter(t=>!t.synced).length,u=un?` · ${un} te uploaden`:'';
+function stText(){const c=S.club;if(!c.gid)return '';if(!c.gok)return 'Opnieuw verbinden: ga naar Meer';const un=S.tx.filter(t=>!t.synced).length,u=un?` · ${un} te uploaden`:'';
  if(SYNCING)return 'Synchroniseren…';
+ if(S.sync.pick)return 'Kies je spreadsheet opnieuw bij Meer';
  if(S.sync.auth)return 'Tik om opnieuw te verbinden'+u;
  if(S.sync.err)return 'Sync mislukt, tik om opnieuw te proberen'+u;
  if(!navigator.onLine)return 'Offline'+u;
  return un?un+' te uploaden':'✓ Gesynchroniseerd'}
-function gStatus(){const c=S.club;if(!c.gid)return 'Nog niet verbonden.';const un=S.tx.filter(t=>!t.synced).length;
+function gStatus(){const c=S.club;if(!c.gid)return 'Nog niet verbonden.';if(!c.gok)return 'Opnieuw verbinden nodig: de app vraagt nu minder toegang. Tik op Verbinden met Google.';const un=S.tx.filter(t=>!t.synced).length;
  return `Verbonden. ${un} boeking(en) te uploaden. Laatste synchronisatie: ${S.sync.last?new Date(S.sync.last).toLocaleString('nl-BE'):'nog niet'}.`+(S.sync.err?' Fout: '+S.sync.err:'')}
 function refreshSt(){const e=$('#st');if(e){const t=stText();e.textContent=t;e.style.display=t?'block':'none'}const g=$('#gst');if(g)g.textContent=gStatus()}
 function readG(){const c=S.club,gm=document.querySelector('input[name=gm]:checked');
- if(gm)c.gmode=gm.value;if($('#ig'))c.gurl=$('#ig').value.trim();if($('#ict'))c.catTab=$('#ict').value.trim()||'Categorieën';if($('#icid'))c.cid=$('#icid').value.trim();
- if(c.gmode==='existing'){const id=parseId(c.gurl);if(id&&id!==c.gid){c.gid=id;c.gcreated=false;S.tx.forEach(t=>t.synced=false)}}
+ if(gm)c.gmode=gm.value;if($('#ict'))c.catTab=$('#ict').value.trim()||'Categorieën';
+ if($('#icid'))c.cid=$('#icid').value.trim();if($('#iak'))c.akey=$('#iak').value.trim();if($('#iap'))c.appid=$('#iap').value.trim();
+ if(c.gmode==='existing'&&c.gcreated)c.gpicked=false;
  ENS='';save()}
 async function connect(){readG();const c=S.club;
  if(!cid())return toast('Geen Google Client ID ingesteld. Zie de handleiding.');
- if(c.gmode==='existing'&&!parseId(c.gurl))return toast('Plak de link van je spreadsheet.');
+ if(c.gmode==='existing'&&!c.gpicked)return choose();
  await sync(true,true);if(tab==='inst')render()}
-function unlink(){ask('Spreadsheet ontkoppelen? Je boekingen blijven op dit toestel bewaard.','Ontkoppelen',()=>{Object.assign(S.club,{gid:'',gok:false,gcreated:false});S.sync={last:0,err:'',auth:false};ENS='';TOKEN=null;try{sessionStorage.removeItem('qg')}catch(e){}save();render()})}
+async function choose(){readG();const c=S.club;
+ if(!cid())return toast('Geen Google Client ID ingesteld. Zie de handleiding.');
+ if(!apiKey()||!appId())return toast('API-sleutel of projectnummer ontbreekt. Zie de handleiding.');
+ let r;
+ try{const tok=await getToken();await loadPicker();r=await pickFile(tok)}catch(e){S.sync.err=e.message;S.sync.auth=!!e.auth;save();refreshSt();return toast(e.message)}
+ if(!r)return;
+ c.gmode='existing';
+ if(r.id!==c.gid){c.gid=r.id;c.gcreated=false;S.tx.forEach(t=>t.synced=false)}
+ c.gname=r.name;c.gpicked=true;c.gok=true;S.sync.pick=false;ENS='';save();
+ await sync(true,true);if(tab==='inst')render()}
+function unlink(){ask('Spreadsheet ontkoppelen? Je boekingen blijven op dit toestel bewaard.','Ontkoppelen',()=>{Object.assign(S.club,{gid:'',gok:false,gcreated:false,gpicked:false,gname:''});S.sync={last:0,err:'',auth:false,pick:false};ENS='';TOKEN=null;try{sessionStorage.removeItem('qg')}catch(e){}save();render()})}
 window.addEventListener('online',()=>{refreshSt();queueSync()});
 window.addEventListener('offline',refreshSt);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)queueSync()});
@@ -209,16 +238,16 @@ setInterval(()=>{if(!document.hidden)sync(false)},120000);
 
 /* ================= START EN INLOGGEN ================= */
 function start(){theme();if(!S.club.pinQ)return setup();if(!role)return login();render()}
-function setup(){$('#app').innerHTML=`<div class="auth"><h2>Welkom bij je betalingsapp</h2><p class="mu">Stel je club in. Alles kan je later aanpassen.</p>
+function setup(){$('#app').innerHTML=`<div class="auth"><h2>Welkom bij je betalingsapp</h2><p class="mu">Een gratis app voor studentenclubs en verenigingen om tijdens een activiteit te registreren wie betaald heeft: cash, Payconiq, overschrijving of op de schuldenlijst. Je gegevens blijven op je toestel. Als je wil, worden ze ook in je eigen Google Sheet gezet.</p><p class="mu">Stel je club in. Alles kan je later aanpassen.</p>
 <label>Naam van de club<input id="sn" autocomplete="off"></label>
 <label>Pincode voor de Quaestor (minstens 4 cijfers)<input id="sq" type="password" inputmode="numeric"></label>
 <label>Pincode voor helpers aan de deur (een andere dan die van de Quaestor)<input id="sh" type="password" inputmode="numeric"></label>
-<div class="err" id="se"></div><button class="btn" onclick="doSetup()">Starten</button></div>`}
+<div class="err" id="se"></div><button class="btn" onclick="doSetup()">Starten</button><p class="mu" style="margin-top:16px"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`}
 function doSetup(){const n=$('#sn').value.trim(),q=$('#sq').value.trim(),h=$('#sh').value.trim();
  const e=!n?'Vul de naam van de club in.':q.length<4||h.length<4?'Elke pincode heeft minstens 4 cijfers.':q===h?'De twee pincodes moeten verschillen.':'';
  if(e){$('#se').textContent=e;return}
  Object.assign(S.club,{name:n,pinQ:q,pinH:h});save();role='q';render()}
-function login(){$('#app').innerHTML=`<div class="auth"><h2>${esc(S.club.name)}</h2><label>Pincode<input id="lp" type="password" inputmode="numeric" autofocus onkeydown="if(event.key==='Enter')doLogin()"></label><div class="err" id="le"></div><button class="btn" onclick="doLogin()">Openen</button></div>`}
+function login(){$('#app').innerHTML=`<div class="auth"><h2>${esc(S.club.name)}</h2><label>Pincode<input id="lp" type="password" inputmode="numeric" autofocus onkeydown="if(event.key==='Enter')doLogin()"></label><div class="err" id="le"></div><button class="btn" onclick="doLogin()">Openen</button><p class="mu" style="margin-top:16px"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`}
 function doLogin(){const p=$('#lp').value.trim();if(p===S.club.pinQ)role='q';else if(p===S.club.pinH)role='h';else{$('#le').textContent='Deze pincode klopt niet.';return}tab='boek';render();queueSync()}
 function logout(){role=null;login()}
 
@@ -309,16 +338,21 @@ function catCard(){const c=S.club;
  if(c.gid)return `<div class="card"><h2>Categorieën</h2><p class="mu">De categorieën worden gelezen uit het tabblad ‘${esc(c.catTab)}’ van je spreadsheet (kolom A hoofdcategorieën, kolom B subcategorieën). Pas ze daar aan en tik daarna op Opslaan en nu synchroniseren, of tik bovenaan op de status. Nu: ${S.cats.h.length} hoofd- en ${S.cats.s.length} subcategorieën.</p></div>`;
  return `<div class="card"><h2>Categorieën</h2><p class="mu">Kopieer de kolom met hoofdcategorieën uit je spreadsheet en plak ze in het eerste veld, doe hetzelfde met de subcategorieën in het tweede veld. Eén per regel. Zodra je een spreadsheet koppelt, worden ze daaruit gelezen.</p>
  <label>Hoofdcategorieën<textarea id="ich">${esc(S.cats.h.join('\n'))}</textarea></label><label>Subcategorieën<textarea id="ics">${esc(S.cats.s.join('\n'))}</textarea></label></div>`}
-function gCard(){const c=S.club,on=!!c.gid;
+function gCard(){const c=S.club,on=!!c.gid&&c.gok,ex=c.gmode==='existing',tg="document.getElementById('pk').style.display=this.value==='existing'?'block':'none'";
  return `<div class="card"><h2>Google Sheets</h2><p class="mu" id="gst">${esc(gStatus())}</p>
- <label style="color:var(--tx)"><input type="radio" name="gm" value="new"${c.gmode==='new'?' checked':''}>Nieuwe aparte spreadsheet laten aanmaken</label>
- <label style="color:var(--tx)"><input type="radio" name="gm" value="existing"${c.gmode==='existing'?' checked':''}>Bestaande spreadsheet gebruiken, de app voegt nieuwe tabbladen toe</label>
- <label>Link naar de bestaande spreadsheet<input id="ig" value="${esc(c.gurl)}" placeholder="https://docs.google.com/spreadsheets/…"></label>
+ <label style="color:var(--tx)"><input type="radio" name="gm" value="new"${!ex?' checked':''} onchange="${tg}">Nieuwe aparte spreadsheet laten aanmaken</label>
+ <label style="color:var(--tx)"><input type="radio" name="gm" value="existing"${ex?' checked':''} onchange="${tg}">Bestaande spreadsheet gebruiken, de app voegt nieuwe tabbladen toe</label>
+ <div id="pk" style="display:${ex?'block':'none'}"><p class="mu">${c.gpicked?`Gekozen spreadsheet: <b>${esc(c.gname||c.gid)}</b>`:'Nog geen spreadsheet gekozen.'} De app krijgt enkel toegang tot de spreadsheet die je zelf kiest.</p>
+ <button class="btn ghost" style="margin-bottom:12px" onclick="choose()">Spreadsheet kiezen</button></div>
  <label>Tabblad met je categorieën<input id="ict" value="${esc(c.catTab)}"></label>
  <p class="mu" style="margin-top:-6px">De app maakt de tabbladen Boekingen en Leden aan, en gebruikt je categorietabblad. Bestaat dat nog niet, dan maakt de app het aan met je huidige lijst.</p>
- <details><summary>Geavanceerd</summary><label>Google Client ID<input id="icid" value="${esc(c.cid)}" placeholder="${GOOGLE_CLIENT_ID?'Standaard van de app':'xxxx.apps.googleusercontent.com'}"></label></details>
+ <details><summary>Geavanceerd</summary>
+  <label>Google Client ID<input id="icid" value="${esc(c.cid)}" placeholder="${GOOGLE_CLIENT_ID?'Standaard van de app':'xxxx.apps.googleusercontent.com'}"></label>
+  <label>API-sleutel (voor de keuzelijst)<input id="iak" value="${esc(c.akey)}" placeholder="${GOOGLE_API_KEY?'Standaard van de app':'AIza…'}"></label>
+  <label>Projectnummer<input id="iap" value="${esc(c.appid)}" placeholder="${GOOGLE_APP_ID?'Standaard van de app':'123456789012'}"></label></details>
  <button class="btn" onclick="connect()">${on?'Opslaan en nu synchroniseren':'Verbinden met Google'}</button>
- ${on?`<a class="btn ghost" style="margin-top:8px" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}">Spreadsheet openen</a><button class="btn ghost" style="margin-top:8px" onclick="unlink()">Ontkoppelen</button>`:''}</div>`}
+ ${c.gid?`<a class="btn ghost" style="margin-top:8px" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}">Spreadsheet openen</a><button class="btn ghost" style="margin-top:8px" onclick="unlink()">Ontkoppelen</button>`:''}
+ <p class="mu" style="margin-top:12px">De app vraagt alleen toegang tot spreadsheets die ze zelf aanmaakt of die je zelf kiest. <a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`}
 function vInst(){const c=S.club;
  return `<div class="card"><h2>Club</h2><label>Naam<input id="in" value="${esc(c.name)}"></label><label>Clubkleur<input type="color" id="ic" value="${c.color}"></label>
  <label>Logo<input type="file" accept="image/*" onchange="logo(this)"></label>${c.logo?'<button class="btn ghost" onclick="S.club.logo=\'\';save();render()">Logo verwijderen</button>':''}
