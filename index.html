@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quaestor – ledenbetalingen</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#8b1e3f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Quaestor">
+<style>
+:root{--bg:#eef0f3;--card:#fff;--tx:#16181d;--mu:#646a76;--bd:#d9dde3;--ac:#8b1e3f;--on:#fff;--ok:#1b7a4b;--er:#b3261e;--in:#f6f7f9;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101216;--card:#1a1d23;--tx:#eceef2;--mu:#9aa1ad;--bd:#2d323b;--ok:#5cc896;--er:#f28b82;--in:#12151a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#101216;--card:#1a1d23;--tx:#eceef2;--mu:#9aa1ad;--bd:#2d323b;--ok:#5cc896;--er:#f28b82;--in:#12151a;color-scheme:dark}
+*,*:before,*:after{box-sizing:inherit}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{background:var(--ac);color:var(--on);display:flex;align-items:center;gap:10px;padding:10px 14px}
+header img{height:34px;width:34px;object-fit:contain;border-radius:6px;background:#fff3}
+header .hd{flex:1;min-width:0}
+header h1{font-size:1.05rem;margin:0;font-weight:700}
+header small{opacity:.85}
+header button{background:#0003;color:inherit;border:0;border-radius:8px;padding:7px 12px;font:inherit;font-size:.85rem}
+header button.st{display:block;background:none;padding:0;margin-top:2px;font-size:.75rem;opacity:.9;text-align:left;border-radius:0}
+main{flex:1;overflow-y:auto;padding:12px;max-width:640px;width:100%;margin:0 auto}
+nav{display:flex;background:var(--card);border-top:1px solid var(--bd);overflow-x:auto}
+nav button{flex:1;min-width:64px;background:none;border:0;color:var(--mu);padding:12px 6px;font:inherit;font-size:.85rem;border-top:3px solid transparent}
+nav button.on{color:var(--tx);font-weight:700;border-top-color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+h2{font-size:1.05rem;margin:0 0 10px}h3{margin:0 0 8px}
+label{display:block;font-size:.85rem;color:var(--mu);margin:0 0 12px}
+input,select,textarea{display:block;width:100%;margin-top:4px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--in);color:var(--tx);font:inherit;font-size:1rem}
+textarea{min-height:110px}
+input[type=color]{padding:2px;height:46px}
+input[type=radio]{display:inline-block;width:auto;margin:0 6px 0 0}
+details{margin-bottom:12px}
+summary{color:var(--mu);font-size:.85rem;padding:4px 0}
+:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
+.btn{display:block;width:100%;padding:14px;border:0;border-radius:10px;background:var(--ac);color:var(--on);font:inherit;font-weight:700;font-size:1rem;text-align:center;text-decoration:none}
+.btn.ghost{background:var(--in);color:var(--tx);border:1px solid var(--bd);font-weight:400}
+.seg{display:grid;grid-auto-flow:column;gap:6px;margin-bottom:12px}
+.seg button{padding:12px 4px;border:1px solid var(--bd);background:var(--in);color:var(--tx);border-radius:10px;font:inherit;font-size:.85rem}
+.seg button.on{background:var(--ac);color:var(--on);border-color:var(--ac);font-weight:700}
+.opt{display:flex;justify-content:space-between;width:100%;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);font:inherit;margin-top:6px;text-align:left}
+.opt.new{border-style:dashed;color:var(--ac);font-weight:700}
+.chip{color:var(--ok);font-size:.85rem;margin:-6px 0 10px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)}
+.row:last-child{border:0}
+.row.void{opacity:.5;text-decoration:line-through}
+.mu{color:var(--mu);font-size:.85rem}
+.amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.neg{color:var(--er)}
+.sm{display:block;margin:4px 0 0 auto;padding:6px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--in);color:var(--tx);font:inherit;font-size:.8rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.stat{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.stat b{display:block;font-size:1.25rem;font-variant-numeric:tabular-nums}
+.stat.big{grid-column:span 2;border-color:var(--ac)}
+.auth{max-width:380px;margin:0 auto;padding:40px 16px}
+.err{color:var(--er);font-size:.9rem;margin-bottom:10px}
+#modal{position:fixed;inset:0;background:#0008;display:none;align-items:flex-end;justify-content:center;z-index:5}
+#modal.on{display:flex}
+#modal>div{background:var(--card);width:100%;max-width:640px;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));max-height:85%;overflow-y:auto}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:.9rem;display:none;z-index:6;max-width:90%;text-align:center}
+</style>
+</head>
+<body>
+<div id="app" style="display:contents"></div>
+<div id="modal"><div id="mbox"></div></div>
+<div id="toast"></div>
+<script>
+/* Plak hier het Client ID van je Google-project (zie de handleiding). Je kan het ook in de app invullen bij Meer > Geavanceerd. */
+const GOOGLE_CLIENT_ID='';
+const SCOPE='https://www.googleapis.com/auth/spreadsheets';
+const TAB_B='Boekingen',TAB_L='Leden';
+const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip'];
+
+const K='quaestor-v1';
+const DEF=()=>({club:{name:'',color:'#8b1e3f',logo:'',theme:'auto',pinQ:'',pinH:'',gmode:'new',gurl:''},cats:{h:['Cantus','Weekend','Andere'],s:['Introcantus','Bierbowling','Lidgeld','Schuld']},members:[],tx:[]});
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const eur=n=>new Intl.NumberFormat('nl-BE',{style:'currency',currency:'EUR'}).format(n);
+const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,9);
+const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const M={cash:'Cash',payconiq:'Payconiq',overschrijving:'Overschrijving',schuld:'Schuldenlijst'};
+let S=null,role=null,tab='boek',DAY=today(),LQ='',ASK=null;
+let B={mid:null,name:'',amt:'',desc:'',method:'cash',h:'',s:''};
+try{const r=localStorage.getItem(K);if(r)S=JSON.parse(r)}catch(e){}
+if(!S)S=DEF();
+function norm(){
+ if(Array.isArray(S.cats)){const o=S.cats;S.cats={h:o.map(c=>c.h),s:[...new Set(o.flatMap(c=>c.s))]}}
+ S.club=Object.assign({gid:'',gok:false,gcreated:false,catTab:'Categorieën',cid:'',gmode:'new',gurl:''},S.club);
+ S.sync=Object.assign({last:0,err:'',auth:false},S.sync||{});
+ S.members=S.members||[];S.tx=S.tx||[];delete S.opening}
+norm();
+function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){toast('Opslaan op dit toestel lukt niet')}}
+function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2800)}
+function modal(h){$('#mbox').innerHTML=h;$('#modal').classList.add('on')}
+function closeM(){$('#modal').classList.remove('on')}
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeM()});
+function ask(t,yes,fn){ASK=fn;modal(`<h3>${t}</h3><button class="btn" onclick="askOk()">${yes}</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
+function askOk(){const f=ASK;ASK=null;closeM();if(f)f()}
+function theme(){const c=S.club,r=document.documentElement;r.style.setProperty('--ac',c.color);const n=parseInt(c.color.slice(1),16),l=.299*(n>>16)+.587*(n>>8&255)+.114*(n&255);r.style.setProperty('--on',l>150?'#111':'#fff');c.theme==='auto'?r.removeAttribute('data-theme'):r.setAttribute('data-theme',c.theme)}
+
+/* ================= GOOGLE SHEETS ================= */
+let TOKEN=null,TEXP=0,SYNCING=false,SI=false,ENS='',LASTPULL=0,QT=null;
+try{const q=JSON.parse(sessionStorage.getItem('qg')||'null');if(q&&q.exp>Date.now()){TOKEN=q.t;TEXP=q.exp}}catch(e){}
+const cid=()=>(S.club.cid||GOOGLE_CLIENT_ID||'').trim();
+const haveTok=()=>TOKEN&&Date.now()<TEXP-60000;
+const autoOk=()=>S.club.gok&&S.club.gid;
+const authErr=m=>{const e=new Error(m);e.auth=true;return e};
+function loadGsi(){return new Promise((res,rej)=>{if(window.google&&google.accounts&&google.accounts.oauth2)return res();const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=()=>res();s.onerror=()=>rej(new Error('Google kon niet geladen worden. Controleer je internetverbinding.'));document.head.appendChild(s)})}
+function getToken(){return new Promise((res,rej)=>{
+ if(haveTok())return res(TOKEN);
+ if(!cid())return rej(authErr('Geen Google Client ID ingesteld. Zie de handleiding.'));
+ loadGsi().then(()=>{
+  const tc=google.accounts.oauth2.initTokenClient({client_id:cid(),scope:SCOPE,
+   callback:r=>{if(r.error)return rej(authErr(r.error==='access_denied'?'Toegang geweigerd in Google.':'Google-fout: '+r.error));
+    TOKEN=r.access_token;TEXP=Date.now()+(+r.expires_in||3600)*1000;try{sessionStorage.setItem('qg',JSON.stringify({t:TOKEN,exp:TEXP}))}catch(e){}
+    if(!S.club.gok){S.club.gok=true;save()}res(TOKEN)},
+   error_callback:()=>rej(authErr('Aanmelden bij Google is niet gelukt of werd geannuleerd.'))});
+  tc.requestAccessToken({prompt:S.club.gok?'':'consent'})}).catch(rej)})}
+async function api(path,opt){opt=opt||{};
+ if(!haveTok()){if(!SI)throw authErr('Opnieuw verbinden nodig.');await getToken()}
+ const r=await fetch('https://sheets.googleapis.com/v4/spreadsheets'+path,{...opt,headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'}});
+ if(r.status===401){TOKEN=null;try{sessionStorage.removeItem('qg')}catch(e){}throw authErr('Sessie verlopen. Tik op de status bovenaan om opnieuw te verbinden.')}
+ if(!r.ok){let m='';try{m=(await r.json()).error.message}catch(e){}throw new Error(m||('Google-fout '+r.status))}
+ return r.json()}
+const parseId=u=>{const m=String(u||'').match(/\/d\/([a-zA-Z0-9_-]+)/)||String(u||'').trim().match(/^([a-zA-Z0-9_-]{25,})$/);return m?m[1]:''};
+const rng=(tab,a)=>`'${tab.replace(/'/g,"''")}'!${a}`;
+const enc=encodeURIComponent;
+const cell=v=>typeof v==='string'&&/^[=+\-@]/.test(v)?"'"+v:v;
+const typ=t=>t.storno?'Storno':t.ref?'Afbetaling':'Boeking';
+const rowOf=t=>[ "'"+t.id,t.date,cell(t.name||''),cell(t.desc||''),cell(t.h||''),cell(t.s||''),M[t.method],t.v,typ(t),t.ref?"'"+t.ref:'',t.by==='q'?'Quaestor':'Helper',new Date(t.ts).toISOString()];
+async function append(tab,cols,rows){for(let i=0;i<rows.length;i+=200)await api(`/${S.club.gid}/values/${enc(rng(tab,cols))}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,{method:'POST',body:JSON.stringify({values:rows.slice(i,i+200)})})}
+async function head(tab,hd){const d=await api(`/${S.club.gid}/values/${enc(rng(tab,'A1:Z1'))}`);const v=(d.values||[])[0];
+ if(!v||!v.some(x=>String(x||'').trim())){await api(`/${S.club.gid}/values/${enc(rng(tab,'A1'))}?valueInputOption=RAW`,{method:'PUT',body:JSON.stringify({values:[hd]})});return}
+ if(String(v[0]).trim()!==hd[0])throw new Error(`Het tabblad ‘${tab}’ bestaat al en hoort niet bij de app. Geef het een andere naam of verwijder het.`)}
+async function putCats(){const c=S.cats,n=Math.max(c.h.length,c.s.length),v=[['Hoofdcategorie','Subcategorie']];for(let i=0;i<n;i++)v.push([c.h[i]||'',c.s[i]||'']);
+ await api(`/${S.club.gid}/values/${enc(rng(S.club.catTab,'A1'))}?valueInputOption=RAW`,{method:'PUT',body:JSON.stringify({values:v})})}
+async function ensureSheet(){const c=S.club;let created=[];
+ if([TAB_B,TAB_L].includes(c.catTab))throw new Error('Het tabblad voor categorieën mag niet Boekingen of Leden heten.');
+ if(c.gmode==='new'&&!c.gcreated){
+  const r=await api('',{method:'POST',body:JSON.stringify({properties:{title:(c.name||'Club')+' – betalingen'},sheets:[TAB_B,TAB_L,c.catTab].map(t=>({properties:{title:t}}))})});
+  c.gid=r.spreadsheetId;c.gcreated=true;S.tx.forEach(t=>t.synced=false);save();created=[c.catTab]}
+ else{
+  const m=await api(`/${c.gid}?fields=sheets.properties.title`),titles=(m.sheets||[]).map(s=>s.properties.title);
+  const need=[TAB_B,TAB_L,c.catTab].filter((t,i,a)=>!titles.includes(t)&&a.indexOf(t)===i);
+  if(need.length)await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:need.map(t=>({addSheet:{properties:{title:t}}}))})});
+  created=need.filter(t=>t===c.catTab)}
+ await head(TAB_B,HEAD_B);await head(TAB_L,['Naam','Status'])}
+async function pullCats(){const d=await api(`/${S.club.gid}/values/${enc(rng(S.club.catTab,'A:B'))}`);
+ let rows=(d.values||[]).filter(r=>r.some(x=>String(x||'').trim()));
+ if(!rows.length){await putCats();return false}
+ if(/^hoofd/i.test(String(rows[0][0]||'').trim()))rows=rows.slice(1);
+ const h=[...new Set(rows.map(r=>String(r[0]||'').trim()).filter(Boolean))],s=[...new Set(rows.map(r=>String(r[1]||'').trim()).filter(Boolean))];
+ if(!h.length)return false;
+ const ch=JSON.stringify(S.cats)!==JSON.stringify({h,s});S.cats={h,s};return ch}
+async function syncMembers(){const d=await api(`/${S.club.gid}/values/${enc(rng(TAB_L,'A2:B'))}`),have=new Set(S.members.map(m=>m.name.toLowerCase())),inSheet=new Set();let add=0;
+ (d.values||[]).forEach(r=>{const n=String(r[0]||'').trim();if(!n)return;inSheet.add(n.toLowerCase());if(!have.has(n.toLowerCase())){const st=String(r[1]||'').trim();S.members.push({id:uid(),name:n,status:['lid','niet-lid','oud-lid'].includes(st)?st:'lid'});have.add(n.toLowerCase());add++}});
+ const out=S.members.filter(m=>!inSheet.has(m.name.toLowerCase()));
+ if(out.length)await append(TAB_L,'A:B',out.map(m=>[cell(m.name),m.status]));
+ return add>0}
+async function pushTx(){const p=S.tx.filter(t=>!t.synced);if(!p.length)return;
+ const d=await api(`/${S.club.gid}/values/${enc(rng(TAB_B,'A2:A'))}`),ex=new Set((d.values||[]).map(r=>String(r[0]||'').trim().replace(/^'/,'')));
+ const nw=p.filter(t=>!ex.has(t.id)).sort((a,b)=>a.ts-b.ts);
+ if(nw.length)await append(TAB_B,'A:L',nw.map(rowOf));
+ p.forEach(t=>t.synced=true);save()}
+async function sync(manual,force){
+ if(SYNCING)return;const c=S.club;if(!force&&!autoOk())return;
+ if(!navigator.onLine){refreshSt();if(manual)toast('Geen internet. De boekingen worden later geüpload.');return}
+ SYNCING=true;SI=!!manual;refreshSt();let changed=false;
+ try{
+  const key=c.gmode+'|'+c.gid+'|'+c.catTab;
+  if(ENS!==key){await ensureSheet();ENS=c.gmode+'|'+c.gid+'|'+c.catTab;LASTPULL=0}
+  if(manual||Date.now()-LASTPULL>120000){changed=await pullCats()||changed;changed=await syncMembers()||changed;LASTPULL=Date.now()}
+  await pushTx();
+  S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;save();
+  if(manual)toast('Gesynchroniseerd')}
+ catch(e){S.sync.err=e.message||'Onbekende fout';S.sync.auth=!!e.auth;if(!e.auth)ENS='';save();if(manual)toast(S.sync.err)}
+ finally{SYNCING=false;SI=false}
+ if(changed&&tab!=='boek'&&role)render();else refreshSt()}
+function queueSync(){clearTimeout(QT);QT=setTimeout(()=>sync(false),1500)}
+function statusTap(){sync(true)}
+function stText(){const c=S.club;if(!autoOk())return '';const un=S.tx.filter(t=>!t.synced).length,u=un?` · ${un} te uploaden`:'';
+ if(SYNCING)return 'Synchroniseren…';
+ if(S.sync.auth)return 'Tik om opnieuw te verbinden'+u;
+ if(S.sync.err)return 'Sync mislukt, tik om opnieuw te proberen'+u;
+ if(!navigator.onLine)return 'Offline'+u;
+ return un?un+' te uploaden':'✓ Gesynchroniseerd'}
+function gStatus(){const c=S.club;if(!c.gid)return 'Nog niet verbonden.';const un=S.tx.filter(t=>!t.synced).length;
+ return `Verbonden. ${un} boeking(en) te uploaden. Laatste synchronisatie: ${S.sync.last?new Date(S.sync.last).toLocaleString('nl-BE'):'nog niet'}.`+(S.sync.err?' Fout: '+S.sync.err:'')}
+function refreshSt(){const e=$('#st');if(e){const t=stText();e.textContent=t;e.style.display=t?'block':'none'}const g=$('#gst');if(g)g.textContent=gStatus()}
+function readG(){const c=S.club,gm=document.querySelector('input[name=gm]:checked');
+ if(gm)c.gmode=gm.value;if($('#ig'))c.gurl=$('#ig').value.trim();if($('#ict'))c.catTab=$('#ict').value.trim()||'Categorieën';if($('#icid'))c.cid=$('#icid').value.trim();
+ if(c.gmode==='existing'){const id=parseId(c.gurl);if(id&&id!==c.gid){c.gid=id;c.gcreated=false;S.tx.forEach(t=>t.synced=false)}}
+ ENS='';save()}
+async function connect(){readG();const c=S.club;
+ if(!cid())return toast('Geen Google Client ID ingesteld. Zie de handleiding.');
+ if(c.gmode==='existing'&&!parseId(c.gurl))return toast('Plak de link van je spreadsheet.');
+ await sync(true,true);if(tab==='inst')render()}
+function unlink(){ask('Spreadsheet ontkoppelen? Je boekingen blijven op dit toestel bewaard.','Ontkoppelen',()=>{Object.assign(S.club,{gid:'',gok:false,gcreated:false});S.sync={last:0,err:'',auth:false};ENS='';TOKEN=null;try{sessionStorage.removeItem('qg')}catch(e){}save();render()})}
+window.addEventListener('online',()=>{refreshSt();queueSync()});
+window.addEventListener('offline',refreshSt);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)queueSync()});
+setInterval(()=>{if(!document.hidden)sync(false)},120000);
+
+/* ================= START EN INLOGGEN ================= */
+function start(){theme();if(!S.club.pinQ)return setup();if(!role)return login();render()}
+function setup(){$('#app').innerHTML=`<div class="auth"><h2>Welkom bij je betalingsapp</h2><p class="mu">Stel je club in. Alles kan je later aanpassen.</p>
+<label>Naam van de club<input id="sn" autocomplete="off"></label>
+<label>Pincode voor de Quaestor (minstens 4 cijfers)<input id="sq" type="password" inputmode="numeric"></label>
+<label>Pincode voor helpers aan de deur (een andere dan die van de Quaestor)<input id="sh" type="password" inputmode="numeric"></label>
+<div class="err" id="se"></div><button class="btn" onclick="doSetup()">Starten</button></div>`}
+function doSetup(){const n=$('#sn').value.trim(),q=$('#sq').value.trim(),h=$('#sh').value.trim();
+ const e=!n?'Vul de naam van de club in.':q.length<4||h.length<4?'Elke pincode heeft minstens 4 cijfers.':q===h?'De twee pincodes moeten verschillen.':'';
+ if(e){$('#se').textContent=e;return}
+ Object.assign(S.club,{name:n,pinQ:q,pinH:h});save();role='q';render()}
+function login(){$('#app').innerHTML=`<div class="auth"><h2>${esc(S.club.name)}</h2><label>Pincode<input id="lp" type="password" inputmode="numeric" autofocus onkeydown="if(event.key==='Enter')doLogin()"></label><div class="err" id="le"></div><button class="btn" onclick="doLogin()">Openen</button></div>`}
+function doLogin(){const p=$('#lp').value.trim();if(p===S.club.pinQ)role='q';else if(p===S.club.pinH)role='h';else{$('#le').textContent='Deze pincode klopt niet.';return}tab='boek';render();queueSync()}
+function logout(){role=null;login()}
+
+/* ================= OPBOUW ================= */
+function render(){const Q=role==='q';
+ if(!Q&&['dag','schuld','leden','inst'].includes(tab))tab='boek';
+ const tabs=Q?[['boek','Boeken'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['inst','Meer']]:[['boek','Boeken'],['vandaag','Vandaag']];
+ const v={boek:vBoek,vandaag:vVandaag,dag:vDag,schuld:vSchuld,leden:vLeden,inst:vInst}[tab]();
+ $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1>${esc(S.club.name)} <small>${Q?'Quaestor':'Helper'}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div><button onclick="logout()">Vergrendel</button></header>
+ <main>${v}</main><nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</nav>`;
+ if(tab==='boek')sug();if(tab==='leden')ml();refreshSt()}
+const row=(t,st)=>`<div class="row${t.void?' void':''}"><div><b>${esc(t.name||'Zonder naam')}</b><div class="mu">${esc(t.h)}${t.s?' · '+esc(t.s):''} · ${M[t.method]}${t.desc?' · '+esc(t.desc):''}${t.storno?' · storno':''}</div></div><div class="amt ${t.v<0?'neg':''}">${eur(t.v)}${st&&!t.void&&!t.storno?`<button class="sm" onclick="storno('${t.id}')">Storno</button>`:''}</div></div>`;
+const empty=t=>`<p class="mu">${t}</p>`;
+const opts=(l,sel,blank)=>(blank?'<option value="">(geen)</option>':'')+l.map(x=>`<option${x===sel?' selected':''}>${esc(x)}</option>`).join('');
+
+/* ---------- boeken ---------- */
+function vBoek(){const c=S.cats;
+ if(!c.h.includes(B.h))B.h=c.h[0]||'';
+ if(B.s&&!c.s.includes(B.s))B.s='';
+ const last=S.tx.filter(t=>t.date===today()).slice(-5).reverse();
+ return `<div class="card">
+ <label>Lid<input id="q" autocomplete="off" placeholder="Typ een naam…" value="${esc(B.name)}" oninput="onQ(this.value)"></label><div id="sug"></div>
+ <label>Bedrag in euro<input type="number" inputmode="decimal" step="0.01" min="0" value="${esc(B.amt)}" oninput="B.amt=this.value"></label>
+ <div class="seg" style="grid-auto-flow:row;grid-template-columns:1fr 1fr">${Object.keys(M).map(m=>`<button class="${B.method===m?'on':''}" onclick="B.method='${m}';render()">${M[m]}</button>`).join('')}</div>
+ <label>Hoofdcategorie<select onchange="B.h=this.value">${opts(c.h,B.h)}</select></label>
+ <label>Subcategorie<select onchange="B.s=this.value">${opts(c.s,B.s,true)}</select></label>
+ <label>Opmerking (niet verplicht)<input value="${esc(B.desc)}" oninput="B.desc=this.value"></label>
+ <button class="btn" onclick="book()">Boeking registreren</button></div>
+ <div class="card"><h2>Laatst geboekt</h2>${last.length?last.map(t=>row(t,false)).join(''):empty('Nog niets geboekt vandaag.')}</div>`}
+function onQ(v){B.name=v;B.mid=null;sug()}
+function sug(){const e=$('#sug');if(!e)return;const t=B.name.trim().toLowerCase();let h='';
+ if(B.mid)h='<div class="chip">✓ Lid geselecteerd</div>';
+ else if(t){h=S.members.filter(m=>m.name.toLowerCase().includes(t)).slice(0,6).map(m=>`<button class="opt" onclick="pick('${m.id}')"><span>${esc(m.name)}</span><span class="mu">${esc(m.status)}</span></button>`).join('');
+  if(!S.members.some(m=>m.name.toLowerCase()===t))h+=`<button class="opt new" onclick="newM()">+ Nieuw lid toevoegen: ${esc(B.name.trim())}</button>`}
+ e.innerHTML=h}
+function pick(id){const m=S.members.find(x=>x.id===id);B.mid=id;B.name=m.name;render()}
+function newM(){const m={id:uid(),name:B.name.trim(),status:'lid'};S.members.push(m);save();B.mid=m.id;queueSync();render()}
+function book(){const a=parseFloat(String(B.amt).replace(',','.'));
+ if(!(a>0))return toast('Vul een bedrag in');
+ if(!B.mid)return toast('Kies een lid of voeg een nieuw lid toe');
+ if(S.tx.some(t=>t.mid===B.mid&&t.date===today()&&t.h===B.h&&t.s===B.s&&t.v>0&&!t.void&&!t.storno&&!t.ref))
+  return ask('Dit lid is vandaag al geboekt voor deze categorie. Toch nog eens boeken?','Toch boeken',()=>commit(a));
+ commit(a)}
+function commit(a){const m=S.members.find(x=>x.id===B.mid);
+ S.tx.push({id:uid(),ts:Date.now(),date:today(),mid:B.mid,name:m?m.name:B.name.trim(),v:a,method:B.method,h:B.h,s:B.s,desc:B.desc.trim(),by:role,void:false,synced:false});
+ save();Object.assign(B,{mid:null,name:'',amt:'',desc:''});toast('Geboekt');render();queueSync()}
+function storno(id){const t=S.tx.find(x=>x.id===id);if(!t)return;
+ if(t.method==='schuld'&&t.paidBy)return toast('Storneer eerst de afbetaling van deze schuld');
+ ask('Deze boeking storneren? Er komt een tegenboeking, er wordt niets gewist.','Storneren',()=>doStorno(id))}
+function doStorno(id){const t=S.tx.find(x=>x.id===id);if(!t||t.void)return;
+ t.void=true;S.tx.push({...t,id:uid(),ts:Date.now(),date:today(),v:-t.v,storno:true,void:false,ref:t.id,by:role,synced:false});
+ if(t.ref){const d=S.tx.find(x=>x.id===t.ref);if(d&&d.paidBy===t.id){delete d.paidBy;delete d.paidDate}}
+ save();toast('Gestorneerd');render();queueSync()}
+function vVandaag(){const l=S.tx.filter(t=>t.date===today()&&!t.storno).reverse();return `<div class="card"><h2>Vandaag: ${l.filter(t=>!t.void).length} boekingen</h2>${l.length?l.map(t=>row(t,false)).join(''):empty('Nog niets geboekt vandaag.')}</div>`}
+
+/* ---------- dag ---------- */
+function vDag(){const l=S.tx.filter(t=>t.date===DAY),sum=m=>l.filter(t=>t.method===m).reduce((a,t)=>a+t.v,0);
+ const tot=sum('cash')+sum('payconiq')+sum('overschrijving');
+ const done=new Set(l.filter(t=>!t.void&&!t.storno&&t.v>0).map(t=>t.mid));
+ const todo=S.members.filter(m=>!done.has(m.id)).sort((a,b)=>a.name.localeCompare(b.name));
+ return `<div class="card"><label>Dag<input type="date" value="${DAY}" onchange="DAY=this.value||today();render()"></label>
+ <div class="grid"><div class="stat">Cash<b>${eur(sum('cash'))}</b></div><div class="stat">Payconiq<b>${eur(sum('payconiq'))}</b></div><div class="stat">Overschrijving<b>${eur(sum('overschrijving'))}</b></div><div class="stat">Op schuldenlijst<b>${eur(sum('schuld'))}</b></div><div class="stat big">Totaal ontvangen<b>${eur(tot)}</b><span class="mu">Tel de kassa na en vergelijk met het bedrag bij Cash.</span></div></div></div>
+ <div class="card"><h2>Boekingen van deze dag</h2>${l.length?l.slice().reverse().map(t=>row(t,true)).join(''):empty('Geen boekingen op deze dag.')}</div>
+ <div class="card"><h2>Nog niet geboekt op deze dag (${todo.length})</h2>${todo.length?todo.slice(0,40).map(m=>`<div class="row"><div>${esc(m.name)} <span class="mu">${esc(m.status)}</span></div><button class="sm" onclick="goBook('${m.id}')">Boeken</button></div>`).join('')+(todo.length>40?empty('… en '+(todo.length-40)+' anderen'):''):empty('Iedereen uit de ledenlijst is geboekt.')}</div>`}
+function goBook(id){tab='boek';pick(id)}
+
+/* ---------- schulden ---------- */
+const open=()=>S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno&&!t.paidBy);
+function vSchuld(){const o=open(),by={};o.forEach(t=>{(by[t.name]=by[t.name]||[]).push(t)});const tot=o.reduce((a,t)=>a+t.v,0);
+ return `<div class="grid"><div class="stat big">Totaal openstaand<b>${eur(tot)}</b></div></div>`+(Object.keys(by).length?Object.keys(by).sort().map(n=>`<div class="card"><h2>${esc(n)} · ${eur(by[n].reduce((a,t)=>a+t.v,0))}</h2>${by[n].map(t=>`<div class="row"><div>${t.date} · ${esc(t.h)}${t.s?' · '+esc(t.s):''}${t.desc?`<div class="mu">${esc(t.desc)}</div>`:''}</div><div class="amt">${eur(t.v)}<button class="sm" onclick="pay('${t.id}')">Betaald</button></div></div>`).join('')}</div>`).join(''):`<div class="card">${empty('Geen openstaande schulden.')}</div>`)}
+function pay(id){const d=S.tx.find(x=>x.id===id);modal(`<h3>Schuld afbetalen</h3><p>${esc(d.name)} · ${eur(d.v)}</p><label>Betaalwijze<select id="pm"><option value="cash">Cash</option><option value="payconiq">Payconiq</option><option value="overschrijving">Overschrijving</option></select></label><label>Datum<input type="date" id="pd" value="${today()}"></label><button class="btn" onclick="payOk('${id}')">Markeer als betaald</button>`)}
+function payOk(id){const d=S.tx.find(x=>x.id===id),n={id:uid(),ts:Date.now(),date:$('#pd').value||today(),mid:d.mid,name:d.name,v:d.v,method:$('#pm').value,h:d.h,s:d.s,desc:'Afbetaling schuld',by:role,ref:d.id,void:false,synced:false};
+ S.tx.push(n);d.paidBy=n.id;d.paidDate=n.date;save();closeM();toast('Schuld afbetaald');render();queueSync()}
+
+/* ---------- leden ---------- */
+function vLeden(){return `<div class="card"><h2>Lid toevoegen</h2><label>Naam<input id="mn" autocomplete="off"></label><label>Status<select id="ms"><option>lid</option><option>niet-lid</option><option>oud-lid</option></select></label><button class="btn" onclick="addM()">Toevoegen</button>
+ <button class="btn ghost" style="margin-top:8px" onclick="impM()">Lijst plakken uit spreadsheet</button></div>
+ <div class="card"><h2>${S.members.length} leden</h2><label>Zoeken<input oninput="LQ=this.value;ml()"></label><div id="ml"></div></div>`}
+function ml(){const e=$('#ml');if(!e)return;const q=LQ.toLowerCase(),o=open(),l=S.members.filter(m=>m.name.toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name));
+ e.innerHTML=l.length?l.map(m=>{const d=o.filter(t=>t.mid===m.id).reduce((a,t)=>a+t.v,0);return `<div class="row"><div>${esc(m.name)} <span class="mu">${esc(m.status)}</span>${d?`<div class="neg">Schuld ${eur(d)}</div>`:''}</div><button class="sm" onclick="delM('${m.id}')">Verwijder</button></div>`}).join(''):empty('Geen leden gevonden.')}
+function addM(){const n=$('#mn').value.trim();if(!n)return toast('Vul een naam in');S.members.push({id:uid(),name:n,status:$('#ms').value});save();render();queueSync()}
+function delM(id){ask('Dit lid verwijderen uit de lijst? Bestaande boekingen blijven staan.'+(S.club.gid?' Verwijder het lid ook in het tabblad Leden van je spreadsheet, anders komt het terug.':''),'Verwijderen',()=>{S.members=S.members.filter(m=>m.id!==id);save();render()})}
+function impM(){modal(`<h3>Ledenlijst plakken</h3><p class="mu">Eén lid per regel: naam, of naam en status (lid, niet-lid of oud-lid) gescheiden door een tab of puntkomma. Je kan dus kolommen uit je spreadsheet kopiëren.</p><textarea id="it"></textarea><button class="btn" style="margin-top:10px" onclick="impOk()">Importeren</button>`)}
+function impOk(){let n=0;$('#it').value.split(/\r?\n/).forEach(l=>{const p=l.split(/[;\t]/).map(x=>x.trim());if(!p[0]||/^naam$/i.test(p[0]))return;if(S.members.some(m=>m.name.toLowerCase()===p[0].toLowerCase()))return;S.members.push({id:uid(),name:p[0],status:['lid','niet-lid','oud-lid'].includes(p[1])?p[1]:'lid'});n++});save();closeM();toast(n+' leden toegevoegd');render();queueSync()}
+
+/* ---------- instellingen ---------- */
+function catCard(){const c=S.club;
+ if(c.gid)return `<div class="card"><h2>Categorieën</h2><p class="mu">De categorieën worden gelezen uit het tabblad ‘${esc(c.catTab)}’ van je spreadsheet (kolom A hoofdcategorieën, kolom B subcategorieën). Pas ze daar aan en tik daarna op Opslaan en nu synchroniseren, of tik bovenaan op de status. Nu: ${S.cats.h.length} hoofd- en ${S.cats.s.length} subcategorieën.</p></div>`;
+ return `<div class="card"><h2>Categorieën</h2><p class="mu">Kopieer de kolom met hoofdcategorieën uit je spreadsheet en plak ze in het eerste veld, doe hetzelfde met de subcategorieën in het tweede veld. Eén per regel. Zodra je een spreadsheet koppelt, worden ze daaruit gelezen.</p>
+ <label>Hoofdcategorieën<textarea id="ich">${esc(S.cats.h.join('\n'))}</textarea></label><label>Subcategorieën<textarea id="ics">${esc(S.cats.s.join('\n'))}</textarea></label></div>`}
+function gCard(){const c=S.club,on=!!c.gid;
+ return `<div class="card"><h2>Google Sheets</h2><p class="mu" id="gst">${esc(gStatus())}</p>
+ <label style="color:var(--tx)"><input type="radio" name="gm" value="new"${c.gmode==='new'?' checked':''}>Nieuwe aparte spreadsheet laten aanmaken</label>
+ <label style="color:var(--tx)"><input type="radio" name="gm" value="existing"${c.gmode==='existing'?' checked':''}>Bestaande spreadsheet gebruiken, de app voegt nieuwe tabbladen toe</label>
+ <label>Link naar de bestaande spreadsheet<input id="ig" value="${esc(c.gurl)}" placeholder="https://docs.google.com/spreadsheets/…"></label>
+ <label>Tabblad met je categorieën<input id="ict" value="${esc(c.catTab)}"></label>
+ <p class="mu" style="margin-top:-6px">De app maakt de tabbladen Boekingen en Leden aan, en gebruikt je categorietabblad. Bestaat dat nog niet, dan maakt de app het aan met je huidige lijst.</p>
+ <details><summary>Geavanceerd</summary><label>Google Client ID<input id="icid" value="${esc(c.cid)}" placeholder="${GOOGLE_CLIENT_ID?'Standaard van de app':'xxxx.apps.googleusercontent.com'}"></label></details>
+ <button class="btn" onclick="connect()">${on?'Opslaan en nu synchroniseren':'Verbinden met Google'}</button>
+ ${on?`<a class="btn ghost" style="margin-top:8px" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}">Spreadsheet openen</a><button class="btn ghost" style="margin-top:8px" onclick="unlink()">Ontkoppelen</button>`:''}</div>`}
+function vInst(){const c=S.club;
+ return `<div class="card"><h2>Club</h2><label>Naam<input id="in" value="${esc(c.name)}"></label><label>Clubkleur<input type="color" id="ic" value="${c.color}"></label>
+ <label>Logo<input type="file" accept="image/*" onchange="logo(this)"></label>${c.logo?'<button class="btn ghost" onclick="S.club.logo=\'\';save();render()">Logo verwijderen</button>':''}
+ <label style="margin-top:12px">Weergave<select id="it2"><option value="auto"${c.theme==='auto'?' selected':''}>Volgt je toestel</option><option value="light"${c.theme==='light'?' selected':''}>Licht</option><option value="dark"${c.theme==='dark'?' selected':''}>Donker</option></select></label></div>
+ <div class="card"><h2>Pincodes</h2><label>Pincode Quaestor<input id="iq" type="password" inputmode="numeric" value="${esc(c.pinQ)}"></label><label>Pincode Helper<input id="ih" type="password" inputmode="numeric" value="${esc(c.pinH)}"></label></div>
+ ${catCard()}${gCard()}
+ <button class="btn" onclick="saveSet()">Instellingen opslaan</button>
+ <div class="card" style="margin-top:12px"><h2>Back-up</h2><button class="btn ghost" onclick="showT('Boekingen als csv',csv())">Boekingen kopiëren (csv)</button><button class="btn ghost" style="margin-top:8px" onclick="showT('Volledige back-up',JSON.stringify(S))">Volledige back-up kopiëren</button><button class="btn ghost" style="margin-top:8px" onclick="restore()">Back-up terugzetten</button></div>`}
+function saveSet(){const q=$('#iq').value.trim(),h=$('#ih').value.trim();if(q.length<4||h.length<4||q===h)return toast('Pincodes: minstens 4 cijfers en niet gelijk');
+ if($('#ich')){const list=id=>[...new Set($(id).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean))];
+  const ch=list('#ich'),cs=list('#ics');if(!ch.length)return toast('Voeg minstens één hoofdcategorie toe');S.cats={h:ch,s:cs}}
+ Object.assign(S.club,{name:$('#in').value.trim()||S.club.name,color:$('#ic').value,theme:$('#it2').value,pinQ:q,pinH:h});
+ readG();theme();toast('Opgeslagen');render()}
+function logo(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,160/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);S.club.logo=c.toDataURL('image/png');save();render()};im.src=r.result};r.readAsDataURL(f)}
+function csv(){const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';return ['id;datum;lid;omschrijving;hoofdcategorie;subcategorie;betaalwijze;bedrag;status'].concat(S.tx.map(t=>[t.id,t.date,t.name,t.desc,t.h,t.s,M[t.method],String(t.v).replace('.',','),t.storno?'storno':t.void?'gestorneerd':'ok'].map(q).join(';'))).join('\n')}
+function showT(t,x){modal(`<h3>${t}</h3><textarea id="tx" readonly>${esc(x)}</textarea><button class="btn" style="margin-top:10px" onclick="cp()">Kopiëren</button>`)}
+function cp(){const e=$('#tx');e.select();try{navigator.clipboard.writeText(e.value).then(()=>toast('Gekopieerd'),()=>document.execCommand('copy'))}catch(x){try{document.execCommand('copy');toast('Gekopieerd')}catch(y){toast('Selecteer de tekst en kopieer ze zelf')}}}
+function restore(){modal(`<h3>Back-up terugzetten</h3><p class="mu">Plak hier de volledige back-up. Alles op dit toestel wordt vervangen.</p><textarea id="rt"></textarea><button class="btn" style="margin-top:10px" onclick="restoreOk()">Terugzetten</button>`)}
+function restoreOk(){try{const d=JSON.parse($('#rt').value);if(!d.club||!Array.isArray(d.tx)||!d.cats)throw 0;S=d;norm();ENS='';save();theme();closeM();render();toast('Back-up teruggezet')}catch(e){toast('Dit is geen geldige back-up')}}
+
+start();
+if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+</script>
+</body>
+</html>
