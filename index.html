@@ -70,7 +70,7 @@ summary{color:var(--mu);font-size:.85rem;padding:4px 0}
 .banner{border-color:var(--ac)}
 #toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:.9rem;display:none;z-index:6;max-width:90%;text-align:center}
 .auth::after{content:var(--ver);display:block;text-align:center;margin-top:18px;font-size:12px;opacity:.6}
-.acc{padding:12px 0;border-bottom:1px solid var(--bd)}.acc:last-child{border:0}
+.acc{padding:12px 0;border-bottom:1px solid var(--bd)}.accd{margin:8px 0 0 0;padding:8px 0 4px 12px;border-left:3px solid var(--bd)}.acc:last-child{border:0}
 .tag{display:inline-block;font-size:.72rem;padding:2px 7px;border-radius:99px;background:var(--in);border:1px solid var(--bd);margin:2px 2px 0 0;font-weight:400}
 .tag.warn{border-color:var(--er);color:var(--er)}
 .accb{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.accb .btn{width:auto;padding:7px 11px;font-size:.85rem}
@@ -659,23 +659,23 @@ function vAcc(){const c=S.club,A=c.acc||{},st=o=>(A[o.id]||{}).s||'';
  let h=`<button class="btn ghost" style="margin-bottom:12px" onclick="tab='inst';render()">← Terug naar Meer</button>`;
  if(ACCE)return h+`<div class="card"><p class="err">${esc(ACCE)}</p><button class="btn" onclick="accOpen()">Opnieuw proberen</button></div>`;
  if(!ACCL)return h+`<div class="card"><p class="mu">Accounts laden…</p></div>`;
- const on=ACCL.filter(o=>st(o)!=='uit'),cnt={};on.forEach(o=>{const k=sk(o.n);if(k)cnt[k]=(cnt[k]||0)+1});
- const isQ=o=>o.r==='q'&&st(o)!=='h',srt=l=>l.sort((a,b)=>String(a.n||'').localeCompare(String(b.n||''))||(+b.l||0)-(+a.l||0));
- const item=o=>{const me=o.id===c.dev,s=st(o),tg=[];
+ const on=ACCL.filter(o=>st(o)!=='uit'),isQ=o=>o.r==='q'&&st(o)!=='h';
+ const dev=o=>{const me=o.id===c.dev,s=st(o),tg=[];
   if(me)tg.push('<span class="tag">Dit toestel</span>');
-  if(s!=='uit'&&cnt[sk(o.n)]>1)tg.push('<span class="tag warn">Zelfde naam als een ander account</span>');
-  if(!o.n)tg.push('<span class="tag warn">Geen naam</span>');
   if(s==='h')tg.push('<span class="tag">Quaestorrechten afgenomen</span>');
-  if(Date.now()-(+o.l||0)>60*864e5)tg.push('<span class="tag">Meer dan 2 maanden niet gebruikt</span>');
+  if(Date.now()-(+o.l||0)>60*864e5)tg.push('<span class="tag warn">Meer dan 2 maanden niet gebruikt</span>');
   if((+o.v||0)<+APP_VERSION)tg.push(`<span class="tag">Oude versie ${esc(o.v||'?')}</span>`);
   const b=[];if(!me){if(s==='uit')b.push(['accSet','','Toegang teruggeven']);else{if(s==='h')b.push(['accSet','','Quaestorrechten teruggeven']);else if(o.r==='q')b.push(['accSet','h','Alleen helper maken']);b.push(['accSet','uit','Toegang intrekken'])}b.push(['accRm','','Verwijderen'])}
-  return `<div class="acc"><b>${esc(o.n||'(geen naam)')}</b><div>${tg.join('')}</div><div class="mu">${esc(o.d||'Onbekend toestel')} · laatst actief ${dt(o.l)} · sinds ${dt(o.f)}</div>${b.length?`<div class="accb">${b.map(x=>`<button class="btn ghost" onclick="${x[0]}('${esc(o.id)}','${x[1]}')">${x[2]}</button>`).join('')}</div>`:''}</div>`};
- const sec=(t,l,e)=>`<div class="card"><h2>${t} (${l.length})</h2>${l.length?srt(l).map(item).join(''):`<p class="mu">${e}</p>`}</div>`;
- const dup=Object.values(cnt).some(n=>n>1);
- return h+(dup?`<div class="card banner"><p>Sommige namen komen meer dan eens voor. Dat kan dezelfde persoon op twee toestellen zijn, of een oud toestel. Verwijder wat niet meer gebruikt wordt.</p></div>`:'')
+  return `<div class="accd"><div>${esc(o.d||'Onbekend toestel')} ${tg.join('')}</div><div class="mu">Laatst actief ${dt(o.l)} · sinds ${dt(o.f)}</div>${b.length?`<div class="accb">${b.map(x=>`<button class="btn ghost" onclick="${x[0]}('${esc(o.id)}','${x[1]}')">${x[2]}</button>`).join('')}</div>`:''}</div>`};
+ const sec=(t,l,e)=>{const g=new Map();l.forEach(o=>{const k=sk(o.n)||('#'+o.id);if(!g.has(k))g.set(k,[]);g.get(k).push(o)});
+  const ps=[...g.values()].sort((a,b)=>String(a[0].n||'').localeCompare(String(b[0].n||'')));
+  return `<div class="card"><h2>${t} (${ps.length})</h2>${ps.length?ps.map(d=>{d.sort((a,b)=>(+b.l||0)-(+a.l||0));
+   return `<div class="acc"><b>${esc(d[0].n||'(geen naam)')}</b>${d.length>1?` <span class="tag">${d.length} toestellen</span>`:''}${d.map(dev).join('')}</div>`}).join(''):`<p class="mu">${e}</p>`}</div>`};
+ const multi=[...new Set(on.map(o=>sk(o.n)).filter(Boolean))].some(k=>on.filter(o=>sk(o.n)===k).length>1);
+ return h+(multi?`<div class="card"><p class="mu">Toestellen met dezelfde naam staan samen. Iemand op twee toestellen (bijvoorbeeld gsm en laptop) is in orde. Verwijder enkel een toestel dat niet meer gebruikt wordt, of waarvan je de persoon niet herkent.</p></div>`:'')
   +sec('Quaestors',on.filter(isQ),'Geen.')+sec('Helpers',on.filter(o=>!isQ(o)),'Nog geen helpers.')+(ACCL.some(o=>st(o)==='uit')?sec('Toegang ingetrokken',ACCL.filter(o=>st(o)==='uit'),''):'')
-  +`<div class="card"><h2>Goed om te weten</h2><p class="mu">Een toestel verschijnt hier zodra het versie ${APP_VERSION} of later gebruikt en gesynchroniseerd heeft. Een wijziging werkt zodra het toestel opnieuw synchroniseert, meestal binnen een minuut als het online is.</p><p class="mu">Intrekken blokkeert alleen de app. Wie de pincode kent of nog toegang heeft tot de spreadsheet in Google Drive, kan opnieuw beginnen. Wijzig daarom ook de pincode bij Meer en haal de persoon weg bij Delen in Google Drive.</p><a class="btn ghost" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}/edit" target="_blank" rel="noopener">Spreadsheet openen om te delen of weg te halen</a><button class="btn ghost" style="margin-top:8px" onclick="accOpen()">Lijst vernieuwen</button></div>`}
-const accName=id=>{const o=(ACCL||[]).find(x=>x.id===id);return esc((o&&o.n)||'dit toestel')};
+  +`<div class="card"><h2>Goed om te weten</h2><p class="mu">De naam is wat iemand invulde bij "Wie ben je?". Je eigen naam wijzig je bij Meer → Jouw naam. Een toestel verschijnt hier zodra het versie ${APP_VERSION} of later gebruikt en gesynchroniseerd heeft. Een wijziging werkt zodra het toestel opnieuw synchroniseert, meestal binnen een minuut als het online is.</p><p class="mu">Intrekken blokkeert alleen de app. Wie de pincode kent of nog toegang heeft tot de spreadsheet in Google Drive, kan opnieuw beginnen. Wijzig daarom ook de pincode bij Meer en haal de persoon weg bij Delen in Google Drive.</p><a class="btn ghost" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}/edit" target="_blank" rel="noopener">Spreadsheet openen om te delen of weg te halen</a><button class="btn ghost" style="margin-top:8px" onclick="accOpen()">Lijst vernieuwen</button></div>`}
+const accName=id=>{const o=(ACCL||[]).find(x=>x.id===id);return o?esc((o.n||'dit toestel')+' ('+(o.d||'onbekend toestel')+')'):'dit toestel'};
 function accSet(id,s){if(id===S.club.dev)return;const n=accName(id);
  const q=s==='uit'?`Toegang van ${n} intrekken? Dat toestel kan niets meer boeken zodra het synchroniseert. Boekingen die het al deed, blijven staan.`:s==='h'?`${n} alleen helperrechten geven? Op dat toestel werkt de Quaestorpincode dan niet meer.`:`Toegang teruggeven aan ${n}?`;
  ask(q,s==='uit'?'Intrekken':s==='h'?'Alleen helper':'Teruggeven',()=>accApply(id,s))}
