@@ -88,6 +88,7 @@ const TAB_B='Boekingen',TAB_L='Leden',TAB_P='Prijzen',TAB_I='Instellingen';
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
+const APP_VERSION='8';
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -101,7 +102,7 @@ function addSt(x){const t=cleanSt(x);if(!t)return '';const c=canonSt(t);if(c)ret
 function setStatuses(l){const out=[];const add=x=>{const t=cleanSt(x);if(t&&!out.some(y=>sk(y)===sk(t)))out.push(t)};l.forEach(add);S.members.forEach(m=>add(m.status));
  if(out.length)S.statuses=out;S.members.forEach(m=>{m.status=canonSt(m.status)||S.statuses[0]})}
 const stOpts=sel=>S.statuses.map(x=>`<option value="${esc(x)}"${x===sel?' selected':''}>${esc(x)}</option>`).join('')+'<option value="__new">+ Nieuwe status…</option>';
-const DEF=()=>({club:{name:'',color:'#8b1e3f',logo:'',theme:'auto',pinQ:'',pinH:'',gmode:'new',gurl:''},cats:{h:['Cantus','Weekend','Andere'],s:['Introcantus','Bierbowling','Lidgeld','Schuld']},members:[],tx:[],prices:[],pricesDirty:false,statuses:['lid','niet-lid','oud-lid']});
+const DEF=()=>({club:{name:'',color:'#8b1e3f',logo:'',theme:'auto',pinQ:'',pinH:'',gmode:'new',gurl:''},cats:{h:['Cantus','Weekend','Andere'],s:['Introcantus','Bierbowling','Lidgeld','Schuld']},members:[],tx:[],prices:[],pricesDirty:false,statuses:['lid','niet-lid','oud-lid'],delM:[],pendDel:[]});
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const eur=n=>new Intl.NumberFormat('nl-BE',{style:'currency',currency:'EUR'}).format(n);
@@ -119,6 +120,7 @@ function norm(){
  if(S.club.gscope!==SCOPE){if(S.club.gid||S.club.gok){S.club.gok=false;if(S.club.gmode==='existing')S.club.gpicked=false;try{sessionStorage.removeItem('qg')}catch(e){}}S.club.gscope=SCOPE}
  S.sync=Object.assign({last:0,err:'',auth:false,pick:false,warn:''},S.sync||{});
  S.club.names=Object.assign({q:'',h:''},S.club.names||{});
+ S.delM=Array.isArray(S.delM)?S.delM:[];S.pendDel=Array.isArray(S.pendDel)?S.pendDel:[];
  S.members=S.members||[];S.tx=S.tx||[];S.prices=S.prices||[];S.pricesDirty=!!S.pricesDirty;delete S.opening;
  S.statuses=(Array.isArray(S.statuses)?S.statuses.map(cleanSt).filter(Boolean):[]);if(!S.statuses.length)S.statuses=['lid','niet-lid','oud-lid'];
  S.members.forEach(m=>{m.status=addSt(m.status)||S.statuses[0]})}
@@ -194,7 +196,7 @@ async function ensureSheet(){const c=S.club;let created=[];
  if([TAB_B,TAB_L,TAB_P,TAB_I].includes(c.catTab))throw new Error('Het tabblad voor categorieën mag niet Boekingen, Leden, Prijzen of Instellingen heten.');
  if(c.gmode==='new'&&!c.gcreated){
   const r=await api('',{method:'POST',body:JSON.stringify({properties:{title:(c.name||'Club')+' – betalingen'},sheets:[TAB_B,TAB_L,c.catTab].map(t=>({properties:{title:t}}))})});
-  c.gid=r.spreadsheetId;c.gcreated=true;c.gpicked=false;c.gname='';S.tx.forEach(t=>t.synced=false);save();created=[c.catTab]}
+  c.gid=r.spreadsheetId;c.gcreated=true;c.gpicked=false;c.gname='';S.tx.forEach(t=>t.synced=false);S.members.forEach(m=>m.on=false);S.delM=[];save();created=[c.catTab]}
  else{
   const m=await api(`/${c.gid}?fields=sheets.properties.title`),titles=(m.sheets||[]).map(s=>s.properties.title);
   const need=[TAB_B,TAB_L,c.catTab].filter((t,i,a)=>!titles.includes(t)&&a.indexOf(t)===i);
@@ -243,15 +245,23 @@ async function syncSettings(){const c=S.club;
    save();theme();ch=true}}
  if(src==='tab'){if(!wrote)await metaPut(c.gid,m,false);await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{deleteSheet:{sheetId:id}}]})})}
  return ch}
-async function syncMembers(){const d=await api(`/${S.club.gid}/values/${enc(rng(TAB_L,'A2:B'))}`),rows=d.values||[],idx=new Map();let changed=false;
+async function syncMembers(){const gid=S.club.gid;
+ if(S.delM.length){const ks=new Set(S.delM.map(x=>x.toLowerCase())),d0=await api(`/${gid}/values/${enc(rng(TAB_L,'A2:A'))}`),del=[];
+  (d0.values||[]).forEach((r,i)=>{if(ks.has(String(r[0]||'').trim().toLowerCase()))del.push(i)});
+  if(del.length){const mt=await api(`/${gid}?fields=sheets.properties(sheetId,title)`),sh=(mt.sheets||[]).find(x=>x.properties.title===TAB_L);
+   if(sh)await api(`/${gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:del.sort((x,y)=>y-x).map(i=>({deleteDimension:{range:{sheetId:sh.properties.sheetId,dimension:'ROWS',startIndex:i+1,endIndex:i+2}}}))})})}
+  S.delM=[];save()}
+ const d=await api(`/${gid}/values/${enc(rng(TAB_L,'A2:B'))}`),rows=d.values||[],idx=new Map();let changed=false;
  rows.forEach((r,i)=>{const n=String(r[0]||'').trim();if(n&&!idx.has(n.toLowerCase()))idx.set(n.toLowerCase(),{row:i+2,st:cleanSt(r[1])})});
- const upd=[],out=[],mine=new Set();
+ const upd=[],out=[],mine=new Set(),gone=new Set();
  S.members.forEach(m=>{const k=m.name.toLowerCase();mine.add(k);const e=idx.get(k);
-  if(!e){out.push(m);m.dirty=false;return}
+  if(!e){if(m.on&&!m.dirty){gone.add(m.id);return}out.push(m);m.dirty=false;m.on=true;return}
+  m.on=true;
   if(m.dirty){if(sk(e.st)!==sk(m.status))upd.push({range:rng(TAB_L,'B'+e.row),values:[[m.status]]});m.dirty=false}
   else if(e.st&&sk(e.st)!==sk(m.status)){m.status=addSt(e.st);changed=true}});
- idx.forEach((e,k)=>{if(mine.has(k))return;const n=String(rows[e.row-2][0]).trim();S.members.push({id:uid(),name:n,status:e.st?addSt(e.st):S.statuses[0]});changed=true});
- if(upd.length)await api(`/${S.club.gid}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data:upd})});
+ if(gone.size){S.members=S.members.filter(m=>!gone.has(m.id));changed=true}
+ idx.forEach((e,k)=>{if(mine.has(k))return;const n=String(rows[e.row-2][0]).trim();S.members.push({id:uid(),name:n,status:e.st?addSt(e.st):S.statuses[0],on:true});changed=true});
+ if(upd.length)await api(`/${gid}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data:upd})});
  if(out.length)await append(TAB_L,'A:B',out.map(m=>[cell(m.name),cell(m.status)]));
  save();return changed}
 const pnum=v=>{if(v===''||v==null)return null;const n=typeof v==='number'?v:parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null};
@@ -264,7 +274,8 @@ async function syncPrices(){const c=S.club,has=await hasTab(TAB_P);
   await api(`/${c.gid}/values/${enc(rng(TAB_P,'A1'))}?valueInputOption=USER_ENTERED`,{method:'PUT',body:JSON.stringify({values:v})});
   S.pricesDirty=false;save();return false}
  const d=await api(`/${c.gid}/values/${enc(rng(TAB_P,'A1:Z'))}?valueRenderOption=UNFORMATTED_VALUE`),vals=d.values||[],rows=vals.slice(1).filter(r=>String(r[0]||'').trim());
- if(!rows.length){if(S.prices.length&&!c.helperOnly){S.pricesDirty=true;return syncPrices()}return false}
+ if(!rows.length){if(vals.length&&/^hoofd/i.test(String(vals[0][0]||'').trim())){const had=S.prices.length>0;S.prices=[];return had}
+  if(S.prices.length&&!c.helperOnly){S.pricesDirty=true;return syncPrices()}return false}
  const cols=[];(vals[0]||[]).forEach((x,j)=>{if(j<2)return;const t=cleanSt(x);if(t)cols.push([j,canonSt(t)||addSt(t)])});
  const pr=rows.map(r=>{const p={};S.statuses.forEach(k=>p[k]=null);cols.forEach(([j,k])=>{p[k]=pnum(r[j])});return{h:String(r[0]).trim(),s:String(r[1]||'').trim(),p}});
  const ch=JSON.stringify(pr)!==JSON.stringify(S.prices);S.prices=pr;return ch}
@@ -279,14 +290,24 @@ function relink(){const by=new Map(S.tx.map(t=>[t.id,t]));
  S.tx.forEach(t=>{if(t.ref&&!t.storno&&!t.void){const d=by.get(t.ref);if(d){d.paidBy=t.id;d.paidDate=t.date}}})}
 async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(TAB_B,'A2:M'))}?valueRenderOption=UNFORMATTED_VALUE`),have=new Set(S.tx.map(t=>t.id));let add=0;
  const mem=new Map(S.members.map(m=>[m.name.toLowerCase(),m.id]));
- (d.values||[]).forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(!id||have.has(id))return;
+ const inSheet=new Set();
+ (d.values||[]).forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(id)inSheet.add(id);if(!id||have.has(id))return;
   const v=pnum(r[7]);if(v==null)return;const date=toDate(r[1]),ts=toTs(String(r[11]||'').replace(/^'/,'')||r[11],date);
   if(c.wipeTs&&ts<c.wipeTs)return;const meth=REV[String(r[6]||'').trim().toLowerCase()];if(!meth)return;
   const k=String(r[10]||'').trim(),typ=String(r[8]||'').trim().toLowerCase(),ref=String(r[9]==null?'':r[9]).trim().replace(/^'/,''),name=String(r[2]||'').trim();
   const t={id,ts,date,mid:mem.get(name.toLowerCase())||null,name,v,method:meth,h:String(r[4]||'').trim(),s:String(r[5]||'').trim(),desc:String(r[3]||'').trim(),by:/quaestor/i.test(String(r[12]||'').trim()||k)?'q':'h',who:/^(quaestor|helper)$/i.test(k)?'':k,void:false,synced:true};
   if(typ==='storno')t.storno=true;if(ref&&(typ==='storno'||typ==='afbetaling'))t.ref=ref;
   S.tx.push(t);have.add(id);add++});
- if(add){S.tx.sort((a,b)=>a.ts-b.ts);relink();save()}return add>0}
+ const goneT=S.tx.filter(t=>t.synced&&!inSheet.has(t.id)),nSy=S.tx.filter(t=>t.synced).length,oldP=JSON.stringify(S.pendDel);let rem=0;
+ if(goneT.length>=5&&goneT.length*2>=nSy)S.pendDel=goneT.map(t=>t.id);
+ else{S.pendDel=[];S.tx=S.tx.filter(t=>!t.synced||inSheet.has(t.id));rem=goneT.length}
+ const pc=JSON.stringify(S.pendDel)!==oldP;
+ if(add||rem||pc){S.tx.sort((a,b)=>a.ts-b.ts);relink();save()}return add>0||rem>0||pc}
+function delBanner(){const n=(S.pendDel||[]).length;if(!n)return '';
+ return `<div class="card banner"><h2>${n} boekingen staan niet meer in de spreadsheet</h2><p class="mu">Ze zijn uit het tabblad Boekingen verdwenen, bijvoorbeeld omdat de Quaestor ze gewist heeft of per ongeluk. Wil je ze ook op dit toestel verwijderen, of wil je ze bewaren en terugzetten in de spreadsheet?</p><button class="btn ghost" onclick="pendDo(0)">Bewaren en terugzetten in de spreadsheet</button><button class="btn" style="margin-top:8px" onclick="pendDo(1)">Ook op dit toestel verwijderen</button></div>`}
+function pendDo(del){const ids=new Set(S.pendDel);S.pendDel=[];
+ if(del){S.tx=S.tx.filter(t=>!ids.has(t.id));relink()}else S.tx.forEach(t=>{if(ids.has(t.id))t.synced=false});
+ save();render();if(!del)queueSync();toast(del?'Verwijderd op dit toestel':'Boekingen worden teruggezet')}
 async function pushTx(){const p=S.tx.filter(t=>!t.synced);if(!p.length)return;
  const d=await api(`/${S.club.gid}/values/${enc(rng(TAB_B,'A2:A'))}`),ex=new Set((d.values||[]).map(r=>String(r[0]||'').trim().replace(/^'/,'')));
  const nw=p.filter(t=>!ex.has(t.id)).sort((a,b)=>a.ts-b.ts);
@@ -299,7 +320,7 @@ async function sync(manual,force){
  try{
   const key=c.gmode+'|'+c.gid+'|'+c.catTab;
   if(ENS!==key){await ensureSheet();ENS=c.gmode+'|'+c.gid+'|'+c.catTab;LASTPULL=0}
-  if(manual||S.pricesDirty||S.members.some(m=>m.dirty)||c.setDirty||Date.now()-LASTPULL>30000){try{S.sync.warn='';changed=await syncSettings()||changed}catch(e){if(e.auth||e.pick)throw e;S.sync.warn='Clubgegevens bewaren lukte niet: '+(e.message||'onbekende fout')}
+  if(manual||S.pricesDirty||S.delM.length||S.members.some(m=>m.dirty)||c.setDirty||Date.now()-LASTPULL>30000){try{S.sync.warn='';changed=await syncSettings()||changed}catch(e){if(e.auth||e.pick)throw e;S.sync.warn='Clubgegevens bewaren lukte niet: '+(e.message||'onbekende fout')}
   changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;LASTPULL=Date.now()}
   await pushTx();
   S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;S.sync.pick=false;save();
@@ -336,10 +357,10 @@ async function choose(){readG();const c=S.club;
  if(!r)return;
  if(c.helperOnly&&c.inviteGid&&r.id!==c.inviteGid)return toast('Dit is niet de spreadsheet uit de uitnodiging. Kies de spreadsheet die de Quaestor met je deelde.');
  c.gmode='existing';
- if(r.id!==c.gid){c.gid=r.id;c.gcreated=false;S.tx.forEach(t=>t.synced=false)}
+ if(r.id!==c.gid){c.gid=r.id;c.gcreated=false;S.tx.forEach(t=>t.synced=false);S.members.forEach(m=>m.on=false);S.delM=[]}
  c.gname=r.name;c.gpicked=true;c.gok=true;S.sync.pick=false;ENS='';save();
  await sync(true,true);if(role)render()}
-function unlink(){ask('Spreadsheet ontkoppelen? Je boekingen blijven op dit toestel bewaard.','Ontkoppelen',()=>{Object.assign(S.club,{gid:'',gok:false,gcreated:false,gpicked:false,gname:''});S.sync={last:0,err:'',auth:false,pick:false};ENS='';TOKEN=null;try{sessionStorage.removeItem('qg')}catch(e){}save();render()})}
+function unlink(){ask('Spreadsheet ontkoppelen? Je boekingen blijven op dit toestel bewaard.','Ontkoppelen',()=>{Object.assign(S.club,{gid:'',gok:false,gcreated:false,gpicked:false,gname:''});S.delM=[];S.sync={last:0,err:'',auth:false,pick:false,warn:''};ENS='';TOKEN=null;try{sessionStorage.removeItem('qg')}catch(e){}save();render()})}
 window.addEventListener('online',()=>{refreshSt();queueSync()});
 window.addEventListener('offline',refreshSt);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)queueSync()});
@@ -433,7 +454,7 @@ function vBoek(){const c=S.cats;
  if(B.s&&!c.s.includes(B.s))B.s='';
  const last=S.tx.filter(t=>t.date===today()).slice(-5).reverse();
  const hb=S.club.helperOnly&&(!S.club.gid||!S.club.gok||S.sync.pick)?`<div class="card banner"><h2>Laatste stap</h2><p class="mu">Meld je aan bij Google en kies de spreadsheet die de Quaestor met je deelde. Daarna komen alle boekingen automatisch samen.</p><button class="btn" onclick="choose()">Spreadsheet kiezen</button></div>`:'';
- return hb+`<div class="card">
+ return delBanner()+hb+`<div class="card">
  <label>Lid<input id="q" autocomplete="off" placeholder="Typ een naam…" value="${esc(B.name)}" oninput="onQ(this.value)"></label><div id="sug"></div><div id="mi">${miHtml()}</div>
  <label>Bedrag in euro<input id="amt" type="number" inputmode="decimal" step="0.01" min="0" value="${esc(B.amt)}" oninput="onAmt(this.value)"></label>
  <div class="seg" style="grid-auto-flow:row;grid-template-columns:1fr 1fr">${Object.keys(M).map(m=>`<button class="${B.method===m?'on':''}" onclick="B.method='${m}';render()">${M[m]}</button>`).join('')}</div>
@@ -461,7 +482,7 @@ function sug(){const e=$('#sug');if(!e)return;const t=B.name.trim().toLowerCase(
   if(!S.members.some(m=>m.name.toLowerCase()===t))h+=`<div class="mu" style="margin:8px 0 4px">Nieuw toevoegen: ${esc(B.name.trim())}</div><div class="seg" style="grid-auto-flow:row;grid-template-columns:repeat(auto-fit,minmax(90px,1fr))">${S.statuses.map(x=>`<button data-s="${esc(x)}" onclick="newM(this.dataset.s)">${esc(x)}</button>`).join('')}</div>`}
  e.innerHTML=h}
 function pick(id){const m=S.members.find(x=>x.id===id);B.mid=id;B.name=m.name;autoPrice();render()}
-function newM(st){const m={id:uid(),name:B.name.trim(),status:canonSt(st)||S.statuses[0],dirty:true};S.members.push(m);save();B.mid=m.id;autoPrice();queueSync();render()}
+function newM(st){unDel(B.name.trim());const m={id:uid(),name:B.name.trim(),status:canonSt(st)||S.statuses[0],dirty:true};S.members.push(m);save();B.mid=m.id;autoPrice();queueSync();render()}
 function book(){const a=parseFloat(String(B.amt).replace(',','.'));
  if(!(a>0))return toast('Vul een bedrag in');
  if(!B.mid)return toast('Kies een lid of voeg een nieuw lid toe');
@@ -478,14 +499,14 @@ function doStorno(id){const t=S.tx.find(x=>x.id===id);if(!t||t.void)return;
  t.void=true;S.tx.push({...t,who:WHO,id:uid(),ts:Date.now(),date:today(),v:-t.v,storno:true,void:false,ref:t.id,by:role,synced:false});
  if(t.ref){const d=S.tx.find(x=>x.id===t.ref);if(d&&d.paidBy===t.id){delete d.paidBy;delete d.paidDate}}
  save();toast('Gestorneerd');render();queueSync()}
-function vVandaag(){const l=S.tx.filter(t=>t.date===today()&&!t.storno).reverse();return `<div class="card"><h2>Vandaag: ${l.filter(t=>!t.void).length} boekingen</h2>${l.length?l.map(t=>row(t,false)).join(''):empty('Nog niets geboekt vandaag.')}</div>${S.club.helperOnly?`<div class="card"><h2>Dit toestel</h2><p class="mu">Gebruik je dit toestel niet meer voor ${esc(S.club.name)}? Koppel het dan los. De gegevens op dit toestel worden gewist, de spreadsheet blijft.</p><label>Je naam<input id="wn2" value="${esc(S.club.names.h)}"></label><button class="btn ghost" style="margin-bottom:8px" onclick="chName()">Naam opslaan</button><button class="btn ghost" onclick="devOff()">Dit toestel loskoppelen</button></div>`:''}`}
+function vVandaag(){const l=S.tx.filter(t=>t.date===today()&&!t.storno).reverse();return delBanner()+`<div class="card"><h2>Vandaag: ${l.filter(t=>!t.void).length} boekingen</h2>${l.length?l.map(t=>row(t,false)).join(''):empty('Nog niets geboekt vandaag.')}</div>${S.club.helperOnly?`<div class="card"><h2>Dit toestel</h2><p class="mu">Gebruik je dit toestel niet meer voor ${esc(S.club.name)}? Koppel het dan los. De gegevens op dit toestel worden gewist, de spreadsheet blijft.</p><label>Je naam<input id="wn2" value="${esc(S.club.names.h)}"></label><button class="btn ghost" style="margin-bottom:8px" onclick="chName()">Naam opslaan</button><button class="btn ghost" onclick="devOff()">Dit toestel loskoppelen</button></div>`:''}`}
 
 /* ---------- dag ---------- */
 function vDag(){const l=S.tx.filter(t=>t.date===DAY),sum=m=>l.filter(t=>t.method===m).reduce((a,t)=>a+t.v,0);
  const tot=sum('cash')+sum('payconiq')+sum('overschrijving');
  const done=new Set(l.filter(t=>!t.void&&!t.storno&&t.v>0).map(t=>t.mid));
  const todo=S.members.filter(m=>!done.has(m.id)).sort((a,b)=>a.name.localeCompare(b.name));
- return `<div class="card"><label>Dag<input type="date" value="${DAY}" onchange="DAY=this.value||today();render()"></label>
+ return delBanner()+`<div class="card"><label>Dag<input type="date" value="${DAY}" onchange="DAY=this.value||today();render()"></label>
  <div class="grid"><div class="stat">Cash<b>${eur(sum('cash'))}</b></div><div class="stat">Payconiq<b>${eur(sum('payconiq'))}</b></div><div class="stat">Overschrijving<b>${eur(sum('overschrijving'))}</b></div><div class="stat">Op schuldenlijst<b>${eur(sum('schuld'))}</b></div><div class="stat big">Totaal ontvangen<b>${eur(tot)}</b><span class="mu">Tel de kassa na en vergelijk met het bedrag bij Cash.</span></div></div></div>
  ${perPerson(l)}<div class="card"><h2>Boekingen van deze dag</h2>${l.length?l.slice().reverse().map(t=>row(t,true)).join(''):empty('Geen boekingen op deze dag.')}</div>
  <div class="card"><h2>Nog niet geboekt op deze dag (${todo.length})</h2>${todo.length?todo.slice(0,40).map(m=>`<div class="row"><div>${esc(m.name)} <span class="mu">${esc(m.status)}</span></div><button class="sm" onclick="goBook('${m.id}')">Boeken</button></div>`).join('')+(todo.length>40?empty('… en '+(todo.length-40)+' anderen'):''):empty('Iedereen uit de ledenlijst is geboekt.')}</div>`}
@@ -509,10 +530,12 @@ function vLeden(){return `<div class="card"><h2>Lid toevoegen</h2><label>Naam<in
  <div class="card"><h2>${S.members.length} leden</h2>${S.club.gid?'<button class="btn ghost" style="margin-bottom:10px" onclick="sync(true)">Nu synchroniseren</button>':''}<p class="mu">Status aanpassen kan hier, of in kolom B van het tabblad Leden in je spreadsheet (je mag zelf statussen typen, bv. schacht of actief student). De app neemt het over bij de volgende synchronisatie, meestal binnen een halve minuut.</p><label>Zoeken<input oninput="LQ=this.value;ml()"></label><div id="ml"></div></div>`}
 function ml(){const e=$('#ml');if(!e)return;const q=LQ.toLowerCase(),o=open(),l=S.members.filter(m=>m.name.toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name));
  e.innerHTML=l.length?l.map(m=>{const d=o.filter(t=>t.mid===m.id).reduce((a,t)=>a+t.v,0);return `<div class="row"><div>${esc(m.name)}${d?`<div class="neg">Schuld ${eur(d)}</div>`:''}</div><div><select class="ss" aria-label="Status van ${esc(m.name)}" onchange="stSel(this,'${m.id}',false)">${stOpts(m.status)}</select><button class="sm" onclick="delM('${m.id}')">Verwijder</button></div></div>`}).join(''):empty('Geen leden gevonden.')}
-function addM(){const n=$('#mn').value.trim();if(!n)return toast('Vul een naam in');S.members.push({id:uid(),name:n,status:cleanSt($('#ms2').value)?addSt($('#ms2').value):$('#ms').value,dirty:true});save();render();queueSync()}
-function delM(id){ask('Dit lid verwijderen uit de lijst? Bestaande boekingen blijven staan.'+(S.club.gid?' Verwijder het lid ook in het tabblad Leden van je spreadsheet, anders komt het terug.':''),'Verwijderen',()=>{S.members=S.members.filter(m=>m.id!==id);save();render()})}
+function addM(){const n=$('#mn').value.trim();if(!n)return toast('Vul een naam in');unDel(n);S.members.push({id:uid(),name:n,status:cleanSt($('#ms2').value)?addSt($('#ms2').value):$('#ms').value,dirty:true});save();render();queueSync()}
+const unDel=n=>{S.delM=S.delM.filter(x=>x.toLowerCase()!==String(n).toLowerCase())};
+function delM(id){const m0=S.members.find(x=>x.id===id);if(!m0)return;
+ ask('Dit lid verwijderen uit de lijst? Bestaande boekingen blijven staan.'+(S.club.gid?' Het lid wordt ook uit het tabblad Leden van je spreadsheet verwijderd.':''),'Verwijderen',()=>{S.delM.push(m0.name);S.members=S.members.filter(m=>m.id!==id);save();render();queueSync()})}
 function impM(){modal(`<h3>Ledenlijst plakken</h3><p class="mu">Eén lid per regel: naam, of naam en status (bv. schacht of actief student) gescheiden door een tab of puntkomma. Je kan dus kolommen uit je spreadsheet kopiëren.</p><textarea id="it"></textarea><button class="btn" style="margin-top:10px" onclick="impOk()">Importeren</button>`)}
-function impOk(){let n=0;$('#it').value.split(/\r?\n/).forEach(l=>{const p=l.split(/[;\t]/).map(x=>x.trim());if(!p[0]||/^naam$/i.test(p[0]))return;if(S.members.some(m=>m.name.toLowerCase()===p[0].toLowerCase()))return;S.members.push({id:uid(),name:p[0],status:p[1]?addSt(p[1]):S.statuses[0],dirty:true});n++});save();closeM();toast(n+' leden toegevoegd');render();queueSync()}
+function impOk(){let n=0;$('#it').value.split(/\r?\n/).forEach(l=>{const p=l.split(/[;\t]/).map(x=>x.trim());if(!p[0]||/^naam$/i.test(p[0]))return;if(S.members.some(m=>m.name.toLowerCase()===p[0].toLowerCase()))return;unDel(p[0]);S.members.push({id:uid(),name:p[0],status:p[1]?addSt(p[1]):S.statuses[0],dirty:true});n++});save();closeM();toast(n+' leden toegevoegd');render();queueSync()}
 
 /* ---------- instellingen ---------- */
 function catCard(){const c=S.club;
@@ -538,8 +561,16 @@ function shareInv(){const l=inviteLink();if(navigator.share)navigator.share({tit
 function resetAll(){S=DEF();norm();ENS='';TOKEN=null;TEXP=0;LASTPULL=0;PE=[];B=newB();
  try{sessionStorage.removeItem('qg')}catch(e){}save();role=null;tab='boek';start()}
 function devOff(){const n=S.tx.filter(t=>!t.synced).length;ask('Dit toestel loskoppelen? Alle gegevens op dit toestel worden gewist.'+(n?` ${n} boeking(en) zijn nog niet geüpload en gaan verloren.`:''),'Loskoppelen',()=>{resetAll();toast('Toestel losgekoppeld')})}
-function wipeTx(){const n=S.tx.length,u=S.tx.filter(t=>!t.synced).length;
- ask(`Alle ${n} boekingen op dit toestel wissen?`+(u?` ${u} daarvan zijn nog niet geüpload en gaan verloren.`:'')+(S.club.gid?' In je spreadsheet blijven ze staan. De app leest er daarna alleen nog nieuwe boekingen uit. Andere toestellen houden hun eigen kopie tot je er ook wist of ze loskoppelt.':''),'Boekingen wissen',()=>{S.tx=[];S.club.wipeTs=Date.now();save();render();toast('Boekingen gewist')})}
+function wipeTx(){const n=S.tx.length,u=S.tx.filter(t=>!t.synced).length,g=S.club.gid&&S.club.gok;
+ modal(`<h3>Alle ${n} boekingen wissen?</h3>${u?`<p class="neg">${u} boeking(en) zijn nog niet geüpload en gaan verloren.</p>`:''}<p class="mu">Wissen in de spreadsheet is niet te herstellen, tenzij je de versiegeschiedenis van Google Sheets gebruikt.</p>
+ <button class="btn ghost" onclick="wipeTxGo(false)">Alleen op dit toestel wissen</button><p class="mu" style="margin:4px 0 10px">${g?'De boekingen blijven in je spreadsheet staan als archief. Andere toestellen houden hun kopie.':''}</p>
+ ${g?`<button class="btn" onclick="wipeTxSheet()">Ook uit de spreadsheet wissen</button><p class="mu" style="margin:4px 0 10px">Alle rijen in het tabblad Boekingen verdwijnen. Helpers krijgen de vraag of ze hun kopie ook willen wissen of bewaren.</p>`:''}
+ <button class="btn ghost" onclick="closeM()">Annuleren</button>`)}
+function wipeTxSheet(){if(role!=='q')return;modal(`<h3>Ook uit de spreadsheet wissen</h3><p>Alle rijen in het tabblad Boekingen verdwijnen voor iedereen. Dit is niet ongedaan te maken in de app. Typ WISSEN om te bevestigen.</p><input id="wc2" autocomplete="off"><button class="btn" style="margin-top:10px" onclick="wipeTxSheetOk()">Definitief wissen</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
+function wipeTxSheetOk(){if(($('#wc2').value||'').trim().toUpperCase()!=='WISSEN')return toast('Typ WISSEN om te bevestigen');wipeTxGo(true)}
+async function wipeTxGo(sheet){if(role!=='q')return;closeM();
+ if(sheet){SI=true;try{await api(`/${S.club.gid}/values/${enc(rng(TAB_B,'A2:M'))}:clear`,{method:'POST',body:'{}'})}catch(e){SI=false;return toast(e.message||'Wissen in de spreadsheet is niet gelukt')}SI=false}
+ S.tx=[];S.club.wipeTs=Date.now();save();render();toast(sheet?'Boekingen gewist, ook in de spreadsheet':'Boekingen gewist op dit toestel')}
 function wipeMem(){const g=S.club.gid&&S.club.gok;
  ask('De ledenlijst leegmaken?'+(g?' Ook de lijst in het tabblad Leden van je spreadsheet wordt leeggemaakt, anders komt ze terug.':'')+' Bestaande boekingen blijven staan.','Leegmaken',async()=>{
   if(g){SI=true;try{await api(`/${S.club.gid}/values/${enc(rng(TAB_L,'A2:B'))}:clear`,{method:'POST',body:'{}'})}catch(e){SI=false;return toast(e.message||'Leegmaken in de spreadsheet is niet gelukt')}SI=false}
@@ -570,7 +601,8 @@ function vInst(){const c=S.club;
  ${catCard()}${statCard()}${prCard()}${gCard()}${invCard()}
  <button class="btn" onclick="saveSet()">Instellingen opslaan</button>
  <div class="card" style="margin-top:12px"><h2>Back-up</h2><button class="btn ghost" onclick="showT('Boekingen als csv',csv())">Boekingen kopiëren (csv)</button><button class="btn ghost" style="margin-top:8px" onclick="showT('Volledige back-up',JSON.stringify(S))">Volledige back-up kopiëren</button><button class="btn ghost" style="margin-top:8px" onclick="restore()">Back-up terugzetten</button></div>
- <div class="card"><h2>Gegevens wissen</h2><p class="mu">Wissen gebeurt op dit toestel. Je spreadsheet blijft staan als archief. Maak eerst een back-up als je twijfelt.</p><button class="btn ghost" onclick="wipeTx()">Alle boekingen wissen</button><button class="btn ghost" style="margin-top:8px" onclick="wipeMem()">Ledenlijst leegmaken</button><button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="wipeAll()">Alles wissen en opnieuw beginnen</button></div>`}
+ <div class="card"><h2>Gegevens wissen</h2><p class="mu">Maak eerst een back-up als je twijfelt. Bij boekingen en de ledenlijst kies je of de spreadsheet ook meegaat. Bij Alles wissen blijft de spreadsheet staan.</p><button class="btn ghost" onclick="wipeTx()">Alle boekingen wissen</button><button class="btn ghost" style="margin-top:8px" onclick="wipeMem()">Ledenlijst leegmaken</button><button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="wipeAll()">Alles wissen en opnieuw beginnen</button></div>
+ <p class="mu" style="text-align:center">Versie ${APP_VERSION}</p>`}
 function saveSet(){const q=$('#iq').value.trim(),h=$('#ih').value.trim(),c0=S.club;
  if((q&&q.length<4)||(h&&h.length<4)||(!q&&!c0.pinQh)||(!h&&!c0.pinHh)||(q&&q===h))return toast('Pincodes: minstens 4 cijfers en niet gelijk');
  if($('#ich')){const list=id=>[...new Set($(id).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean))];
