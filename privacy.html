@@ -34,7 +34,7 @@ nav{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}
 <p>Quaestor is een gratis webapp voor studentenclubs en verenigingen om tijdens een activiteit te registreren wie betaald heeft (cash, Payconiq, overschrijving of via de schuldenlijst). De app is gemaakt door Slenders Laurens. Contact: <a href="mailto:slenders.laurens@gmail.com">slenders.laurens@gmail.com</a>.</p>
 
 <h2>Welke gegevens gebruikt de app?</h2>
-<p>Alles wat je zelf in de app invoert: de naam en kleur van de club, een logo, de pincodes, categorieën, namen en status van leden, en de boekingen (datum, naam van het lid, bedrag, betaalwijze, categorie en omschrijving).</p>
+<p>Alles wat je zelf in de app invoert: de naam en kleur van de club, je eigen naam (die bij elke boeking die je invoert wordt bewaard, ook in de spreadsheet), een logo, de pincodes, categorieën, namen en status van leden, en de boekingen (datum, naam van het lid, bedrag, betaalwijze, categorie en omschrijving).</p>
 <ul>
 <li>Deze gegevens worden <b>op je eigen toestel</b> bewaard, in de opslag van je browser.</li>
 <li>Er is <b>geen account</b> bij ons en <b>geen server van ons</b>. Wij kunnen je gegevens niet zien.</li>
@@ -45,7 +45,7 @@ nav{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}
 <p>Koppelen met Google is optioneel. Als je dat doet, vraagt de app toestemming voor één toegang: <code>drive.file</code> (“Toon en beheer alleen de Google Drive-bestanden die je met deze app gebruikt”). Daarmee kan de app alleen werken met een spreadsheet die de app zelf aanmaakt, of met de spreadsheet die jij zelf kiest in het keuzevenster van Google. De app krijgt geen toegang tot je andere bestanden.</p>
 <ul>
 <li>De app <b>schrijft</b> je boekingen, ledenlijst (met status) en prijzen naar de spreadsheet, en <b>leest</b> er de boekingen, de ledenlijst, de prijzen en de categorieën uit. Zo zien de Quaestor en de helpers dezelfde gegevens.</li>
-<li>De app zet ook de naam en kleur van de club en een <b>versleutelde controlecode</b> van de pincodes (geen pincodes zelf) in het tabblad Instellingen. Zo kan de Quaestor dezelfde club op een nieuw toestel ophalen. Wie de spreadsheet kan bewerken, kan dit tabblad zien.</li>
+<li>De app zet ook de naam en kleur van de club en een <b>versleutelde controlecode</b> van de pincodes (geen pincodes zelf) als verborgen gegevens van de spreadsheet (geen zichtbaar tabblad). Zo kan de Quaestor dezelfde club op een nieuw toestel ophalen.</li>
 <li>Werken helpers mee, dan deelt de Quaestor de spreadsheet zelf met hen in Google. Elke helper geeft de app toegang tot die ene spreadsheet. De uitnodigingslink bevat de naam en kleur van de club en het ID van de spreadsheet, geen pincodes.</li>
 <li>De toegangssleutel van Google wordt alleen in je browser bewaard (tot je het tabblad of de app sluit, en ten hoogste ongeveer een uur) en gaat alleen naar de servers van Google.</li>
 <li>De gegevens in je spreadsheet staan in <b>jouw</b> Google-account. Wij ontvangen of bewaren er geen kopie van.</li>
@@ -83,7 +83,7 @@ nav{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}
 <p>Quaestor is a free web app for student clubs and associations to record who has paid during an event (cash, Payconiq, bank transfer or the debt list). The app is made by Slenders Laurens. Contact: <a href="mailto:slenders.laurens@gmail.com">slenders.laurens@gmail.com</a>.</p>
 
 <h2>What data does the app use?</h2>
-<p>Everything you enter yourself: the club's name and colour, a logo, PIN codes, categories, member names and status, and the bookings (date, member name, amount, payment method, category and description).</p>
+<p>Everything you enter yourself: the club's name and colour, your own name (stored with every booking you enter, also in the spreadsheet), a logo, PIN codes, categories, member names and status, and the bookings (date, member name, amount, payment method, category and description).</p>
 <ul>
 <li>This data is stored <b>on your own device</b>, in your browser's storage.</li>
 <li>There is <b>no account</b> with us and <b>no server of ours</b>. We cannot see your data.</li>
@@ -94,7 +94,7 @@ nav{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}
 <p>Connecting Google is optional. If you do, the app asks for a single permission: <code>drive.file</code> ("See, edit, create and delete only the specific Google Drive files you use with this app"). With it, the app can only work with a spreadsheet that the app creates itself, or one that you pick yourself in Google's file picker. The app cannot access your other files.</p>
 <ul>
 <li>The app <b>writes</b> your bookings, member list (with status) and prices to the spreadsheet and <b>reads</b> the bookings, member list, prices and categories from it. This way the Quaestor and the helpers see the same data.</li>
-<li>The app also puts the club's name and colour and an <b>encrypted check code</b> of the PIN codes (not the PIN codes themselves) in the Instellingen tab. This lets the Quaestor retrieve the same club on a new device. Anyone who can edit the spreadsheet can see this tab.</li>
+<li>The app also puts the club's name and colour and an <b>encrypted check code</b> of the PIN codes (not the PIN codes themselves) as hidden data of the spreadsheet (no visible tab). This lets the Quaestor retrieve the same club on a new device.</li>
 <li>When helpers take part, the Quaestor shares the spreadsheet with them in Google. Each helper gives the app access to that one spreadsheet. The invitation link contains the club's name and colour and the spreadsheet ID, no PIN codes.</li>
 <li>Google's access token is kept only in your browser (until you close the tab or app, and for about an hour at most) and is only sent to Google's servers.</li>
 <li>The data in your spreadsheet lives in <b>your</b> Google account. We do not receive or keep a copy.</li>

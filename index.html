@@ -86,7 +86,7 @@ const GOOGLE_APP_ID=String(QC.appId||'').trim();
 const SCOPE='https://www.googleapis.com/auth/drive.file';
 const TAB_B='Boekingen',TAB_L='Leden',TAB_P='Prijzen',TAB_I='Instellingen';
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
-const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip'];
+const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
@@ -110,9 +110,10 @@ try{const r=localStorage.getItem(K);if(r)S=JSON.parse(r)}catch(e){}
 if(!S)S=DEF();
 function norm(){
  if(Array.isArray(S.cats)){const o=S.cats;S.cats={h:o.map(c=>c.h),s:[...new Set(o.flatMap(c=>c.s))]}}
- S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0},S.club);
+ S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0,askName:false},S.club);
  if(S.club.gscope!==SCOPE){if(S.club.gid||S.club.gok){S.club.gok=false;if(S.club.gmode==='existing')S.club.gpicked=false;try{sessionStorage.removeItem('qg')}catch(e){}}S.club.gscope=SCOPE}
- S.sync=Object.assign({last:0,err:'',auth:false,pick:false},S.sync||{});
+ S.sync=Object.assign({last:0,err:'',auth:false,pick:false,warn:''},S.sync||{});
+ S.club.names=Object.assign({q:'',h:''},S.club.names||{});
  S.members=S.members||[];S.tx=S.tx||[];S.prices=S.prices||[];S.pricesDirty=!!S.pricesDirty;delete S.opening;
  S.members.forEach(m=>{if(!ST.includes(m.status))m.status='lid'})}
 norm();save();
@@ -134,6 +135,7 @@ function askOk(){const f=ASK;ASK=null;closeM();if(f)f()}
 function theme(){const c=S.club,r=document.documentElement;r.style.setProperty('--ac',c.color);const n=parseInt(c.color.slice(1),16),l=.299*(n>>16)+.587*(n>>8&255)+.114*(n&255);r.style.setProperty('--on',l>150?'#111':'#fff');c.theme==='auto'?r.removeAttribute('data-theme'):r.setAttribute('data-theme',c.theme)}
 
 /* ================= GOOGLE SHEETS ================= */
+let WHO='';
 let TOKEN=null,TEXP=0,SYNCING=false,SI=false,ENS='',LASTPULL=0,QT=null;
 try{const q=JSON.parse(sessionStorage.getItem('qg')||'null');if(q&&q.exp>Date.now()){TOKEN=q.t;TEXP=q.exp}}catch(e){}
 const cid=()=>(S.club.cid||GOOGLE_CLIENT_ID||'').trim();
@@ -175,7 +177,7 @@ const rng=(tab,a)=>`'${tab.replace(/'/g,"''")}'!${a}`;
 const enc=encodeURIComponent;
 const cell=v=>typeof v==='string'&&/^[=+\-@]/.test(v)?"'"+v:v;
 const typ=t=>t.storno?'Storno':t.ref?'Afbetaling':'Boeking';
-const rowOf=t=>[ "'"+t.id,t.date,cell(t.name||''),cell(t.desc||''),cell(t.h||''),cell(t.s||''),M[t.method],t.v,typ(t),t.ref?"'"+t.ref:'',t.by==='q'?'Quaestor':'Helper',"'"+new Date(t.ts).toISOString()];
+const rowOf=t=>[ "'"+t.id,t.date,cell(t.name||''),cell(t.desc||''),cell(t.h||''),cell(t.s||''),M[t.method],t.v,typ(t),t.ref?"'"+t.ref:'',cell(t.who||(t.by==='q'?'Quaestor':'Helper')),"'"+new Date(t.ts).toISOString(),t.by==='q'?'Quaestor':'Helper'];
 async function append(tab,cols,rows){for(let i=0;i<rows.length;i+=200)await api(`/${S.club.gid}/values/${enc(rng(tab,cols))}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,{method:'POST',body:JSON.stringify({values:rows.slice(i,i+200)})})}
 async function head(tab,hd){const d=await api(`/${S.club.gid}/values/${enc(rng(tab,'A1:Z1'))}`);const v=(d.values||[])[0];
  if(!v||!v.some(x=>String(x||'').trim())){await api(`/${S.club.gid}/values/${enc(rng(tab,'A1'))}?valueInputOption=RAW`,{method:'PUT',body:JSON.stringify({values:[hd]})});return}
@@ -185,14 +187,16 @@ async function putCats(){const c=S.cats,n=Math.max(c.h.length,c.s.length),v=[['H
 async function ensureSheet(){const c=S.club;let created=[];
  if([TAB_B,TAB_L,TAB_P,TAB_I].includes(c.catTab))throw new Error('Het tabblad voor categorieën mag niet Boekingen, Leden, Prijzen of Instellingen heten.');
  if(c.gmode==='new'&&!c.gcreated){
-  const r=await api('',{method:'POST',body:JSON.stringify({properties:{title:(c.name||'Club')+' – betalingen'},sheets:[TAB_B,TAB_L,TAB_P,TAB_I,c.catTab].map(t=>({properties:{title:t}}))})});
+  const r=await api('',{method:'POST',body:JSON.stringify({properties:{title:(c.name||'Club')+' – betalingen'},sheets:[TAB_B,TAB_L,c.catTab].map(t=>({properties:{title:t}}))})});
   c.gid=r.spreadsheetId;c.gcreated=true;c.gpicked=false;c.gname='';S.tx.forEach(t=>t.synced=false);save();created=[c.catTab]}
  else{
   const m=await api(`/${c.gid}?fields=sheets.properties.title`),titles=(m.sheets||[]).map(s=>s.properties.title);
-  const need=[TAB_B,TAB_L,TAB_P,TAB_I,c.catTab].filter((t,i,a)=>!titles.includes(t)&&a.indexOf(t)===i);
+  const need=[TAB_B,TAB_L,c.catTab].filter((t,i,a)=>!titles.includes(t)&&a.indexOf(t)===i);
   if(need.length)await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:need.map(t=>({addSheet:{properties:{title:t}}}))})});
   created=need.filter(t=>t===c.catTab)}
- await head(TAB_B,HEAD_B);await head(TAB_L,['Naam','Status']);await head(TAB_P,HEAD_P);await head(TAB_I,['Instelling','Waarde'])}
+ await head(TAB_B,HEAD_B);await rolCol();await head(TAB_L,['Naam','Status'])}
+async function rolCol(){const u=`/${S.club.gid}/values/${enc(rng(TAB_B,'M1'))}`,d=await api(u);
+ if(!(d.values&&d.values[0]&&String(d.values[0][0]||'').trim()))await api(u+'?valueInputOption=RAW',{method:'PUT',body:JSON.stringify({values:[['Rol']]})})}
 async function pullCats(){const d=await api(`/${S.club.gid}/values/${enc(rng(S.club.catTab,'A:B'))}`);
  let rows=(d.values||[]).filter(r=>r.some(x=>String(x||'').trim()));
  if(!rows.length){await putCats();return false}
@@ -204,22 +208,34 @@ const rnd=()=>[...crypto.getRandomValues(new Uint8Array(12))].map(x=>x.toString(
 async function hashPin(pin,salt){const te=new TextEncoder(),k=await crypto.subtle.importKey('raw',te.encode(pin),'PBKDF2',false,['deriveBits']);
  const b=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:te.encode(salt),iterations:100000},k,256);return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 async function okPin(k,p){const c=S.club;if(c[k]&&p===c[k])return true;if(c[k+'h']&&c.salt){try{return await hashPin(p,c.salt)===c[k+'h']}catch(e){}}return false}
-async function readSettings(gid){const d=await api(`/${gid}/values/${enc(rng(TAB_I,'A2:B'))}?valueRenderOption=UNFORMATTED_VALUE`),m={};
- (d.values||[]).forEach(r=>{if(r[0])m[String(r[0]).trim()]=r[1]==null?'':r[1]});return m}
-async function syncSettings(){const c=S.club;if(c.helperOnly)return false;const m=await readSettings(c.gid);
+const META='quaestor-club';
+async function metaGet(gid){const r=await api(`/${gid}/developerMetadata:search`,{method:'POST',body:JSON.stringify({dataFilters:[{developerMetadataLookup:{metadataKey:META}}]})});
+ const x=((r.matchedDeveloperMetadata||[])[0]||{}).developerMetadata;if(!x)return null;try{return JSON.parse(x.metadataValue)}catch(e){return null}}
+async function metaPut(gid,o,exists){const v=JSON.stringify(o),lk={developerMetadataLookup:{metadataKey:META}};
+ const rq=exists?{updateDeveloperMetadata:{dataFilters:[lk],developerMetadata:{metadataValue:v},fields:'metadataValue'}}
+  :{createDeveloperMetadata:{developerMetadata:{metadataKey:META,metadataValue:v,location:{spreadsheet:true},visibility:'DOCUMENT'}}};
+ await api(`/${gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[rq]})})}
+async function oldTab(gid){
+ try{const m=await api(`/${gid}?fields=sheets.properties(sheetId,title)`),sh=(m.sheets||[]).find(x=>x.properties.title===TAB_I);if(!sh)return null;
+  const d=await api(`/${gid}/values/${enc(rng(TAB_I,'A1:B'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[];
+  if(!rows.length||String(rows[0][0]||'').trim()!=='Instelling')return null;
+  const o={};rows.slice(1).forEach(r=>{if(r[0])o[String(r[0]).trim()]=r[1]==null?'':r[1]});return{o,id:sh.properties.sheetId}}
+ catch(e){if(e.auth)throw e;return null}}
+async function readSettings(gid){const o=await metaGet(gid);if(o)return{m:o,src:'meta'};const t=await oldTab(gid);return t?{m:t.o,src:'tab',id:t.id}:{m:{},src:null}}
+async function syncSettings(){const c=S.club;if(c.helperOnly)return false;
+ const {m,src,id}=await readSettings(c.gid);let ch=false,wrote=false;
  if(c.setDirty||!m['Naam']){if(!c.salt)c.salt=rnd();let qh=c.pinQh,hh=c.pinHh;
   try{if(c.pinQ)qh=await hashPin(c.pinQ,c.salt);if(c.pinH)hh=await hashPin(c.pinH,c.salt)}catch(e){}
   c.pinQh=qh||'';c.pinHh=hh||'';c.setTs=Date.now();
-  const v=[['Naam',c.name],['Kleur',c.color],['Categorietabblad',c.catTab],['Salt',c.salt],['Quaestor-code',c.pinQh],['Helper-code',c.pinHh],['Gewijzigd',c.setTs]];
-  await api(`/${c.gid}/values/${enc(rng(TAB_I,'A2:B'))}:clear`,{method:'POST',body:'{}'});
-  await api(`/${c.gid}/values/${enc(rng(TAB_I,'A2'))}?valueInputOption=RAW`,{method:'PUT',body:JSON.stringify({values:v})});
-  c.setDirty=false;save();return false}
- const ts=+m['Gewijzigd']||0;
- if(ts>(c.setTs||0)){c.name=String(m['Naam']||c.name);if(/^#[0-9a-f]{6}$/i.test(String(m['Kleur'])))c.color=String(m['Kleur']);
-  if(m['Salt'])c.salt=String(m['Salt']);c.pinQh=String(m['Quaestor-code']||'');c.pinHh=String(m['Helper-code']||'');c.setTs=ts;
-  try{for(const k of ['pinQ','pinH'])if(c[k]&&c[k+'h']&&await hashPin(c[k],c.salt)!==c[k+'h'])c[k]=''}catch(e){}
-  save();theme();return true}
- return false}
+  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Gewijzigd':c.setTs},src==='meta');
+  wrote=true;c.setDirty=false;save()}
+ else{const ts=+m['Gewijzigd']||0;
+  if(ts>(c.setTs||0)){c.name=String(m['Naam']||c.name);if(/^#[0-9a-f]{6}$/i.test(String(m['Kleur'])))c.color=String(m['Kleur']);
+   if(m['Salt'])c.salt=String(m['Salt']);c.pinQh=String(m['Quaestor-code']||'');c.pinHh=String(m['Helper-code']||'');c.setTs=ts;
+   try{for(const k of ['pinQ','pinH'])if(c[k]&&c[k+'h']&&await hashPin(c[k],c.salt)!==c[k+'h'])c[k]=''}catch(e){}
+   save();theme();ch=true}}
+ if(src==='tab'){if(!wrote)await metaPut(c.gid,m,false);await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{deleteSheet:{sheetId:id}}]})})}
+ return ch}
 async function syncMembers(){const d=await api(`/${S.club.gid}/values/${enc(rng(TAB_L,'A2:B'))}`),rows=d.values||[],idx=new Map();let changed=false;
  rows.forEach((r,i)=>{const n=String(r[0]||'').trim();if(n&&!idx.has(n.toLowerCase()))idx.set(n.toLowerCase(),{row:i+2,st:normSt(r[1])})});
  const upd=[],out=[],mine=new Set();
@@ -232,8 +248,11 @@ async function syncMembers(){const d=await api(`/${S.club.gid}/values/${enc(rng(
  if(out.length)await append(TAB_L,'A:B',out.map(m=>[cell(m.name),m.status]));
  save();return changed}
 const pnum=v=>{if(v===''||v==null)return null;const n=typeof v==='number'?v:parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null};
-async function syncPrices(){const c=S.club,rg=enc(rng(TAB_P,'A2:E'));
- if(S.pricesDirty){await api(`/${c.gid}/values/${rg}:clear`,{method:'POST',body:'{}'});
+async function hasTab(t){const m=await api(`/${S.club.gid}?fields=sheets.properties.title`);return (m.sheets||[]).some(x=>x.properties.title===t)}
+async function syncPrices(){const c=S.club,rg=enc(rng(TAB_P,'A2:E')),has=await hasTab(TAB_P);
+ if(!has){if(!S.prices.length||c.helperOnly)return false;S.pricesDirty=true}
+ if(S.pricesDirty){if(!has){await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:TAB_P}}}]})});await head(TAB_P,HEAD_P)}
+  await api(`/${c.gid}/values/${rg}:clear`,{method:'POST',body:'{}'});
   const v=S.prices.map(x=>[cell(x.h),cell(x.s||''),x.p.lid==null?'':x.p.lid,x.p['niet-lid']==null?'':x.p['niet-lid'],x.p['oud-lid']==null?'':x.p['oud-lid']]);
   if(v.length)await api(`/${c.gid}/values/${enc(rng(TAB_P,'A2'))}?valueInputOption=USER_ENTERED`,{method:'PUT',body:JSON.stringify({values:v})});
   S.pricesDirty=false;save();return false}
@@ -250,20 +269,20 @@ function relink(){const by=new Map(S.tx.map(t=>[t.id,t]));
  S.tx.forEach(t=>{if(!t.storno)t.void=false;delete t.paidBy;delete t.paidDate});
  S.tx.forEach(t=>{if(t.storno){const o=by.get(t.ref);if(o)o.void=true}});
  S.tx.forEach(t=>{if(t.ref&&!t.storno&&!t.void){const d=by.get(t.ref);if(d){d.paidBy=t.id;d.paidDate=t.date}}})}
-async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(TAB_B,'A2:L'))}?valueRenderOption=UNFORMATTED_VALUE`),have=new Set(S.tx.map(t=>t.id));let add=0;
+async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(TAB_B,'A2:M'))}?valueRenderOption=UNFORMATTED_VALUE`),have=new Set(S.tx.map(t=>t.id));let add=0;
  const mem=new Map(S.members.map(m=>[m.name.toLowerCase(),m.id]));
  (d.values||[]).forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(!id||have.has(id))return;
   const v=pnum(r[7]);if(v==null)return;const date=toDate(r[1]),ts=toTs(String(r[11]||'').replace(/^'/,'')||r[11],date);
   if(c.wipeTs&&ts<c.wipeTs)return;const meth=REV[String(r[6]||'').trim().toLowerCase()];if(!meth)return;
-  const typ=String(r[8]||'').trim().toLowerCase(),ref=String(r[9]==null?'':r[9]).trim().replace(/^'/,''),name=String(r[2]||'').trim();
-  const t={id,ts,date,mid:mem.get(name.toLowerCase())||null,name,v,method:meth,h:String(r[4]||'').trim(),s:String(r[5]||'').trim(),desc:String(r[3]||'').trim(),by:/quaestor/i.test(String(r[10]||''))?'q':'h',void:false,synced:true};
+  const k=String(r[10]||'').trim(),typ=String(r[8]||'').trim().toLowerCase(),ref=String(r[9]==null?'':r[9]).trim().replace(/^'/,''),name=String(r[2]||'').trim();
+  const t={id,ts,date,mid:mem.get(name.toLowerCase())||null,name,v,method:meth,h:String(r[4]||'').trim(),s:String(r[5]||'').trim(),desc:String(r[3]||'').trim(),by:/quaestor/i.test(String(r[12]||'').trim()||k)?'q':'h',who:/^(quaestor|helper)$/i.test(k)?'':k,void:false,synced:true};
   if(typ==='storno')t.storno=true;if(ref&&(typ==='storno'||typ==='afbetaling'))t.ref=ref;
   S.tx.push(t);have.add(id);add++});
  if(add){S.tx.sort((a,b)=>a.ts-b.ts);relink();save()}return add>0}
 async function pushTx(){const p=S.tx.filter(t=>!t.synced);if(!p.length)return;
  const d=await api(`/${S.club.gid}/values/${enc(rng(TAB_B,'A2:A'))}`),ex=new Set((d.values||[]).map(r=>String(r[0]||'').trim().replace(/^'/,'')));
  const nw=p.filter(t=>!ex.has(t.id)).sort((a,b)=>a.ts-b.ts);
- if(nw.length)await append(TAB_B,'A:L',nw.map(rowOf));
+ if(nw.length)await append(TAB_B,'A:M',nw.map(rowOf));
  p.forEach(t=>t.synced=true);save()}
 async function sync(manual,force){
  if(SYNCING)return;const c=S.club;if(!force&&!autoOk())return;
@@ -272,7 +291,8 @@ async function sync(manual,force){
  try{
   const key=c.gmode+'|'+c.gid+'|'+c.catTab;
   if(ENS!==key){await ensureSheet();ENS=c.gmode+'|'+c.gid+'|'+c.catTab;LASTPULL=0}
-  if(manual||S.pricesDirty||S.members.some(m=>m.dirty)||Date.now()-LASTPULL>120000){changed=await syncSettings()||changed;changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;LASTPULL=Date.now()}
+  if(manual||S.pricesDirty||S.members.some(m=>m.dirty)||Date.now()-LASTPULL>120000){try{S.sync.warn='';changed=await syncSettings()||changed}catch(e){if(e.auth||e.pick)throw e;S.sync.warn='Clubgegevens bewaren lukte niet: '+(e.message||'onbekende fout')}
+  changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;LASTPULL=Date.now()}
   await pushTx();
   S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;S.sync.pick=false;save();
   if(manual)toast('Gesynchroniseerd')}
@@ -289,7 +309,7 @@ function stText(){const c=S.club;if(!c.gid)return '';if(!c.gok)return c.helperOn
  if(!navigator.onLine)return 'Offline'+u;
  return un?un+' te uploaden':'✓ Gesynchroniseerd'}
 function gStatus(){const c=S.club;if(!c.gid)return 'Nog niet verbonden.';if(!c.gok)return 'Opnieuw verbinden nodig: de app vraagt nu minder toegang. Tik op Verbinden met Google.';const un=S.tx.filter(t=>!t.synced).length;
- return `Verbonden. ${un} boeking(en) te uploaden. Laatste synchronisatie: ${S.sync.last?new Date(S.sync.last).toLocaleString('nl-BE'):'nog niet'}.`+(S.sync.err?' Fout: '+S.sync.err:'')}
+ return `Verbonden. ${un} boeking(en) te uploaden. Laatste synchronisatie: ${S.sync.last?new Date(S.sync.last).toLocaleString('nl-BE'):'nog niet'}.`+(S.sync.err?' Fout: '+S.sync.err:'')+(S.sync.warn?' '+S.sync.warn:'')}
 function refreshSt(){const e=$('#st');if(e){const t=stText();e.textContent=t;e.style.display=t?'block':'none'}const g=$('#gst');if(g)g.textContent=gStatus()}
 function readG(){const c=S.club,gm=document.querySelector('input[name=gm]:checked');
  if(gm)c.gmode=gm.value;if($('#ict'))c.catTab=$('#ict').value.trim()||'Categorieën';
@@ -333,7 +353,7 @@ function doJoin(){const p=$('#jp').value.trim();if(p.length<4){$('#je').textCont
  const o=JOIN,sx=v=>typeof v==='string'&&/^[\w.-]{5,120}$/.test(v)?v:'',col=/^#[0-9a-f]{6}$/i.test(o.c||'')?o.c:'#8b1e3f';
  Object.assign(S.club,{helperOnly:true,name:String(o.n||'Club').slice(0,60),color:col,catTab:String(o.t||'Categorieën').slice(0,60),pinH:p,pinQ:'',gmode:'existing',gid:'',gok:false,gpicked:false,gcreated:false,inviteGid:o.i,cid:sx(o.ci),akey:sx(o.ak),appid:sx(o.ap)});
  save();JOIN=null;try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
- role='h';tab='boek';theme();render()}
+ role='h';theme();enter()}
 function setup(){$('#app').innerHTML=`<div class="auth"><h2>Welkom bij je betalingsapp</h2><p class="mu">Een gratis app voor studentenclubs en verenigingen om tijdens een activiteit te registreren wie betaald heeft: cash, Payconiq, overschrijving of op de schuldenlijst. Je gegevens blijven op je toestel. Als je wil, worden ze ook in je eigen Google Sheet gezet.</p><p class="mu">Stel je club in. Alles kan je later aanpassen.</p>
 <label>Naam van de club<input id="sn" autocomplete="off"></label>
 <label>Pincode voor de Quaestor (minstens 4 cijfers)<input id="sq" type="password" inputmode="numeric"></label>
@@ -342,10 +362,15 @@ function setup(){$('#app').innerHTML=`<div class="auth"><h2>Welkom bij je betali
 function doSetup(){const n=$('#sn').value.trim(),q=$('#sq').value.trim(),h=$('#sh').value.trim();
  const e=!n?'Vul de naam van de club in.':q.length<4||h.length<4?'Elke pincode heeft minstens 4 cijfers.':q===h?'De twee pincodes moeten verschillen.':'';
  if(e){$('#se').textContent=e;return}
- Object.assign(S.club,{name:n,pinQ:q,pinH:h,setDirty:true});save();role='q';render()}
+ Object.assign(S.club,{name:n,pinQ:q,pinH:h,setDirty:true});save();role='q';enter()}
 function login(){$('#app').innerHTML=`<div class="auth"><h2>${esc(S.club.name)}</h2><label>Pincode<input id="lp" type="password" inputmode="numeric" autofocus onkeydown="if(event.key==='Enter')doLogin()"></label><div class="err" id="le"></div><button class="btn" onclick="doLogin()">Openen</button><button class="btn ghost" style="margin-top:8px" onclick="clubsScreen()">Mijn clubs</button><p class="mu" style="margin-top:16px"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`}
+const needName=()=>!S.club.names[role]||S.club.askName;
+function enter(){if(needName())return nameScreen();WHO=S.club.names[role];tab='boek';render();queueSync()}
+function nameScreen(){$('#app').innerHTML=`<div class="auth"><h2>Wie ben je?</h2><p class="mu">Je naam komt bij elke boeking die je registreert te staan, zodat de Quaestor kan nagaan wie wat heeft ingevoerd.</p><label>Je naam<input id="wn" autocomplete="name" value="${esc(S.club.names[role]||'')}" onkeydown="if(event.key==='Enter')saveName()"></label><div class="err" id="wne"></div><button class="btn" onclick="saveName()">Verder</button></div>`}
+function saveName(){const n=($('#wn').value||'').trim().slice(0,40);if(n.length<2){$('#wne').textContent='Vul je naam in (minstens 2 letters).';return}S.club.names[role]=n;WHO=n;save();tab='boek';render();queueSync()}
+function chName(){const n=($('#wn2').value||'').trim().slice(0,40);if(n.length<2)return toast('Vul je naam in (minstens 2 letters)');S.club.names[role]=n;WHO=n;save();toast('Naam opgeslagen')}
 async function doLogin(){const p=$('#lp').value.trim();let r=null;if(p){if(!S.club.helperOnly&&await okPin('pinQ',p))r='q';else if(await okPin('pinH',p))r='h'}
- if(!r){$('#le').textContent='Deze pincode klopt niet.';return}role=r;tab='boek';render();queueSync()}
+ if(!r){$('#le').textContent='Deze pincode klopt niet.';return}role=r;enter()}
 function logout(){role=null;login()}
 function busy(){if(SYNCING){toast('Even geduld, er loopt een synchronisatie.');return true}return false}
 function clubsScreen(){const l=REG.list.map(x=>{const a=x.id===REG.active;
@@ -371,7 +396,7 @@ async function restorePick(){const e=m=>{const x=$('#re');if(x)x.textContent=m};
  let r;try{SI=true;const tok=await getToken();await loadPicker();r=await pickFile(tok)}catch(x){SI=false;return e(x.message)}
  SI=false;if(!r)return;
  const old=S.club.gid;S.club.gid=r.id;let m;
- try{SI=true;m=await readSettings(r.id)}catch(x){S.club.gid=old;SI=false;return e(x.message)}SI=false;
+ try{SI=true;m=(await readSettings(r.id)).m}catch(x){S.club.gid=old;SI=false;return e(x.message)}SI=false;
  if(!m['Naam']||!m['Quaestor-code']||!m['Salt']){S.club.gid=old;return e('In deze spreadsheet staan nog geen clubgegevens. Open de app op het toestel van de Quaestor, tik bovenaan op de status om te synchroniseren en probeer dan opnieuw.')}
  RST.id=r.id;RST.name=r.name;RST.m=m;
  $('#app').innerHTML=`<div class="auth"><h2>${esc(m['Naam'])}</h2><label>Pincode van de Quaestor<input id="rp" type="password" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter')restoreGo()"></label><div class="err" id="re"></div><button class="btn" onclick="restoreGo()">Aanmelden als Quaestor</button><button class="btn ghost" style="margin-top:8px" onclick="restoreCancel()">Annuleren</button></div>`}
@@ -380,7 +405,7 @@ async function restoreGo(){const p=($('#rp').value||'').trim(),m=RST.m;if(!p)ret
  if(h!==String(m['Quaestor-code']))return $('#re').textContent='Deze pincode klopt niet.';
  Object.assign(S.club,{name:String(m['Naam']),color:/^#[0-9a-f]{6}$/i.test(String(m['Kleur']))?String(m['Kleur']):'#8b1e3f',catTab:String(m['Categorietabblad']||'Categorieën'),salt:String(m['Salt']),pinQ:p,pinQh:h,pinH:'',pinHh:String(m['Helper-code']||''),
   gid:RST.id,gmode:'existing',gpicked:true,gname:RST.name||'',gok:true,gcreated:false,setTs:+m['Gewijzigd']||0,setDirty:false});
- RST=null;save();theme();role='q';tab='boek';render();sync(true,true)}
+ RST=null;save();theme();role='q';sync(true,true);enter()}
 
 /* ================= OPBOUW ================= */
 function render(){const Q=role==='q';
@@ -390,7 +415,7 @@ function render(){const Q=role==='q';
  $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${Q?'Quaestor':'Helper'}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div><button onclick="logout()">Vergrendel</button></header>
  <main>${v}</main><nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</nav>`;
  if(tab==='boek')sug();if(tab==='leden')ml();refreshSt()}
-const row=(t,st)=>`<div class="row${t.void?' void':''}"><div><b>${esc(t.name||'Zonder naam')}</b><div class="mu">${esc(t.h)}${t.s?' · '+esc(t.s):''} · ${M[t.method]}${t.desc?' · '+esc(t.desc):''}${t.storno?' · storno':''}</div></div><div class="amt ${t.v<0?'neg':''}">${eur(t.v)}${st&&!t.void&&!t.storno?`<button class="sm" onclick="storno('${t.id}')">Storno</button>`:''}</div></div>`;
+const row=(t,st)=>`<div class="row${t.void?' void':''}"><div><b>${esc(t.name||'Zonder naam')}</b><div class="mu">${esc(t.h)}${t.s?' · '+esc(t.s):''} · ${M[t.method]}${t.desc?' · '+esc(t.desc):''}${t.who?' · '+esc(t.who):''}${t.storno?' · storno':''}</div></div><div class="amt ${t.v<0?'neg':''}">${eur(t.v)}${st&&!t.void&&!t.storno?`<button class="sm" onclick="storno('${t.id}')">Storno</button>`:''}</div></div>`;
 const empty=t=>`<p class="mu">${t}</p>`;
 const opts=(l,sel,blank)=>(blank?'<option value="">(geen)</option>':'')+l.map(x=>`<option${x===sel?' selected':''}>${esc(x)}</option>`).join('');
 
@@ -434,16 +459,16 @@ function book(){const a=parseFloat(String(B.amt).replace(',','.'));
   return ask('Dit lid is vandaag al geboekt voor deze categorie. Toch nog eens boeken?','Toch boeken',()=>commit(a));
  commit(a)}
 function commit(a){const m=S.members.find(x=>x.id===B.mid);
- S.tx.push({id:uid(),ts:Date.now(),date:today(),mid:B.mid,name:m?m.name:B.name.trim(),v:a,method:B.method,h:B.h,s:B.s,desc:B.desc.trim(),by:role,void:false,synced:false});
+ S.tx.push({who:WHO,id:uid(),ts:Date.now(),date:today(),mid:B.mid,name:m?m.name:B.name.trim(),v:a,method:B.method,h:B.h,s:B.s,desc:B.desc.trim(),by:role,void:false,synced:false});
  save();Object.assign(B,{mid:null,name:'',amt:'',desc:'',man:false});toast('Geboekt');render();queueSync()}
 function storno(id){const t=S.tx.find(x=>x.id===id);if(!t)return;
  if(t.method==='schuld'&&t.paidBy)return toast('Storneer eerst de afbetaling van deze schuld');
  ask('Deze boeking storneren? Er komt een tegenboeking, er wordt niets gewist.','Storneren',()=>doStorno(id))}
 function doStorno(id){const t=S.tx.find(x=>x.id===id);if(!t||t.void)return;
- t.void=true;S.tx.push({...t,id:uid(),ts:Date.now(),date:today(),v:-t.v,storno:true,void:false,ref:t.id,by:role,synced:false});
+ t.void=true;S.tx.push({...t,who:WHO,id:uid(),ts:Date.now(),date:today(),v:-t.v,storno:true,void:false,ref:t.id,by:role,synced:false});
  if(t.ref){const d=S.tx.find(x=>x.id===t.ref);if(d&&d.paidBy===t.id){delete d.paidBy;delete d.paidDate}}
  save();toast('Gestorneerd');render();queueSync()}
-function vVandaag(){const l=S.tx.filter(t=>t.date===today()&&!t.storno).reverse();return `<div class="card"><h2>Vandaag: ${l.filter(t=>!t.void).length} boekingen</h2>${l.length?l.map(t=>row(t,false)).join(''):empty('Nog niets geboekt vandaag.')}</div>${S.club.helperOnly?`<div class="card"><h2>Dit toestel</h2><p class="mu">Gebruik je dit toestel niet meer voor ${esc(S.club.name)}? Koppel het dan los. De gegevens op dit toestel worden gewist, de spreadsheet blijft.</p><button class="btn ghost" onclick="devOff()">Dit toestel loskoppelen</button></div>`:''}`}
+function vVandaag(){const l=S.tx.filter(t=>t.date===today()&&!t.storno).reverse();return `<div class="card"><h2>Vandaag: ${l.filter(t=>!t.void).length} boekingen</h2>${l.length?l.map(t=>row(t,false)).join(''):empty('Nog niets geboekt vandaag.')}</div>${S.club.helperOnly?`<div class="card"><h2>Dit toestel</h2><p class="mu">Gebruik je dit toestel niet meer voor ${esc(S.club.name)}? Koppel het dan los. De gegevens op dit toestel worden gewist, de spreadsheet blijft.</p><label>Je naam<input id="wn2" value="${esc(S.club.names.h)}"></label><button class="btn ghost" style="margin-bottom:8px" onclick="chName()">Naam opslaan</button><button class="btn ghost" onclick="devOff()">Dit toestel loskoppelen</button></div>`:''}`}
 
 /* ---------- dag ---------- */
 function vDag(){const l=S.tx.filter(t=>t.date===DAY),sum=m=>l.filter(t=>t.method===m).reduce((a,t)=>a+t.v,0);
@@ -452,8 +477,12 @@ function vDag(){const l=S.tx.filter(t=>t.date===DAY),sum=m=>l.filter(t=>t.method
  const todo=S.members.filter(m=>!done.has(m.id)).sort((a,b)=>a.name.localeCompare(b.name));
  return `<div class="card"><label>Dag<input type="date" value="${DAY}" onchange="DAY=this.value||today();render()"></label>
  <div class="grid"><div class="stat">Cash<b>${eur(sum('cash'))}</b></div><div class="stat">Payconiq<b>${eur(sum('payconiq'))}</b></div><div class="stat">Overschrijving<b>${eur(sum('overschrijving'))}</b></div><div class="stat">Op schuldenlijst<b>${eur(sum('schuld'))}</b></div><div class="stat big">Totaal ontvangen<b>${eur(tot)}</b><span class="mu">Tel de kassa na en vergelijk met het bedrag bij Cash.</span></div></div></div>
- <div class="card"><h2>Boekingen van deze dag</h2>${l.length?l.slice().reverse().map(t=>row(t,true)).join(''):empty('Geen boekingen op deze dag.')}</div>
+ ${perPerson(l)}<div class="card"><h2>Boekingen van deze dag</h2>${l.length?l.slice().reverse().map(t=>row(t,true)).join(''):empty('Geen boekingen op deze dag.')}</div>
  <div class="card"><h2>Nog niet geboekt op deze dag (${todo.length})</h2>${todo.length?todo.slice(0,40).map(m=>`<div class="row"><div>${esc(m.name)} <span class="mu">${esc(m.status)}</span></div><button class="sm" onclick="goBook('${m.id}')">Boeken</button></div>`).join('')+(todo.length>40?empty('… en '+(todo.length-40)+' anderen'):''):empty('Iedereen uit de ledenlijst is geboekt.')}</div>`}
+function perPerson(l){const pp={};
+ l.forEach(t=>{const k=t.who||(t.by==='q'?'Quaestor':'Helper');const o=pp[k]=pp[k]||{n:0,v:0};if(!t.storno&&!t.void)o.n++;if(t.method!=='schuld')o.v+=t.v});
+ const ks=Object.keys(pp).sort();if(!ks.length)return '';
+ return `<div class="card"><h2>Per persoon</h2>${ks.map(k=>`<div class="row"><div>${esc(k)} <span class="mu">${pp[k].n} boeking${pp[k].n===1?'':'en'}</span></div><div class="amt">${eur(pp[k].v)}</div></div>`).join('')}<p class="mu">Ontvangen bedrag (zonder schuldenlijst), na stornos.</p></div>`}
 function goBook(id){tab='boek';pick(id)}
 
 /* ---------- schulden ---------- */
@@ -461,7 +490,7 @@ const open=()=>S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno&&!t
 function vSchuld(){const o=open(),by={};o.forEach(t=>{(by[t.name]=by[t.name]||[]).push(t)});const tot=o.reduce((a,t)=>a+t.v,0);
  return `<div class="grid"><div class="stat big">Totaal openstaand<b>${eur(tot)}</b></div></div>`+(Object.keys(by).length?Object.keys(by).sort().map(n=>`<div class="card"><h2>${esc(n)} · ${eur(by[n].reduce((a,t)=>a+t.v,0))}</h2>${by[n].map(t=>`<div class="row"><div>${t.date} · ${esc(t.h)}${t.s?' · '+esc(t.s):''}${t.desc?`<div class="mu">${esc(t.desc)}</div>`:''}</div><div class="amt">${eur(t.v)}<button class="sm" onclick="pay('${t.id}')">Betaald</button></div></div>`).join('')}</div>`).join(''):`<div class="card">${empty('Geen openstaande schulden.')}</div>`)}
 function pay(id){const d=S.tx.find(x=>x.id===id);modal(`<h3>Schuld afbetalen</h3><p>${esc(d.name)} · ${eur(d.v)}</p><label>Betaalwijze<select id="pm"><option value="cash">Cash</option><option value="payconiq">Payconiq</option><option value="overschrijving">Overschrijving</option></select></label><label>Datum<input type="date" id="pd" value="${today()}"></label><button class="btn" onclick="payOk('${id}')">Markeer als betaald</button>`)}
-function payOk(id){const d=S.tx.find(x=>x.id===id),n={id:uid(),ts:Date.now(),date:$('#pd').value||today(),mid:d.mid,name:d.name,v:d.v,method:$('#pm').value,h:d.h,s:d.s,desc:'Afbetaling schuld',by:role,ref:d.id,void:false,synced:false};
+function payOk(id){const d=S.tx.find(x=>x.id===id),n={who:WHO,id:uid(),ts:Date.now(),date:$('#pd').value||today(),mid:d.mid,name:d.name,v:d.v,method:$('#pm').value,h:d.h,s:d.s,desc:'Afbetaling schuld',by:role,ref:d.id,void:false,synced:false};
  S.tx.push(n);d.paidBy=n.id;d.paidDate=n.date;save();closeM();toast('Schuld afbetaald');render();queueSync()}
 
 /* ---------- leden ---------- */
@@ -525,6 +554,7 @@ function vInst(){const c=S.club;
  return `<div class="card"><h2>Club</h2><label>Naam<input id="in" value="${esc(c.name)}"></label><label>Clubkleur<input type="color" id="ic" value="${c.color}"></label>
  <label>Logo<input type="file" accept="image/*" onchange="logo(this)"></label>${c.logo?'<button class="btn ghost" onclick="S.club.logo=\'\';save();render()">Logo verwijderen</button>':''}
  <label style="margin-top:12px">Weergave<select id="it2"><option value="auto"${c.theme==='auto'?' selected':''}>Volgt je toestel</option><option value="light"${c.theme==='light'?' selected':''}>Licht</option><option value="dark"${c.theme==='dark'?' selected':''}>Donker</option></select></label></div>
+ <div class="card"><h2>Jouw naam</h2><label>Naam van de Quaestor<input id="iw" value="${esc(c.names.q)}"></label><label>Naam vragen bij elke keer inloggen<select id="ia"><option value="0">Nee</option><option value="1"${c.askName?' selected':''}>Ja, handig als meerdere mensen dit toestel gebruiken</option></select></label></div>
  <div class="card"><h2>Pincodes</h2><label>Pincode Quaestor<input id="iq" type="password" inputmode="numeric" value="${esc(c.pinQ)}" placeholder="${c.pinQh&&!c.pinQ?'(ongewijzigd)':''}"></label><label>Pincode Helper<input id="ih" type="password" inputmode="numeric" value="${esc(c.pinH)}" placeholder="${c.pinHh&&!c.pinH?'(ongewijzigd)':''}"></label></div>
  ${catCard()}${prCard()}${gCard()}${invCard()}
  <button class="btn" onclick="saveSet()">Instellingen opslaan</button>
@@ -535,9 +565,10 @@ function saveSet(){const q=$('#iq').value.trim(),h=$('#ih').value.trim(),c0=S.cl
  if($('#ich')){const list=id=>[...new Set($(id).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean))];
   const ch=list('#ich'),cs=list('#ics');if(!ch.length)return toast('Voeg minstens één hoofdcategorie toe');S.cats={h:ch,s:cs}}
  Object.assign(S.club,{name:$('#in').value.trim()||S.club.name,color:$('#ic').value,theme:$('#it2').value,pinQ:q||S.club.pinQ,pinH:h||S.club.pinH,setDirty:true});
+ const iw=($('#iw').value||'').trim().slice(0,40);if(iw.length>=2){S.club.names.q=iw;if(role==='q')WHO=iw}S.club.askName=$('#ia').value==='1';
  readG();theme();toast('Opgeslagen');render()}
 function logo(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,160/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);S.club.logo=c.toDataURL('image/png');save();render()};im.src=r.result};r.readAsDataURL(f)}
-function csv(){const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';return ['id;datum;lid;omschrijving;hoofdcategorie;subcategorie;betaalwijze;bedrag;status'].concat(S.tx.map(t=>[t.id,t.date,t.name,t.desc,t.h,t.s,M[t.method],String(t.v).replace('.',','),t.storno?'storno':t.void?'gestorneerd':'ok'].map(q).join(';'))).join('\n')}
+function csv(){const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';return ['id;datum;lid;omschrijving;hoofdcategorie;subcategorie;betaalwijze;bedrag;status;ingevoerd door'].concat(S.tx.map(t=>[t.id,t.date,t.name,t.desc,t.h,t.s,M[t.method],String(t.v).replace('.',','),t.storno?'storno':t.void?'gestorneerd':'ok',t.who||(t.by==='q'?'Quaestor':'Helper')].map(q).join(';'))).join('\n')}
 function showT(t,x){modal(`<h3>${t}</h3><textarea id="tx" readonly>${esc(x)}</textarea><button class="btn" style="margin-top:10px" onclick="cp()">Kopiëren</button>`)}
 function cp(){const e=$('#tx');e.select();try{navigator.clipboard.writeText(e.value).then(()=>toast('Gekopieerd'),()=>document.execCommand('copy'))}catch(x){try{document.execCommand('copy');toast('Gekopieerd')}catch(y){toast('Selecteer de tekst en kopieer ze zelf')}}}
 function restore(){modal(`<h3>Back-up terugzetten</h3><p class="mu">Plak hier de volledige back-up. Alles op dit toestel wordt vervangen.</p><textarea id="rt"></textarea><button class="btn" style="margin-top:10px" onclick="restoreOk()">Terugzetten</button>`)}
