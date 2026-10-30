@@ -69,6 +69,7 @@ summary{color:var(--mu);font-size:.85rem;padding:4px 0}
 .g3 label{margin:0}
 .banner{border-color:var(--ac)}
 #toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:.9rem;display:none;z-index:6;max-width:90%;text-align:center}
+.auth::after{content:var(--ver);display:block;text-align:center;margin-top:18px;font-size:12px;opacity:.6}
 </style>
 </head>
 <body>
@@ -88,7 +89,7 @@ const TAB_B='Boekingen',TAB_L='Leden',TAB_P='Prijzen',TAB_I='Instellingen';
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='8';
+const APP_VERSION='8';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -619,7 +620,9 @@ function restore(){modal(`<h3>Back-up terugzetten</h3><p class="mu">Plak hier de
 function restoreOk(){try{const d=JSON.parse($('#rt').value);if(!d.club||!Array.isArray(d.tx)||!d.cats)throw 0;S=d;norm();ENS='';save();theme();closeM();render();toast('Back-up teruggezet')}catch(e){toast('Dit is geen geldige back-up')}}
 
 start();
-if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0){const had=!!navigator.serviceWorker.controller,t0=Date.now();let rl=false;
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!rl&&Date.now()-t0<15000){rl=true;location.reload()}});
+ navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{})}
 </script>
 </body>
 </html>
