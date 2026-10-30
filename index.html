@@ -98,7 +98,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='10';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='11';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -416,7 +416,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)queueSync(
 setInterval(()=>{if(!document.hidden)sync(false)},45000);
 
 /* ================= START EN INLOGGEN ================= */
-function parseJoin(){const m=location.hash.match(/^#join=([\w-]+)$/);if(!m)return null;
+function parseJoin(s){const m=String(s==null?location.hash:s).trim().match(/#join=([\w-]+)\s*$/);if(!m)return null;
  try{const o=JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g,'+').replace(/_/g,'/')))));return o&&typeof o.i==='string'&&/^[\w-]{20,}$/.test(o.i)?o:null}catch(e){return null}}
 let JOIN=parseJoin();
 function start(){theme();
@@ -425,6 +425,8 @@ function start(){theme();
  if(emptyClub(S))return setup();if(!role)return login();render()}
 function joinAsk(){$('#app').innerHTML=`<div class="auth"><h2>Uitnodiging</h2><p class="mu">Je bent uitgenodigd als helper bij <b>${esc(JOIN.n||'een club')}</b>. Dit toestel is al ingesteld voor een andere club. Wil je deze club erbij zetten? Je andere clubs blijven bewaard.</p><button class="btn" onclick="addJoin()">Toevoegen als extra club</button><button class="btn ghost" style="margin-top:8px" onclick="ignoreJoin()">Negeren</button></div>`}
 function addJoin(){save();const j=JOIN;newProfile();JOIN=j;joinScreen()}
+function pasteInv(){modal(`<h3>Uitnodigingslink plakken</h3><p class="mu">Kopieer de link die de Quaestor je stuurde en plak hem hier. Handig op een iPhone, waar de app op je beginscherm los staat van Safari.</p><label>Link<input id="pil" autocomplete="off" placeholder="https://…#join=…" onkeydown="if(event.key==='Enter')pasteInvOk()"></label><button class="btn" onclick="pasteInvOk()">Verder</button>`)}
+function pasteInvOk(){const j=parseJoin($('#pil').value);if(!j)return toast('Dit is geen geldige uitnodigingslink');closeM();JOIN=j;start()}
 function ignoreJoin(){JOIN=null;try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}start()}
 function joinScreen(){$('#app').innerHTML=`<div class="auth"><h2>Uitnodiging als helper</h2><p class="mu">Je bent uitgenodigd om mee te helpen bij <b>${esc(JOIN.n||'een club')}</b>. Kies een pincode voor dit toestel. Daarna meld je je aan bij Google en kies je de spreadsheet die de Quaestor met je deelde.</p>
 <label>Pincode voor dit toestel (minstens 4 cijfers)<input id="jp" type="password" inputmode="numeric" autocomplete="off"></label><div class="err" id="je"></div><button class="btn" onclick="doJoin()">Verder</button><p class="mu" style="margin-top:16px"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`}
@@ -437,7 +439,7 @@ function setup(){$('#app').innerHTML=`<div class="auth"><h2>Welkom bij je betali
 <label>Naam van de club<input id="sn" autocomplete="off"></label>
 <label>Pincode voor de Quaestor (minstens 4 cijfers)<input id="sq" type="password" inputmode="numeric"></label>
 <label>Pincode voor helpers aan de deur (een andere dan die van de Quaestor)<input id="sh" type="password" inputmode="numeric"></label>
-<div class="err" id="se"></div><button class="btn" onclick="doSetup()">Starten</button><button class="btn ghost" style="margin-top:8px" onclick="restoreScreen(false)">Bestaande club ophalen</button>${REG.list.length>1?'<button class="btn ghost" style="margin-top:8px" onclick="clubsScreen()">Mijn clubs</button>':''}<p class="mu" style="margin-top:16px"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`}
+<div class="err" id="se"></div><button class="btn" onclick="doSetup()">Starten</button><button class="btn ghost" style="margin-top:8px" onclick="restoreScreen(false)">Bestaande club ophalen</button><button class="btn ghost" style="margin-top:8px" onclick="pasteInv()">Ik heb een uitnodigingslink</button>${REG.list.length>1?'<button class="btn ghost" style="margin-top:8px" onclick="clubsScreen()">Mijn clubs</button>':''}<p class="mu" style="margin-top:16px"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`}
 function doSetup(){const n=$('#sn').value.trim(),q=$('#sq').value.trim(),h=$('#sh').value.trim();
  const e=!n?'Vul de naam van de club in.':q.length<4||h.length<4?'Elke pincode heeft minstens 4 cijfers.':q===h?'De twee pincodes moeten verschillen.':'';
  if(e){$('#se').textContent=e;return}
