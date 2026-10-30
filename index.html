@@ -70,6 +70,10 @@ summary{color:var(--mu);font-size:.85rem;padding:4px 0}
 .banner{border-color:var(--ac)}
 #toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:.9rem;display:none;z-index:6;max-width:90%;text-align:center}
 .auth::after{content:var(--ver);display:block;text-align:center;margin-top:18px;font-size:12px;opacity:.6}
+.acc{padding:12px 0;border-bottom:1px solid var(--bd)}.acc:last-child{border:0}
+.tag{display:inline-block;font-size:.72rem;padding:2px 7px;border-radius:99px;background:var(--in);border:1px solid var(--bd);margin:2px 2px 0 0;font-weight:400}
+.tag.warn{border-color:var(--er);color:var(--er)}
+.accb{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.accb .btn{width:auto;padding:7px 11px;font-size:.85rem}
 </style>
 </head>
 <body>
@@ -89,7 +93,7 @@ const TAB_B='Boekingen',TAB_L='Leden',TAB_P='Prijzen',TAB_I='Instellingen';
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='8';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='9';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -117,7 +121,8 @@ try{const r=localStorage.getItem(K);if(r)S=JSON.parse(r)}catch(e){}
 if(!S)S=DEF();
 function norm(){
  if(Array.isArray(S.cats)){const o=S.cats;S.cats={h:o.map(c=>c.h),s:[...new Set(o.flatMap(c=>c.s))]}}
- S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0,askName:false},S.club);
+ S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0,askName:false,dev:'',acc:{},accMid:0,accGid:'',accSig:'',accTs:0,accF:0,blocked:''},S.club);
+ if(!S.club.dev)S.club.dev=uid().replace(/-/g,'');if(!S.club.acc||typeof S.club.acc!=='object'||Array.isArray(S.club.acc))S.club.acc={};
  if(S.club.gscope!==SCOPE){if(S.club.gid||S.club.gok){S.club.gok=false;if(S.club.gmode==='existing')S.club.gpicked=false;try{sessionStorage.removeItem('qg')}catch(e){}}S.club.gscope=SCOPE}
  S.sync=Object.assign({last:0,err:'',auth:false,pick:false,warn:''},S.sync||{});
  S.club.names=Object.assign({q:'',h:''},S.club.names||{});
@@ -224,6 +229,35 @@ async function metaPut(gid,o,exists){const v=JSON.stringify(o),lk={developerMeta
  const rq=exists?{updateDeveloperMetadata:{dataFilters:[lk],developerMetadata:{metadataValue:v},fields:'metadataValue'}}
   :{createDeveloperMetadata:{developerMetadata:{metadataKey:META,metadataValue:v,location:{spreadsheet:true},visibility:'DOCUMENT'}}};
  await api(`/${gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[rq]})})}
+const ACC='quaestor-acc';
+function devLabel(){const u=navigator.userAgent||'';const os=/iPhone/.test(u)?'iPhone':/iPad/.test(u)?'iPad':/Android/.test(u)?'Android':/CrOS/.test(u)?'Chromebook':/Windows/.test(u)?'Windows':/Mac OS X/.test(u)?'Mac':/Linux/.test(u)?'Linux':'Toestel';
+ const br=/SamsungBrowser/.test(u)?'Samsung Internet':/Edg\//.test(u)?'Edge':/Firefox|FxiOS/.test(u)?'Firefox':/CriOS|Chrome/.test(u)?'Chrome':/Safari/.test(u)?'Safari':'browser';
+ let app=false;try{app=matchMedia('(display-mode: standalone)').matches||!!navigator.standalone}catch(e){}return os+' · '+br+(app?' · geïnstalleerd':'')}
+async function accList(gid){const r=await api(`/${gid}/developerMetadata:search`,{method:'POST',body:JSON.stringify({dataFilters:[{developerMetadataLookup:{metadataKey:ACC}}]})});
+ return (r.matchedDeveloperMetadata||[]).map(x=>{const d=x.developerMetadata||{};try{const o=JSON.parse(d.metadataValue);if(!o||!/^[\w-]{6,64}$/.test(String(o.id)))return null;o.mid=d.metadataId;return o}catch(e){return null}}).filter(Boolean)}
+async function accDel(mids){if(!mids.length)return;await api(`/${S.club.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:mids.map(i=>({deleteDeveloperMetadata:{dataFilter:{developerMetadataLookup:{metadataId:i}}}}))})})}
+async function accPing(){const c=S.club;if(!role||!c.gid)return;const n=WHO||c.names[role]||'',d=devLabel(),sig=JSON.stringify([n,role,d,APP_VERSION,c.gid]);
+ if(c.accMid&&c.accGid===c.gid&&c.accSig===sig&&Date.now()-(c.accTs||0)<36e5)return;
+ if(!c.accF)c.accF=Date.now();const v=JSON.stringify({id:c.dev,n,r:role,d,f:c.accF,l:Date.now(),v:APP_VERSION});
+ const up=c.accMid&&c.accGid===c.gid;
+ const rq=up?{updateDeveloperMetadata:{dataFilters:[{developerMetadataLookup:{metadataId:c.accMid}}],developerMetadata:{metadataValue:v},fields:'metadataValue'}}
+  :{createDeveloperMetadata:{developerMetadata:{metadataKey:ACC,metadataValue:v,location:{spreadsheet:true},visibility:'DOCUMENT'}}};
+ let r;try{r=await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[rq]})})}catch(e){if(e.auth)throw e;if(up){c.accMid=0;save()}return}
+ if(!up){const x=(((r.replies||[])[0]||{}).createDeveloperMetadata||{}).developerMetadata;if(!x||x.metadataId==null)return;c.accMid=x.metadataId;c.accGid=c.gid}
+ c.accSig=sig;c.accTs=Date.now();save()}
+const accSt=()=>{const a=(S.club.acc||{})[S.club.dev];return a&&a.s||''};
+function accCheck(){const c=S.club,s=accSt();
+ if(s==='uit'||s==='weg'){if(c.blocked!==s){c.blocked=s;save()}return s}
+ if(c.blocked){c.blocked='';save();if(!role)setTimeout(()=>{start();toast('Je toegang is teruggegeven')},0)}
+ if(s==='h'&&role==='q'){role=null;setTimeout(()=>{login();toast('De Quaestor heeft dit toestel alleen helperrechten gegeven.')},0)}
+ return ''}
+function blockAfter(){role=null;WHO='';closeM();S.club.blocked==='weg'?goneGo():blockedScreen()}
+function blockedScreen(){const n=S.tx.filter(t=>!t.synced).length;
+ $('#app').innerHTML=`<div class="auth"><h2>${esc(S.club.name)}</h2><p class="mu">De Quaestor heeft de toegang van dit toestel ${S.club.blocked==='weg'?'verwijderd':'ingetrokken'}. Je kan op dit toestel niet meer boeken voor deze club. ${S.club.blocked==='weg'?'':'Als de Quaestor je toegang teruggeeft, kan je gewoon verder.'}</p>${n?`<p class="mu">${n} boeking(en) van dit toestel zijn nog niet geüpload. Ze worden geüpload zodra er verbinding is.</p>`:''}
+ <div class="err" id="be"></div><button class="btn" onclick="recheck()">Opnieuw controleren</button><button class="btn ghost" style="margin-top:8px" onclick="clubsScreen()">Mijn clubs</button></div>`}
+async function recheck(){if(SYNCING)return;LASTPULL=0;await sync(true,true);const c=S.club;if(c.blocked){if(c.blocked==='weg')return goneGo();blockedScreen();const e=$('#be');if(e)e.textContent=S.sync.err||'Je toegang is nog altijd ingetrokken.'}}
+function goneGo(){if(S.tx.some(t=>!t.synced))return blockedScreen();const nm=S.club.name||'deze club';removeProfile(REG.active);S=null;loadProfile(REG.list[0].id);
+ $('#app').innerHTML=`<div class="auth"><h2>Toegang verwijderd</h2><p class="mu">De Quaestor heeft dit toestel verwijderd uit ${esc(nm)}. De gegevens van die club zijn van dit toestel gewist. Wil je later opnieuw meehelpen, vraag dan een nieuwe uitnodiging.</p><button class="btn" onclick="start()">OK</button></div>`}
 async function oldTab(gid){
  try{const m=await api(`/${gid}?fields=sheets.properties(sheetId,title)`),sh=(m.sheets||[]).find(x=>x.properties.title===TAB_I);if(!sh)return null;
   const d=await api(`/${gid}/values/${enc(rng(TAB_I,'A1:B'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[];
@@ -231,13 +265,15 @@ async function oldTab(gid){
   const o={};rows.slice(1).forEach(r=>{if(r[0])o[String(r[0]).trim()]=r[1]==null?'':r[1]});return{o,id:sh.properties.sheetId}}
  catch(e){if(e.auth)throw e;return null}}
 async function readSettings(gid){const o=await metaGet(gid);if(o)return{m:o,src:'meta'};const t=await oldTab(gid);return t?{m:t.o,src:'tab',id:t.id}:{m:{},src:null}}
+function mergeAcc(a,b){const r={};const add=o=>{if(!o||typeof o!=='object')return;for(const k in o){const v=o[k];if(!/^[\w-]{6,64}$/.test(k)||!v||typeof v!=='object')continue;if(!r[k]||(+v.t||0)>(+r[k].t||0))r[k]={s:['uit','h','weg'].includes(v.s)?v.s:'',t:+v.t||0}}};add(a);add(b);return r}
+function takeAcc(m){const c=S.club,n=mergeAcc(c.acc,m['Toegang']);if(JSON.stringify(n)!==JSON.stringify(c.acc)){c.acc=n;save()}}
 async function syncSettings(){const c=S.club;
- if(c.helperOnly){const {m}=await readSettings(c.gid),ts=+m['Gewijzigd']||0;if(ts>(c.setTs||0)&&Array.isArray(m['Statussen'])){setStatuses(m['Statussen']);c.setTs=ts;save();return true}return false}
- const {m,src,id}=await readSettings(c.gid);let ch=false,wrote=false;
+ if(c.helperOnly){const {m}=await readSettings(c.gid),ts=+m['Gewijzigd']||0;takeAcc(m);if(ts>(c.setTs||0)&&Array.isArray(m['Statussen'])){setStatuses(m['Statussen']);c.setTs=ts;save();return true}return false}
+ const {m,src,id}=await readSettings(c.gid);let ch=false,wrote=false;takeAcc(m);
  if(c.setDirty||!m['Naam']){if(!c.salt)c.salt=rnd();let qh=c.pinQh,hh=c.pinHh;
   try{if(c.pinQ)qh=await hashPin(c.pinQ,c.salt);if(c.pinH)hh=await hashPin(c.pinH,c.salt)}catch(e){}
   c.pinQh=qh||'';c.pinHh=hh||'';c.setTs=Date.now();
-  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Gewijzigd':c.setTs},src==='meta');
+  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Toegang':c.acc,'Gewijzigd':c.setTs},src==='meta');
   wrote=true;c.setDirty=false;save()}
  else{const ts=+m['Gewijzigd']||0;
   if(ts>(c.setTs||0)){c.name=String(m['Naam']||c.name);if(/^#[0-9a-f]{6}$/i.test(String(m['Kleur'])))c.color=String(m['Kleur']);
@@ -322,6 +358,8 @@ async function sync(manual,force){
   const key=c.gmode+'|'+c.gid+'|'+c.catTab;
   if(ENS!==key){await ensureSheet();ENS=c.gmode+'|'+c.gid+'|'+c.catTab;LASTPULL=0}
   if(manual||S.pricesDirty||S.delM.length||S.members.some(m=>m.dirty)||c.setDirty||Date.now()-LASTPULL>30000){try{S.sync.warn='';changed=await syncSettings()||changed}catch(e){if(e.auth||e.pick)throw e;S.sync.warn='Clubgegevens bewaren lukte niet: '+(e.message||'onbekende fout')}
+  if(accCheck()){try{await pushTx()}catch(e){}LASTPULL=Date.now();S.sync.last=Date.now();S.sync.err='';save();setTimeout(blockAfter,0);return}
+  try{await accPing()}catch(e){if(e.auth)throw e}
   changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;LASTPULL=Date.now()}
   await pushTx();
   S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;S.sync.pick=false;save();
@@ -373,6 +411,7 @@ function parseJoin(){const m=location.hash.match(/^#join=([\w-]+)$/);if(!m)retur
 let JOIN=parseJoin();
 function start(){theme();
  if(JOIN){if(emptyClub(S))return joinScreen();return joinAsk()}
+ if(S.club.blocked){role=null;return S.club.blocked==='weg'?goneGo():blockedScreen()}
  if(emptyClub(S))return setup();if(!role)return login();render()}
 function joinAsk(){$('#app').innerHTML=`<div class="auth"><h2>Uitnodiging</h2><p class="mu">Je bent uitgenodigd als helper bij <b>${esc(JOIN.n||'een club')}</b>. Dit toestel is al ingesteld voor een andere club. Wil je deze club erbij zetten? Je andere clubs blijven bewaard.</p><button class="btn" onclick="addJoin()">Toevoegen als extra club</button><button class="btn ghost" style="margin-top:8px" onclick="ignoreJoin()">Negeren</button></div>`}
 function addJoin(){save();const j=JOIN;newProfile();JOIN=j;joinScreen()}
@@ -400,7 +439,8 @@ function nameScreen(){$('#app').innerHTML=`<div class="auth"><h2>Wie ben je?</h2
 function saveName(){const n=($('#wn').value||'').trim().slice(0,40);if(n.length<2){$('#wne').textContent='Vul je naam in (minstens 2 letters).';return}S.club.names[role]=n;WHO=n;save();tab='boek';render();queueSync()}
 function chName(){const n=($('#wn2').value||'').trim().slice(0,40);if(n.length<2)return toast('Vul je naam in (minstens 2 letters)');S.club.names[role]=n;WHO=n;save();toast('Naam opgeslagen')}
 async function doLogin(){const p=$('#lp').value.trim();let r=null;if(p){if(!S.club.helperOnly&&await okPin('pinQ',p))r='q';else if(await okPin('pinH',p))r='h'}
- if(!r){$('#le').textContent='Deze pincode klopt niet.';return}role=r;enter()}
+ if(!r){$('#le').textContent='Deze pincode klopt niet.';return}
+ if(r==='q'&&accSt()==='h'){$('#le').textContent='De Quaestor heeft dit toestel alleen helperrechten gegeven. Gebruik de pincode voor helpers.';return}role=r;enter()}
 function logout(){role=null;login()}
 function busy(){if(SYNCING){toast('Even geduld, er loopt een synchronisatie.');return true}return false}
 function clubsScreen(){const l=REG.list.map(x=>{const a=x.id===REG.active;
@@ -438,10 +478,10 @@ async function restoreGo(){const p=($('#rp').value||'').trim(),m=RST.m;if(!p)ret
  setStatuses(Array.isArray(m['Statussen'])?m['Statussen']:S.statuses);RST=null;save();theme();role='q';sync(true,true);enter()}
 
 /* ================= OPBOUW ================= */
-function render(){const Q=role==='q';
- if(!Q&&['dag','schuld','leden','inst'].includes(tab))tab='boek';
+function render(){if(S.club.blocked)return blockAfter();const Q=role==='q';
+ if(!Q&&['dag','schuld','leden','inst','acc'].includes(tab))tab='boek';
  const tabs=Q?[['boek','Boeken'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['inst','Meer']]:[['boek','Boeken'],['vandaag','Vandaag']];
- const v={boek:vBoek,vandaag:vVandaag,dag:vDag,schuld:vSchuld,leden:vLeden,inst:vInst}[tab]();
+ const v={boek:vBoek,vandaag:vVandaag,dag:vDag,schuld:vSchuld,leden:vLeden,inst:vInst,acc:vAcc}[tab]();
  $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${Q?'Quaestor':'Helper'}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div><button onclick="logout()">Vergrendel</button></header>
  <main>${v}</main><nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</nav>`;
  if(tab==='boek')sug();if(tab==='leden')ml();refreshSt()}
@@ -600,10 +640,50 @@ function vInst(){const c=S.club;
  <div class="card"><h2>Jouw naam</h2><label>Naam van de Quaestor<input id="iw" value="${esc(c.names.q)}"></label><label>Naam vragen bij elke keer inloggen<select id="ia"><option value="0">Nee</option><option value="1"${c.askName?' selected':''}>Ja, handig als meerdere mensen dit toestel gebruiken</option></select></label></div>
  <div class="card"><h2>Pincodes</h2><label>Pincode Quaestor<input id="iq" type="password" inputmode="numeric" value="${esc(c.pinQ)}" placeholder="${c.pinQh&&!c.pinQ?'(ongewijzigd)':''}"></label><label>Pincode Helper<input id="ih" type="password" inputmode="numeric" value="${esc(c.pinH)}" placeholder="${c.pinHh&&!c.pinH?'(ongewijzigd)':''}"></label></div>
  ${catCard()}${statCard()}${prCard()}${gCard()}${invCard()}
+ <div class="card"><h2>Accounts</h2><p class="mu">Zie welke toestellen als Quaestor of helper toegang hebben tot deze club. Trek toegang in, geef ze terug of verwijder een toestel.</p><button class="btn ghost" onclick="accOpen()">Accounts beheren</button></div>
  <button class="btn" onclick="saveSet()">Instellingen opslaan</button>
  <div class="card" style="margin-top:12px"><h2>Back-up</h2><button class="btn ghost" onclick="showT('Boekingen als csv',csv())">Boekingen kopiëren (csv)</button><button class="btn ghost" style="margin-top:8px" onclick="showT('Volledige back-up',JSON.stringify(S))">Volledige back-up kopiëren</button><button class="btn ghost" style="margin-top:8px" onclick="restore()">Back-up terugzetten</button></div>
  <div class="card"><h2>Gegevens wissen</h2><p class="mu">Maak eerst een back-up als je twijfelt. Bij boekingen en de ledenlijst kies je of de spreadsheet ook meegaat. Bij Alles wissen blijft de spreadsheet staan.</p><button class="btn ghost" onclick="wipeTx()">Alle boekingen wissen</button><button class="btn ghost" style="margin-top:8px" onclick="wipeMem()">Ledenlijst leegmaken</button><button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="wipeAll()">Alles wissen en opnieuw beginnen</button></div>
  <p class="mu" style="text-align:center">Versie ${APP_VERSION}</p>`}
+let ACCL=null,ACCE='';
+function accOpen(){tab='acc';ACCL=null;ACCE='';render();scrollTo(0,0);accLoad()}
+async function accLoad(){if(!S.club.gid||!S.club.gok){ACCE='Verbind eerst met Google (Meer → Google Sheets). De accounts worden in de spreadsheet bijgehouden.';return tab==='acc'&&render()}
+ for(let i=0;SYNCING&&i<100;i++)await new Promise(r=>setTimeout(r,150));
+ try{SI=true;await syncSettings();const l=await accList(S.club.gid),A=S.club.acc||{},by=new Map(),junk=[];
+  l.forEach(o=>{if((A[o.id]||{}).s==='weg'){junk.push(o.mid);return}const p=by.get(o.id);if(!p){by.set(o.id,o);return}if((+o.l||0)>(+p.l||0)){junk.push(p.mid);by.set(o.id,o)}else junk.push(o.mid)});
+  if(junk.length)try{await accDel(junk)}catch(e){}
+  ACCL=[...by.values()];ACCE=''}catch(e){ACCE=e.message||'Laden is niet gelukt'}finally{SI=false}
+ if(tab==='acc')render()}
+const dt=x=>x?new Date(+x).toLocaleDateString('nl-BE',{day:'numeric',month:'short',year:'numeric'}):'?';
+function vAcc(){const c=S.club,A=c.acc||{},st=o=>(A[o.id]||{}).s||'';
+ let h=`<button class="btn ghost" style="margin-bottom:12px" onclick="tab='inst';render()">← Terug naar Meer</button>`;
+ if(ACCE)return h+`<div class="card"><p class="err">${esc(ACCE)}</p><button class="btn" onclick="accOpen()">Opnieuw proberen</button></div>`;
+ if(!ACCL)return h+`<div class="card"><p class="mu">Accounts laden…</p></div>`;
+ const on=ACCL.filter(o=>st(o)!=='uit'),cnt={};on.forEach(o=>{const k=sk(o.n);if(k)cnt[k]=(cnt[k]||0)+1});
+ const isQ=o=>o.r==='q'&&st(o)!=='h',srt=l=>l.sort((a,b)=>String(a.n||'').localeCompare(String(b.n||''))||(+b.l||0)-(+a.l||0));
+ const item=o=>{const me=o.id===c.dev,s=st(o),tg=[];
+  if(me)tg.push('<span class="tag">Dit toestel</span>');
+  if(s!=='uit'&&cnt[sk(o.n)]>1)tg.push('<span class="tag warn">Zelfde naam als een ander account</span>');
+  if(!o.n)tg.push('<span class="tag warn">Geen naam</span>');
+  if(s==='h')tg.push('<span class="tag">Quaestorrechten afgenomen</span>');
+  if(Date.now()-(+o.l||0)>60*864e5)tg.push('<span class="tag">Meer dan 2 maanden niet gebruikt</span>');
+  if((+o.v||0)<+APP_VERSION)tg.push(`<span class="tag">Oude versie ${esc(o.v||'?')}</span>`);
+  const b=[];if(!me){if(s==='uit')b.push(['accSet','','Toegang teruggeven']);else{if(s==='h')b.push(['accSet','','Quaestorrechten teruggeven']);else if(o.r==='q')b.push(['accSet','h','Alleen helper maken']);b.push(['accSet','uit','Toegang intrekken'])}b.push(['accRm','','Verwijderen'])}
+  return `<div class="acc"><b>${esc(o.n||'(geen naam)')}</b><div>${tg.join('')}</div><div class="mu">${esc(o.d||'Onbekend toestel')} · laatst actief ${dt(o.l)} · sinds ${dt(o.f)}</div>${b.length?`<div class="accb">${b.map(x=>`<button class="btn ghost" onclick="${x[0]}('${esc(o.id)}','${x[1]}')">${x[2]}</button>`).join('')}</div>`:''}</div>`};
+ const sec=(t,l,e)=>`<div class="card"><h2>${t} (${l.length})</h2>${l.length?srt(l).map(item).join(''):`<p class="mu">${e}</p>`}</div>`;
+ const dup=Object.values(cnt).some(n=>n>1);
+ return h+(dup?`<div class="card banner"><p>Sommige namen komen meer dan eens voor. Dat kan dezelfde persoon op twee toestellen zijn, of een oud toestel. Verwijder wat niet meer gebruikt wordt.</p></div>`:'')
+  +sec('Quaestors',on.filter(isQ),'Geen.')+sec('Helpers',on.filter(o=>!isQ(o)),'Nog geen helpers.')+(ACCL.some(o=>st(o)==='uit')?sec('Toegang ingetrokken',ACCL.filter(o=>st(o)==='uit'),''):'')
+  +`<div class="card"><h2>Goed om te weten</h2><p class="mu">Een toestel verschijnt hier zodra het versie ${APP_VERSION} of later gebruikt en gesynchroniseerd heeft. Een wijziging werkt zodra het toestel opnieuw synchroniseert, meestal binnen een minuut als het online is.</p><p class="mu">Intrekken blokkeert alleen de app. Wie de pincode kent of nog toegang heeft tot de spreadsheet in Google Drive, kan opnieuw beginnen. Wijzig daarom ook de pincode bij Meer en haal de persoon weg bij Delen in Google Drive.</p><a class="btn ghost" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}/edit" target="_blank" rel="noopener">Spreadsheet openen om te delen of weg te halen</a><button class="btn ghost" style="margin-top:8px" onclick="accOpen()">Lijst vernieuwen</button></div>`}
+const accName=id=>{const o=(ACCL||[]).find(x=>x.id===id);return esc((o&&o.n)||'dit toestel')};
+function accSet(id,s){if(id===S.club.dev)return;const n=accName(id);
+ const q=s==='uit'?`Toegang van ${n} intrekken? Dat toestel kan niets meer boeken zodra het synchroniseert. Boekingen die het al deed, blijven staan.`:s==='h'?`${n} alleen helperrechten geven? Op dat toestel werkt de Quaestorpincode dan niet meer.`:`Toegang teruggeven aan ${n}?`;
+ ask(q,s==='uit'?'Intrekken':s==='h'?'Alleen helper':'Teruggeven',()=>accApply(id,s))}
+function accApply(id,s){const c=S.club;c.acc=Object.assign({},c.acc,{[id]:{s,t:Date.now()}});c.setDirty=true;save();render();queueSync();
+ toast(s==='uit'?'Toegang ingetrokken':s==='h'?'Alleen nog helperrechten':s==='weg'?'Toestel verwijderd':'Toegang teruggegeven')}
+function accRm(id){if(id===S.club.dev)return;const n=accName(id);
+ ask(`${n} verwijderen? Dat toestel wist deze club zodra het synchroniseert. Boekingen die het nog niet geüpload had, worden eerst geüpload. Wil de persoon later terugkomen, dan nodig je hem opnieuw uit.`,'Verwijderen',async()=>{
+  const o=(ACCL||[]).find(x=>x.id===id);ACCL=(ACCL||[]).filter(x=>x.id!==id);accApply(id,'weg');if(o&&o.mid!=null)try{SI=true;await accDel([o.mid])}catch(e){}finally{SI=false}})}
 function saveSet(){const q=$('#iq').value.trim(),h=$('#ih').value.trim(),c0=S.club;
  if((q&&q.length<4)||(h&&h.length<4)||(!q&&!c0.pinQh)||(!h&&!c0.pinHh)||(q&&q===h))return toast('Pincodes: minstens 4 cijfers en niet gelijk');
  if($('#ich')){const list=id=>[...new Set($(id).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean))];
@@ -617,7 +697,7 @@ function csv(){const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';return
 function showT(t,x){modal(`<h3>${t}</h3><textarea id="tx" readonly>${esc(x)}</textarea><button class="btn" style="margin-top:10px" onclick="cp()">Kopiëren</button>`)}
 function cp(){const e=$('#tx');e.select();try{navigator.clipboard.writeText(e.value).then(()=>toast('Gekopieerd'),()=>document.execCommand('copy'))}catch(x){try{document.execCommand('copy');toast('Gekopieerd')}catch(y){toast('Selecteer de tekst en kopieer ze zelf')}}}
 function restore(){modal(`<h3>Back-up terugzetten</h3><p class="mu">Plak hier de volledige back-up. Alles op dit toestel wordt vervangen.</p><textarea id="rt"></textarea><button class="btn" style="margin-top:10px" onclick="restoreOk()">Terugzetten</button>`)}
-function restoreOk(){try{const d=JSON.parse($('#rt').value);if(!d.club||!Array.isArray(d.tx)||!d.cats)throw 0;S=d;norm();ENS='';save();theme();closeM();render();toast('Back-up teruggezet')}catch(e){toast('Dit is geen geldige back-up')}}
+function restoreOk(){try{const d=JSON.parse($('#rt').value);if(!d.club||!Array.isArray(d.tx)||!d.cats)throw 0;if(d.club)Object.assign(d.club,{dev:'',accMid:0,accSig:'',blocked:''});S=d;norm();ENS='';save();theme();closeM();render();toast('Back-up teruggezet')}catch(e){toast('Dit is geen geldige back-up')}}
 
 start();
 if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0){const had=!!navigator.serviceWorker.controller,t0=Date.now();let rl=false;
