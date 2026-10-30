@@ -1,4 +1,4 @@
-const CACHE = 'quaestor-v15';
+const CACHE = 'quaestor-v18';
 const FILES = ['./', './index.html', './config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
