@@ -104,7 +104,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='25';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='26';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -827,7 +827,7 @@ function vBon(){const Q=role==='q';if(BON)return bonForm();
  const it=(b,act)=>`<div class="row"><div><b>${esc(b.shop)}</b> <span class="tag">${esc(st(b))}</span><div class="mu">${esc(b.date)}${b.who?' · '+esc(b.who):''}${b.adv?' · voorgeschoten door '+esc(b.adv):''}${b.desc?' · '+esc(b.desc):''}</div>
   <div class="accb"><button class="btn ghost" onclick="bonView('${b.id}')">Bekijken</button>${act&&Q?`<button class="btn ghost" onclick="bonBook('${b.id}')">Inboeken</button><button class="btn ghost" onclick="bonReject('${b.id}')">Afwijzen</button>`:''}</div></div><div class="amt">${eur(b.total)}</div></div>`;
  const srt=l=>l.slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
- let h=`<div class="card"><h2>Bonnetje toevoegen</h2><p class="mu">Neem een foto van het bonnetje of kies er een uit je galerij. De app leest winkel, datum, totaal en artikelen. Jij kijkt alles na voor je het indient${Q?'':', daarna boekt de Quaestor het in'}.</p><label class="btn" style="cursor:pointer">Foto nemen of kiezen<input type="file" accept="image/*" style="display:none" onchange="bonFile(this)"></label></div>`;
+ let h=`<div class="card"><h2>Bonnetje toevoegen</h2><p class="mu">Neem een foto van het bonnetje of kies er een uit je galerij. De app leest winkel, datum, totaal en artikelen. Jij kijkt alles na voor je het indient${Q?'':', daarna boekt de Quaestor het in'}.</p><label class="btn" style="cursor:pointer">📷 Foto nemen<input type="file" accept="image/*" capture="environment" style="display:none" onchange="bonFile(this)"></label><label class="btn ghost" style="cursor:pointer;margin-top:8px">Foto kiezen uit galerij<input type="file" accept="image/*" style="display:none" onchange="bonFile(this)"></label></div>`;
  if(Q){const td=srt(bonTodo()),ao=advOpen(),dn=srt(S.bons.filter(b=>!bonTodo().includes(b))).slice(0,30);
   h+=`<div class="card"><h2>Te verwerken (${td.length})</h2>${td.length?td.map(b=>it(b,true)).join(''):empty('Geen nieuwe bonnetjes.')}</div>`;
   h+=`<div class="card"><h2>Nog terug te betalen (${ao.length})</h2>${ao.length?ao.map(t=>`<div class="row"><div><b>${esc(t.adv)}</b><div class="mu">${esc(t.name)} · ${esc(t.date)}</div><div class="accb"><button class="btn ghost" onclick="refund('${t.id}')">Terugbetaald</button></div></div><div class="amt">${eur(-t.v)}</div></div>`).join(''):empty('Niemand wacht op een terugbetaling.')}</div>`;
