@@ -93,6 +93,7 @@ const GOOGLE_API_KEY=String(QC.apiKey||'').trim();
 const GOOGLE_APP_ID=String(QC.appId||'').trim();
 const DEV_EMAIL=String(QC.devEmail||'').trim().toLowerCase();
 const isDev=e=>!!DEV_EMAIL&&String(e||'').toLowerCase()===DEV_EMAIL;
+const RO=()=>role!=='q';
 const RN={d:'Developer',q:'Quaestor',h:'Helper',p:'Praesidium'};
 const effR=u=>isDev(u.e)?'q':u.r==='d'?'q':u.r;
 /* Enkel toegang tot spreadsheets die de app zelf aanmaakt of die de gebruiker zelf kiest. */
@@ -102,7 +103,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='17';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='19';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -586,8 +587,8 @@ async function restorePick(){const e=m=>{const x=$('#re');if(x)x.textContent=m};
 
 /* ================= OPBOUW ================= */
 function render(){if(S.club.blocked)return blockAfter();const Q=role==='q',P=role==='p';
- if(!Q&&['dag','schuld','leden','inst','acc'].includes(tab))tab='boek';if(P&&!['bon','me'].includes(tab))tab='bon';if(!P&&tab==='me')tab='boek';
- const nb=Q?bonTodo().length:0,tabs=Q?[['boek','Boeken'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'+(nb?' ('+nb+')':'')],['inst','Meer']]:P?[['bon','Bonnen'],['me','Account']]:[['boek','Boeken'],['vandaag','Vandaag'],['bon','Bonnen']];
+ if(!Q&&!P&&['inst','acc'].includes(tab))tab='boek';if(P&&['inst','acc'].includes(tab))tab='bon';if(P&&!['bon','me','schuld','leden','dag'].includes(tab))tab='bon';if(!P&&tab==='me')tab='boek';
+ const nb=Q?bonTodo().length:0,tabs=Q?[['boek','Boeken'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'+(nb?' ('+nb+')':'')],['inst','Meer']]:P?[['bon','Bonnen'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['me','Account']]:[['boek','Boeken'],['vandaag','Vandaag'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen']];
  const v={boek:vBoek,vandaag:vVandaag,dag:vDag,schuld:vSchuld,leden:vLeden,inst:vInst,acc:vAcc,bon:vBon,me:vMe}[tab]();
  $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${ISDEV?'Developer':RN[role]||''}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div><button onclick="logout()">Afmelden</button></header>
  <main>${v}</main><nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</nav>`;
@@ -619,7 +620,7 @@ function autoPrice(){if(B.man)return;const m=B.mid&&S.members.find(x=>x.id===B.m
 function mi(){const e=$('#mi');if(e)e.innerHTML=miHtml();const a=$('#amt');if(a)a.value=B.amt}
 function onAmt(v){B.amt=v;B.man=String(v).trim()!==''}
 function setCat(k,v){B[k]=v;autoPrice();mi()}
-function stSel(el,id,fb){const m=S.members.find(x=>x.id===id);if(!m)return;if(el.value==='__new'){el.value=m.status;return modal(`<h3>Nieuwe status</h3><label>Naam van de status<input id="nst" autocomplete="off" placeholder="bv. schacht" onkeydown="if(event.key==='Enter')newStOk('${id}',${fb?1:0})"></label><button class="btn" onclick="newStOk('${id}',${fb?1:0})">Toevoegen</button>`)}setSt(id,el.value,fb)}
+function stSel(el,id,fb){if(role==='p')return;const m=S.members.find(x=>x.id===id);if(!m)return;if(el.value==='__new'){el.value=m.status;return modal(`<h3>Nieuwe status</h3><label>Naam van de status<input id="nst" autocomplete="off" placeholder="bv. schacht" onkeydown="if(event.key==='Enter')newStOk('${id}',${fb?1:0})"></label><button class="btn" onclick="newStOk('${id}',${fb?1:0})">Toevoegen</button>`)}setSt(id,el.value,fb)}
 function newStOk(id,fb){const t=cleanSt($('#nst').value);if(!t)return toast('Vul een naam in');closeM();setSt(id,t,!!fb)}
 function setSt(id,v,fromBook){const m=S.members.find(x=>x.id===id),n=canonSt(v)||addSt(v);if(!m||!n)return;m.status=n;m.dirty=true;save();queueSync();
  if(fromBook){autoPrice();mi()}else{ml();toast('Status aangepast')}}
@@ -640,7 +641,7 @@ function book(){if(role!=='q'&&role!=='h')return toast('Je hebt geen rechten om 
 function commit(a){const m=S.members.find(x=>x.id===B.mid);
  S.tx.push({who:WHO,id:uid(),ts:Date.now(),date:today(),mid:B.mid,name:m?m.name:B.name.trim(),v:a,method:B.method,h:B.h,s:B.s,desc:B.desc.trim(),by:role,void:false,synced:false});
  save();Object.assign(B,{mid:null,name:'',amt:'',desc:'',man:false});toast('Geboekt');render();queueSync()}
-function storno(id){const t=S.tx.find(x=>x.id===id);if(!t)return;
+function storno(id){if(RO())return;const t=S.tx.find(x=>x.id===id);if(!t)return;
  if(t.method==='schuld'&&t.paidBy)return toast('Storneer eerst de afbetaling van deze schuld');
  if(t.method==='voorschot'&&t.paidBy)return toast('Storneer eerst de terugbetaling');
  ask('Deze boeking storneren? Er komt een tegenboeking, er wordt niets gewist.','Storneren',()=>doStorno(id))}
@@ -657,14 +658,14 @@ function vDag(){const l=S.tx.filter(t=>t.date===DAY),sum=m=>l.filter(t=>t.method
  const done=new Set(l.filter(t=>!t.void&&!t.storno&&t.v>0).map(t=>t.mid));
  const todo=S.members.filter(m=>!done.has(m.id)).sort((a,b)=>a.name.localeCompare(b.name));
  return delBanner()+`<div class="card"><label>Dag<input type="date" value="${DAY}" onchange="DAY=this.value||today();render()"></label>
- <div class="grid"><div class="stat">Cash<b>${eur(sum('cash'))}</b></div><div class="stat">Payconiq<b>${eur(sum('payconiq'))}</b></div><div class="stat">Overschrijving<b>${eur(sum('overschrijving'))}</b></div><div class="stat">Op schuldenlijst<b>${eur(sum('schuld'))}</b></div><div class="stat big">Totaal ontvangen<b>${eur(tot)}</b><span class="mu">Tel de kassa na en vergelijk met het bedrag bij Cash${xk?' min de uitgaven uit de kas':''}.</span></div>${xk||xa?`<div class="stat">Uitgaven uit de kas<b>${eur(xk)}</b></div><div class="stat">Uitgaven via rekening/Payconiq<b>${eur(xa)}</b></div>${xk?`<div class="stat big">In de kassa (cash min uitgaven)<b>${eur(sum('cash')+xk)}</b></div>`:''}`:''}</div></div>
- ${perPerson(l)}<div class="card"><h2>Boekingen van deze dag</h2>${l.length?l.slice().reverse().map(t=>row(t,true)).join(''):empty('Geen boekingen op deze dag.')}</div>
- <div class="card"><h2>Nog niet geboekt op deze dag (${todo.length})</h2>${todo.length?todo.slice(0,40).map(m=>`<div class="row"><div>${esc(m.name)} <span class="mu">${esc(m.status)}</span></div><button class="sm" onclick="goBook('${m.id}')">Boeken</button></div>`).join('')+(todo.length>40?empty('… en '+(todo.length-40)+' anderen'):''):empty('Iedereen uit de ledenlijst is geboekt.')}</div>`}
+ <div class="grid"><div class="stat">Cash<b>${eur(sum('cash'))}</b></div><div class="stat">Payconiq<b>${eur(sum('payconiq'))}</b></div><div class="stat">Overschrijving<b>${eur(sum('overschrijving'))}</b></div><div class="stat">Op schuldenlijst<b>${eur(sum('schuld'))}</b></div><div class="stat big">Totaal ontvangen<b>${eur(tot)}</b><span class="mu">${RO()?'Alleen lezen.':'Tel de kassa na en vergelijk met het bedrag bij Cash'+(xk?' min de uitgaven uit de kas':'')+'.'}</span></div>${xk||xa?`<div class="stat">Uitgaven uit de kas<b>${eur(xk)}</b></div><div class="stat">Uitgaven via rekening/Payconiq<b>${eur(xa)}</b></div>${xk?`<div class="stat big">In de kassa (cash min uitgaven)<b>${eur(sum('cash')+xk)}</b></div>`:''}`:''}</div></div>
+ ${perPerson(l)}<div class="card"><h2>Boekingen van deze dag</h2>${l.length?l.slice().reverse().map(t=>row(t,!RO())).join(''):empty('Geen boekingen op deze dag.')}</div>
+ <div class="card"><h2>Nog niet geboekt op deze dag (${todo.length})</h2>${todo.length?todo.slice(0,40).map(m=>`<div class="row"><div>${esc(m.name)} <span class="mu">${esc(m.status)}</span></div>${role==='p'?'':`<button class="sm" onclick="goBook('${m.id}')">Boeken</button>`}</div>`).join('')+(todo.length>40?empty('… en '+(todo.length-40)+' anderen'):''):empty('Iedereen uit de ledenlijst is geboekt.')}</div>`}
 function perPerson(l){const pp={};
  l.forEach(t=>{if(t.exp)return;const k=t.who||(t.by==='q'?'Quaestor':'Helper');const o=pp[k]=pp[k]||{n:0,v:0};if(!t.storno&&!t.void)o.n++;if(t.method!=='schuld')o.v+=t.v});
  const ks=Object.keys(pp).sort();if(!ks.length)return '';
  return `<div class="card"><h2>Per persoon</h2>${ks.map(k=>`<div class="row"><div>${esc(k)} <span class="mu">${pp[k].n} boeking${pp[k].n===1?'':'en'}</span></div><div class="amt">${eur(pp[k].v)}</div></div>`).join('')}<p class="mu">Ontvangen bedrag (zonder schuldenlijst), na stornos.</p></div>`}
-function goBook(id){tab='boek';pick(id)}
+function goBook(id){if(role==='p')return;tab='boek';pick(id)}
 
 
 /* ---------- bonnetjes ---------- */
@@ -796,22 +797,22 @@ function vBon(){const Q=role==='q';if(BON)return bonForm();
 /* ---------- schulden ---------- */
 const open=()=>S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno&&!t.paidBy);
 function vSchuld(){const o=open(),by={};o.forEach(t=>{(by[t.name]=by[t.name]||[]).push(t)});const tot=o.reduce((a,t)=>a+t.v,0);
- return `<div class="grid"><div class="stat big">Totaal openstaand<b>${eur(tot)}</b></div></div>`+(Object.keys(by).length?Object.keys(by).sort().map(n=>`<div class="card"><h2>${esc(n)} · ${eur(by[n].reduce((a,t)=>a+t.v,0))}</h2>${by[n].map(t=>`<div class="row"><div>${t.date} · ${esc(t.h)}${t.s?' · '+esc(t.s):''}${t.desc?`<div class="mu">${esc(t.desc)}</div>`:''}</div><div class="amt">${eur(t.v)}<button class="sm" onclick="pay('${t.id}')">Betaald</button></div></div>`).join('')}</div>`).join(''):`<div class="card">${empty('Geen openstaande schulden.')}</div>`)}
-function pay(id){const d=S.tx.find(x=>x.id===id);modal(`<h3>Schuld afbetalen</h3><p>${esc(d.name)} · ${eur(d.v)}</p><label>Betaalwijze<select id="pm"><option value="cash">Cash</option><option value="payconiq">Payconiq</option><option value="overschrijving">Overschrijving</option></select></label><label>Datum<input type="date" id="pd" value="${today()}"></label><button class="btn" onclick="payOk('${id}')">Markeer als betaald</button>`)}
+ return `<div class="grid"><div class="stat big">Totaal openstaand<b>${eur(tot)}</b></div></div>`+(Object.keys(by).length?Object.keys(by).sort().map(n=>`<div class="card"><h2>${esc(n)} · ${eur(by[n].reduce((a,t)=>a+t.v,0))}</h2>${by[n].map(t=>`<div class="row"><div>${t.date} · ${esc(t.h)}${t.s?' · '+esc(t.s):''}${t.desc?`<div class="mu">${esc(t.desc)}</div>`:''}</div><div class="amt">${eur(t.v)}${RO()?'':`<button class="sm" onclick="pay('${t.id}')">Betaald</button>`}</div></div>`).join('')}</div>`).join(''):`<div class="card">${empty('Geen openstaande schulden.')}</div>`)}
+function pay(id){if(RO())return;const d=S.tx.find(x=>x.id===id);modal(`<h3>Schuld afbetalen</h3><p>${esc(d.name)} · ${eur(d.v)}</p><label>Betaalwijze<select id="pm"><option value="cash">Cash</option><option value="payconiq">Payconiq</option><option value="overschrijving">Overschrijving</option></select></label><label>Datum<input type="date" id="pd" value="${today()}"></label><button class="btn" onclick="payOk('${id}')">Markeer als betaald</button>`)}
 function payOk(id){const d=S.tx.find(x=>x.id===id),n={who:WHO,id:uid(),ts:Date.now(),date:$('#pd').value||today(),mid:d.mid,name:d.name,v:d.v,method:$('#pm').value,h:d.h,s:d.s,desc:'Afbetaling schuld',by:role,ref:d.id,void:false,synced:false};
  S.tx.push(n);d.paidBy=n.id;d.paidDate=n.date;save();closeM();toast('Schuld afbetaald');render();queueSync()}
 
 /* ---------- leden ---------- */
-function vLeden(){return `<div class="card"><h2>Lid toevoegen</h2><label>Naam<input id="mn" autocomplete="off"></label><label>Status<select id="ms">${S.statuses.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select></label><label>Of een nieuwe status (niet verplicht)<input id="ms2" autocomplete="off" placeholder="bv. schacht"></label><button class="btn" onclick="addM()">Toevoegen</button>
+function vLeden(){if(RO())return `<div class="card"><h2>${S.members.length} leden</h2><p class="mu">Alleen lezen.</p><label>Zoeken<input oninput="LQ=this.value;ml()"></label><div id="ml"></div></div>`;return `<div class="card"><h2>Lid toevoegen</h2><label>Naam<input id="mn" autocomplete="off"></label><label>Status<select id="ms">${S.statuses.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select></label><label>Of een nieuwe status (niet verplicht)<input id="ms2" autocomplete="off" placeholder="bv. schacht"></label><button class="btn" onclick="addM()">Toevoegen</button>
  <button class="btn ghost" style="margin-top:8px" onclick="impM()">Lijst plakken uit spreadsheet</button></div>
  <div class="card"><h2>${S.members.length} leden</h2>${S.club.gid?'<button class="btn ghost" style="margin-bottom:10px" onclick="sync(true)">Nu synchroniseren</button>':''}<p class="mu">Status aanpassen kan hier, of in kolom B van het tabblad Leden in je spreadsheet (je mag zelf statussen typen, bv. schacht of actief student). De app neemt het over bij de volgende synchronisatie, meestal binnen een halve minuut.</p><label>Zoeken<input oninput="LQ=this.value;ml()"></label><div id="ml"></div></div>`}
 function ml(){const e=$('#ml');if(!e)return;const q=LQ.toLowerCase(),o=open(),l=S.members.filter(m=>m.name.toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name));
- e.innerHTML=l.length?l.map(m=>{const d=o.filter(t=>t.mid===m.id).reduce((a,t)=>a+t.v,0);return `<div class="row"><div>${esc(m.name)}${d?`<div class="neg">Schuld ${eur(d)}</div>`:''}</div><div><select class="ss" aria-label="Status van ${esc(m.name)}" onchange="stSel(this,'${m.id}',false)">${stOpts(m.status)}</select><button class="sm" onclick="delM('${m.id}')">Verwijder</button></div></div>`}).join(''):empty('Geen leden gevonden.')}
-function addM(){const n=$('#mn').value.trim();if(!n)return toast('Vul een naam in');unDel(n);S.members.push({id:uid(),name:n,status:cleanSt($('#ms2').value)?addSt($('#ms2').value):$('#ms').value,dirty:true});save();render();queueSync()}
+ e.innerHTML=l.length?l.map(m=>{const d=o.filter(t=>t.mid===m.id).reduce((a,t)=>a+t.v,0);return `<div class="row"><div>${esc(m.name)}${d?`<div class="neg">Schuld ${eur(d)}</div>`:''}</div><div>${RO()?`<span class="mu">${esc(m.status)}</span>`:`<select class="ss" aria-label="Status van ${esc(m.name)}" onchange="stSel(this,'${m.id}',false)">${stOpts(m.status)}</select><button class="sm" onclick="delM('${m.id}')">Verwijder</button>`}</div></div>`}).join(''):empty('Geen leden gevonden.')}
+function addM(){if(RO())return;const n=$('#mn').value.trim();if(!n)return toast('Vul een naam in');unDel(n);S.members.push({id:uid(),name:n,status:cleanSt($('#ms2').value)?addSt($('#ms2').value):$('#ms').value,dirty:true});save();render();queueSync()}
 const unDel=n=>{S.delM=S.delM.filter(x=>x.toLowerCase()!==String(n).toLowerCase())};
-function delM(id){const m0=S.members.find(x=>x.id===id);if(!m0)return;
+function delM(id){if(RO())return;const m0=S.members.find(x=>x.id===id);if(!m0)return;
  ask('Dit lid verwijderen uit de lijst? Bestaande boekingen blijven staan.'+(S.club.gid?' Het lid wordt ook uit het tabblad Leden van je spreadsheet verwijderd.':''),'Verwijderen',()=>{S.delM.push(m0.name);S.members=S.members.filter(m=>m.id!==id);save();render();queueSync()})}
-function impM(){modal(`<h3>Ledenlijst plakken</h3><p class="mu">Eén lid per regel: naam, of naam en status (bv. schacht of actief student) gescheiden door een tab of puntkomma. Je kan dus kolommen uit je spreadsheet kopiëren.</p><textarea id="it"></textarea><button class="btn" style="margin-top:10px" onclick="impOk()">Importeren</button>`)}
+function impM(){if(RO())return;modal(`<h3>Ledenlijst plakken</h3><p class="mu">Eén lid per regel: naam, of naam en status (bv. schacht of actief student) gescheiden door een tab of puntkomma. Je kan dus kolommen uit je spreadsheet kopiëren.</p><textarea id="it"></textarea><button class="btn" style="margin-top:10px" onclick="impOk()">Importeren</button>`)}
 function impOk(){let n=0;$('#it').value.split(/\r?\n/).forEach(l=>{const p=l.split(/[;\t]/).map(x=>x.trim());if(!p[0]||/^naam$/i.test(p[0]))return;if(S.members.some(m=>m.name.toLowerCase()===p[0].toLowerCase()))return;unDel(p[0]);S.members.push({id:uid(),name:p[0],status:p[1]?addSt(p[1]):S.statuses[0],dirty:true});n++});save();closeM();toast(n+' leden toegevoegd');render();queueSync()}
 
 /* ---------- instellingen ---------- */
