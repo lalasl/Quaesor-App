@@ -92,13 +92,13 @@ const GOOGLE_CLIENT_ID=String(QC.clientId||'').trim();
 const GOOGLE_API_KEY=String(QC.apiKey||'').trim();
 const GOOGLE_APP_ID=String(QC.appId||'').trim();
 /* Enkel toegang tot spreadsheets die de app zelf aanmaakt of die de gebruiker zelf kiest. */
-const SCOPE='https://www.googleapis.com/auth/drive.file';
+const SCOPE='https://www.googleapis.com/auth/drive.file openid email';
 const TAB_B='Boekingen',TAB_L='Leden',TAB_P='Prijzen',TAB_I='Instellingen',TAB_BN='Bonnetjes',TAB_BF='Bonnetjes-foto';
 const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingediend door','Ingediend op','Status','Boeking-ID','Voorgeschoten door'];
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='15';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='16';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -126,9 +126,9 @@ try{const r=localStorage.getItem(K);if(r)S=JSON.parse(r)}catch(e){}
 if(!S)S=DEF();
 function norm(){
  if(Array.isArray(S.cats)){const o=S.cats;S.cats={h:o.map(c=>c.h),s:[...new Set(o.flatMap(c=>c.s))]}}
- S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0,askName:false,pinMe:'',hOk:false,uTab:false,lastUser:'',bonTab:false,dev:'',acc:{},accMid:0,accGid:'',accSig:'',accTs:0,accF:0,blocked:''},S.club);
+ S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0,askName:false,pinMe:'',hOk:false,uTab:false,lastUser:'',sess:'',bonTab:false,dev:'',acc:{},accMid:0,accGid:'',accSig:'',accTs:0,accF:0,blocked:''},S.club);
  if(!S.club.dev)S.club.dev=uid().replace(/-/g,'');if(!S.club.acc||typeof S.club.acc!=='object'||Array.isArray(S.club.acc))S.club.acc={};
- if(S.club.gscope!==SCOPE){if(S.club.gid||S.club.gok){S.club.gok=false;if(S.club.gmode==='existing')S.club.gpicked=false;try{sessionStorage.removeItem('qg')}catch(e){}}S.club.gscope=SCOPE}
+ if(S.club.gscope!==SCOPE){if(String(S.club.gscope||'').indexOf('drive.file')<0&&(S.club.gid||S.club.gok)){S.club.gok=false;if(S.club.gmode==='existing')S.club.gpicked=false;try{sessionStorage.removeItem('qg')}catch(e){}}S.club.gscope=SCOPE}
  S.sync=Object.assign({last:0,err:'',auth:false,pick:false,warn:''},S.sync||{});
  S.club.names=Object.assign({q:'',h:''},S.club.names||{});
  S.delM=Array.isArray(S.delM)?S.delM:[];S.users=Array.isArray(S.users)?S.users:[];S.bons=Array.isArray(S.bons)?S.bons:[];S.pendDel=Array.isArray(S.pendDel)?S.pendDel:[];
@@ -156,7 +156,7 @@ function theme(){const c=S.club,r=document.documentElement;r.style.setProperty('
 /* ================= GOOGLE SHEETS ================= */
 let WHO='',LOGVIA='',USER='',LPULL=false;
 let AGAIN=false,TOKEN=null,TEXP=0,SYNCING=false,SI=false,ENS='',LASTPULL=0,QT=null;
-try{const q=JSON.parse(sessionStorage.getItem('qg')||'null');if(q&&q.exp>Date.now()){TOKEN=q.t;TEXP=q.exp}}catch(e){}
+try{const q=JSON.parse(sessionStorage.getItem('qg')||'null');if(q&&q.exp>Date.now()&&q.s===SCOPE){TOKEN=q.t;TEXP=q.exp}}catch(e){}
 const cid=()=>(S.club.cid||GOOGLE_CLIENT_ID||'').trim();
 const apiKey=()=>(S.club.akey||GOOGLE_API_KEY||'').trim();
 const appId=()=>(S.club.appid||GOOGLE_APP_ID||'').trim();
@@ -164,16 +164,21 @@ const haveTok=()=>TOKEN&&Date.now()<TEXP-60000;
 const autoOk=()=>S.club.gok&&S.club.gid;
 const authErr=m=>{const e=new Error(m);e.auth=true;return e};
 function loadGsi(){return new Promise((res,rej)=>{if(window.google&&google.accounts&&google.accounts.oauth2)return res();const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=()=>res();s.onerror=()=>rej(new Error('Google kon niet geladen worden. Controleer je internetverbinding.'));document.head.appendChild(s)})}
-function getToken(){return new Promise((res,rej)=>{
- if(haveTok())return res(TOKEN);
+function getToken(pr){return new Promise((res,rej)=>{
+ if(haveTok()&&pr==null)return res(TOKEN);
  if(!cid())return rej(authErr('Geen Google Client ID ingesteld. Zie de handleiding.'));
  loadGsi().then(()=>{
   const tc=google.accounts.oauth2.initTokenClient({client_id:cid(),scope:SCOPE,
    callback:r=>{if(r.error)return rej(authErr(r.error==='access_denied'?'Toegang geweigerd in Google.':'Google-fout: '+r.error));
-    TOKEN=r.access_token;TEXP=Date.now()+(+r.expires_in||3600)*1000;try{sessionStorage.setItem('qg',JSON.stringify({t:TOKEN,exp:TEXP}))}catch(e){}
+    TOKEN=r.access_token;TEXP=Date.now()+(+r.expires_in||3600)*1000;TEMAIL='';try{sessionStorage.setItem('qg',JSON.stringify({t:TOKEN,exp:TEXP,s:SCOPE}))}catch(e){}
     if(!S.club.gok){S.club.gok=true;save()}res(TOKEN)},
    error_callback:()=>rej(authErr('Aanmelden bij Google is niet gelukt of werd geannuleerd.'))});
-  tc.requestAccessToken({prompt:S.club.gok?'':'consent'})}).catch(rej)})}
+  tc.requestAccessToken({prompt:pr!=null?pr:(S.club.gok?'':'consent')})}).catch(rej)})}
+let TEMAIL='';
+async function uinfo(tok){const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+tok}});
+ if(r.status===401||r.status===403){TOKEN=null;try{sessionStorage.removeItem('qg')}catch(e){}throw authErr('Meld je opnieuw aan bij Google.')}
+ if(!r.ok)throw new Error('Je e-mailadres ophalen bij Google lukte niet.');const j=await r.json();if(!j.email)throw new Error('Google gaf geen e-mailadres door.');TEMAIL=String(j.email).trim().toLowerCase();return TEMAIL}
+async function gEmail(pr){if(TEMAIL&&pr==null&&haveTok())return TEMAIL;return uinfo(await getToken(pr))}
 async function api(path,opt){opt=opt||{};
  if(!haveTok()){if(!SI)throw authErr('Opnieuw verbinden nodig.');await getToken()}
  const r=await fetch('https://sheets.googleapis.com/v4/spreadsheets'+path,{...opt,headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'}});
@@ -375,6 +380,7 @@ async function sync(manual,force){
   if(ENS!==key){await ensureSheet();ENS=c.gmode+'|'+c.gid+'|'+c.catTab;LASTPULL=0}
   if(manual||S.users.some(u=>u.dirty)||S.pricesDirty||S.delM.length||S.bons.some(b=>b.dirty)||S.members.some(m=>m.dirty)||c.setDirty||Date.now()-LASTPULL>30000){try{S.sync.warn='';changed=await syncSettings()||changed}catch(e){if(e.auth||e.pick)throw e;S.sync.warn='Clubgegevens bewaren lukte niet: '+(e.message||'onbekende fout')}
   try{changed=await pullUsers()||changed;await pushUsers()}catch(e){if(e.auth||e.pick)throw e;S.sync.warn='Accounts bijwerken lukte niet: '+(e.message||'onbekende fout')}
+  try{if(await bindMe())changed=true}catch(e){if(e.auth)throw e}
   if(userCheck())changed=true;
   if(accCheck()){try{await pushTx()}catch(e){}LASTPULL=Date.now();S.sync.last=Date.now();S.sync.err='';save();setTimeout(blockAfter,0);return}
   changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;changed=await syncBons(true)||changed;LASTPULL=Date.now()}
@@ -430,7 +436,9 @@ let JOIN=parseJoin();
 function start(){theme();
  if(JOIN){if(emptyClub(S))return joinScreen();return joinAsk()}
  if(S.club.blocked){role=null;return S.club.blocked==='weg'?goneGo():blockedScreen()}
- if(emptyClub(S))return setup();if(!role)return login();render()}
+ if(emptyClub(S))return setup();
+ if(!role&&S.club.sess){const u=S.users.find(x=>x.id===S.club.sess);if(u&&!u.st)return logIn(u);S.club.sess='';save()}
+ if(!role)return login();render()}
 function joinAsk(){$('#app').innerHTML=`<div class="auth"><h2>Uitnodiging</h2><p class="mu">Je bent uitgenodigd als helper bij <b>${esc(JOIN.n||'een club')}</b>. Dit toestel is al ingesteld voor een andere club. Wil je deze club erbij zetten? Je andere clubs blijven bewaard.</p><button class="btn" onclick="addJoin()">Toevoegen als extra club</button><button class="btn ghost" style="margin-top:8px" onclick="ignoreJoin()">Negeren</button></div>`}
 function addJoin(){save();const j=JOIN;newProfile();JOIN=j;joinScreen()}
 function pasteInv(){modal(`<h3>Uitnodigingslink plakken</h3><p class="mu">Kopieer de link die de Quaestor je stuurde en plak hem hier. Handig op een iPhone, waar de app op je beginscherm los staat van Safari.</p><label>Link<input id="pil" autocomplete="off" placeholder="https://…#join=…" onkeydown="if(event.key==='Enter')pasteInvOk()"></label><button class="btn" onclick="pasteInvOk()">Verder</button>`)}
@@ -441,82 +449,96 @@ function joinPick(){const o=JOIN||{},sx=v=>typeof v==='string'&&/^[\w.-]{5,120}$
  Object.assign(S.club,{name:String(o.n||'Club').slice(0,60),color:col,catTab:String(o.t||'Categorieën').slice(0,60),cid:sx(o.ci),akey:sx(o.ak),appid:sx(o.ap)});theme();
  RST=Object.assign(RST||{},{join:true,inv:o.i});restorePick()}
 const PWH='Minstens 6 tekens. Gebruik een wachtwoord dat je <b>nergens anders</b> gebruikt, dus niet dat van je e-mail, Google of bank.';
-function setup(){$('#app').innerHTML=`<div class="auth"><h2>Welkom bij je betalingsapp</h2><p class="mu">Een gratis app voor studentenclubs en verenigingen om tijdens een activiteit te registreren wie betaald heeft: cash, Payconiq, overschrijving of op de schuldenlijst. Alles komt in je eigen Google Sheet.</p><p class="mu">Maak een nieuwe club aan. Jij wordt de eerste Quaestor.</p>
+function setup(){$('#app').innerHTML=`<div class="auth"><h2>Welkom bij je betalingsapp</h2><p class="mu">Een gratis app voor studentenclubs en verenigingen om tijdens een activiteit te registreren wie betaald heeft: cash, Payconiq, overschrijving of op de schuldenlijst. Alles komt in je eigen Google Sheet.</p><p class="mu">Maak een nieuwe club aan. Jij wordt de eerste Quaestor. Je meldt je aan met je Google-account, zonder apart wachtwoord.</p>
 <label>Naam van de club<input id="sn" autocomplete="off"></label>
-<label>Jouw gebruikersnaam (je naam zoals anderen hem zien)<input id="su" autocomplete="username"></label>
-<label>Wachtwoord<input id="sp" type="password" autocomplete="new-password"></label>
-<label>Wachtwoord herhalen<input id="sp2" type="password" autocomplete="new-password"></label><p class="mu">${PWH}</p>
-<div class="err" id="se"></div><button class="btn" onclick="doSetup()">Starten</button><button class="btn ghost" style="margin-top:8px" onclick="restoreScreen(false)">Bestaande club ophalen</button><button class="btn ghost" style="margin-top:8px" onclick="pasteInv()">Ik heb een uitnodigingslink</button>${REG.list.length>1?'<button class="btn ghost" style="margin-top:8px" onclick="clubsScreen()">Mijn clubs</button>':''}<p class="mu" style="margin-top:16px"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`}
-async function doSetup(){const n=$('#sn').value.trim(),u=$('#su').value.trim(),p=$('#sp').value,p2=$('#sp2').value;
- const e=!n?'Vul de naam van de club in.':validU(u)||validP(p,p2);if(e){$('#se').textContent=e;return}
- let us;try{us=await mkUser(u,p,'q')}catch(x){$('#se').textContent='Wachtwoord versleutelen lukt niet op dit toestel.';return}
- Object.assign(S.club,{name:n,setDirty:true,lastUser:us.u});S.users=[us];save();logIn(us)}
+<label>Jouw naam (zoals die bij je boekingen komt)<input id="su" autocomplete="name"></label>
+<div class="err" id="se"></div><button class="btn" onclick="doSetup()">Aanmelden met Google en starten</button><button class="btn ghost" style="margin-top:8px" onclick="restoreScreen(false)">Bestaande club ophalen</button><button class="btn ghost" style="margin-top:8px" onclick="pasteInv()">Ik heb een uitnodigingslink</button>${REG.list.length>1?'<button class="btn ghost" style="margin-top:8px" onclick="clubsScreen()">Mijn clubs</button>':''}<p class="mu" style="margin-top:16px"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`}
+async function doSetup(){const n=$('#sn').value.trim(),u=$('#su').value.trim(),err=m=>$('#se').textContent=m;
+ const e=!n?'Vul de naam van de club in.':validU(u);if(e)return err(e);
+ let em;try{SI=true;em=await gEmail()}catch(x){return err(x.message)}finally{SI=false}
+ const us=await mkUser(u,null,'q',em);Object.assign(S.club,{name:n,setDirty:true,lastUser:us.u});S.users=[us];save();logIn(us)}
 /* ---------- accounts ---------- */
-const TAB_U='Gebruikers',HEAD_U=['ID','Gebruikersnaam','Rol','Status','Salt','Code','Aangemaakt','Gewijzigd'];
+const TAB_U='Gebruikers',HEAD_U=['ID','Gebruikersnaam','Rol','Status','Salt','Code','Aangemaakt','Gewijzigd','E-mail'];
 const uk=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
 const actU=()=>S.users.filter(u=>u.st!=='weg');
 const findU=n=>actU().find(u=>uk(u.u)===uk(n));
+const findE=e=>e?actU().find(u=>u.e&&u.e===String(e).toLowerCase()):null;
+const pwUsers=()=>actU().some(u=>!u.e&&u.code);
 const me=()=>S.users.find(u=>u.id===USER);
 const nQ=()=>actU().filter(u=>u.r==='q'&&u.st!=='uit').length;
 function validU(n){n=String(n||'').trim();if(n.length<2||n.length>30)return 'Een gebruikersnaam heeft 2 tot 30 tekens.';if(!/^[\wÀ-ÿ]/.test(n))return 'Begin je gebruikersnaam met een letter of cijfer.';return ''}
 function validP(p,p2){if(String(p||'').length<6)return 'Het wachtwoord heeft minstens 6 tekens.';if(/^(\d)\1+$|^(123456|1234567|12345678|654321|000000|111111|wachtwoord|password|azerty|qwerty)/i.test(String(p)))return 'Dit wachtwoord is te makkelijk te raden. Kies een ander.';if(p2!=null&&p!==p2)return 'De twee wachtwoorden zijn niet gelijk.';return ''}
-async function mkUser(name,pw,r){const salt=rnd(),now=Date.now();return{id:uid().replace(/-/g,''),u:String(name).trim().replace(/\s+/g,' '),r,st:'',salt,code:await pwHash(pw,salt),ct:now,mt:now,dirty:true}}
-const uRow=u=>[u.id,u.u,u.r==='q'?'Quaestor':'Helper',u.st==='uit'?'Ingetrokken':u.st==='weg'?'Verwijderd':'Actief',u.salt,u.code,u.ct,u.mt];
+async function mkUser(name,pw,r,e){const salt=pw?rnd():'',now=Date.now();return{id:uid().replace(/-/g,''),u:String(name).trim().replace(/\s+/g,' '),r,st:'',salt,code:pw?await pwHash(pw,salt):'',e:e?String(e).toLowerCase():'',ct:now,mt:now,dirty:true}}
+const uRow=u=>[u.id,u.u,u.r==='q'?'Quaestor':'Helper',u.st==='uit'?'Ingetrokken':u.st==='weg'?'Verwijderd':'Actief',u.salt,u.code,u.ct,u.mt,u.e||''];
 async function uTab(){const g=S.club.gid,m=await api(`/${g}?fields=sheets.properties.title`);if(!(m.sheets||[]).some(s=>s.properties.title===TAB_U))await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:TAB_U,hidden:true}}}]})});
- await head(TAB_U,HEAD_U);S.club.uTab=true;save()}
+ await head(TAB_U,HEAD_U);await uHead();S.club.uTab=true;save()}
+let UHD=false;async function uHead(){if(UHD)return;const u=`/${S.club.gid}/values/${enc(rng(TAB_U,'I1'))}`,d=await api(u);if(!(d.values&&d.values[0]&&String(d.values[0][0]||'').trim()))await api(u+'?valueInputOption=RAW',{method:'PUT',body:JSON.stringify({values:[['E-mail']]})});UHD=true}
 async function pullUsers(){const c=S.club,g=c.gid;if(!g||!c.gok)return false;
  if(!c.uTab){if(!await hasTab(TAB_U))return false;c.uTab=true}
- const d=await api(`/${g}/values/${enc(rng(TAB_U,'A2:H'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[],by=new Map(S.users.map(u=>[u.id,u])),seen=new Set();let ch=false;
+ const d=await api(`/${g}/values/${enc(rng(TAB_U,'A2:I'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[],by=new Map(S.users.map(u=>[u.id,u])),seen=new Set();let ch=false;
  rows.forEach((r,i)=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(!id||!r[1])return;seen.add(id);const st=String(r[3]||'').trim().toLowerCase();
-  const o={u:String(r[1]).trim(),r:/^quaestor$/i.test(String(r[2]||'').trim())?'q':'h',st:st==='ingetrokken'?'uit':st==='verwijderd'?'weg':'',salt:String(r[4]||''),code:String(r[5]||''),ct:+r[6]||0,mt:+r[7]||0};
+  const o={u:String(r[1]).trim(),r:/^quaestor$/i.test(String(r[2]||'').trim())?'q':'h',st:st==='ingetrokken'?'uit':st==='verwijderd'?'weg':'',salt:String(r[4]||''),code:String(r[5]||''),ct:+r[6]||0,mt:+r[7]||0,e:String(r[8]||'').trim().toLowerCase()};
   const l=by.get(id);if(!l){S.users.push(Object.assign({id,row:i+2,dirty:false},o));ch=true;return}
   l.row=i+2;if(l.dirty&&(+l.mt||0)>=o.mt)return;for(const k in o)if(l[k]!==o[k]){l[k]=o[k];ch=true}l.dirty=false});
  const n0=S.users.length;S.users=S.users.filter(u=>seen.has(u.id)||(u.dirty&&!u.row));if(S.users.length!==n0)ch=true;
  if(ch)save();return ch}
 async function pushUsers(){const c=S.club;if(!c.gid||!c.gok||!S.users.some(u=>u.dirty))return;
- if(!c.uTab)await uTab();await pullUsers();const dir=S.users.filter(u=>u.dirty);if(!dir.length)return;
- const data=[],add=[];dir.forEach(u=>{if(u.row)data.push({range:rng(TAB_U,'A'+u.row+':H'+u.row),values:[uRow(u)]});else{const x=actU().find(o=>o!==u&&o.row&&uk(o.u)===uk(u.u));if(x&&u.st!=='weg'){u.st='weg';u.clash=true}add.push(u)}});
+ if(!c.uTab)await uTab();await uHead();await pullUsers();const dir=S.users.filter(u=>u.dirty);if(!dir.length)return;
+ const data=[],add=[];dir.forEach(u=>{if(u.row)data.push({range:rng(TAB_U,'A'+u.row+':I'+u.row),values:[uRow(u)]});else{const x=actU().find(o=>o!==u&&o.row&&uk(o.u)===uk(u.u));if(x&&u.st!=='weg'){u.st='weg';u.clash=true}add.push(u)}});
  if(data.length)await api(`/${c.gid}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data})});
- if(add.length)await api(`/${c.gid}/values/${enc(rng(TAB_U,'A:H'))}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{method:'POST',body:JSON.stringify({values:add.map(uRow)})});
+ if(add.length)await api(`/${c.gid}/values/${enc(rng(TAB_U,'A:I'))}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{method:'POST',body:JSON.stringify({values:add.map(uRow)})});
  dir.forEach(u=>u.dirty=false);save();if(add.length)await pullUsers()}
+async function bindMe(){const u=USER&&me();if(!u||u.e)return false;if(!TEMAIL){if(!haveTok())return false;await uinfo(TOKEN)}
+ if(findE(TEMAIL))return false;Object.assign(u,{e:TEMAIL,salt:'',code:'',mt:Date.now(),dirty:true});save();try{await pushUsers()}catch(e){}return true}
 function userCheck(){if(!USER||!role)return false;const u=me();
  if(!u||u.st==='weg'||u.st==='uit'){const m=!u||u.st==='weg'?'Je account bestaat niet meer in deze club.':'De Quaestor heeft je toegang ingetrokken.';setTimeout(()=>{logout();const e=$('#le');if(e)e.textContent=m;toast(m)},0);return true}
  if(u.r!==role){const up=u.r==='q';role=u.r;setTimeout(()=>{render();toast(up?'Je bent nu Quaestor':'Je hebt nu helperrechten')},0);return true}return false}
-function logIn(u){USER=u.id;role=u.r;WHO=u.u;S.club.lastUser=u.u;LOGVIA='';save();tab='boek';render();LASTPULL=0;queueSync()}
+function logIn(u){USER=u.id;role=u.r;WHO=u.u;S.club.lastUser=u.u;S.club.sess=u.id;LOGVIA='';save();tab='boek';render();LASTPULL=0;queueSync()}
 const legacyPins=()=>!nQ()&&!!(S.club.pinQ||S.club.pinQh||S.club.pinH||S.club.pinHh);
 function login(){const c=S.club;
- if(c.gid&&c.gok&&!LPULL){LPULL=true;pullUsers().then(ch=>{if(ch&&!role&&$('#lu'))login()}).catch(()=>{})}
- if(legacyPins())return $('#app').innerHTML=`<div class="auth"><h2>${esc(c.name)}</h2><p class="mu">Deze club werkt nog met pincodes. Meld je nog één keer aan met je pincode. Daarna maak je je eigen account met gebruikersnaam en wachtwoord.</p><label>Pincode<input id="lp" type="password" inputmode="numeric" autofocus onkeydown="if(event.key==='Enter')pinLogin()"></label><div class="err" id="le"></div><button class="btn" onclick="pinLogin()">Openen</button><button class="btn ghost" style="margin-top:8px" onclick="newAcc()">Ik heb geen pincode: nieuw account maken</button><button class="btn ghost" style="margin-top:8px" onclick="clubsScreen()">Mijn clubs</button></div>`;
- $('#app').innerHTML=`<div class="auth"><h2>${esc(c.name)}</h2><label>Gebruikersnaam<input id="lu" autocomplete="username" value="${esc(c.lastUser||'')}"></label><label>Wachtwoord<input id="lp" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></label><div class="err" id="le"></div><button class="btn" onclick="doLogin()">Aanmelden</button><button class="btn ghost" style="margin-top:8px" onclick="newAcc()">Nieuw account maken</button><button class="btn ghost" style="margin-top:8px" onclick="clubsScreen()">Mijn clubs</button><p class="mu" style="margin-top:16px">Wachtwoord vergeten? Vraag de Quaestor om een nieuw wachtwoord in te stellen.</p><p class="mu"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`;
- setTimeout(()=>{const e=$(c.lastUser?'#lp':'#lu');if(e)e.focus()},50)}
+ if(c.gid&&c.gok&&!LPULL){LPULL=true;pullUsers().then(ch=>{if(ch&&!role&&$('#gl'))login()}).catch(()=>{})}
+ if(legacyPins())return $('#app').innerHTML=`<div class="auth"><h2>${esc(c.name)}</h2><p class="mu">Deze club werkt nog met pincodes. Meld je nog één keer aan met je pincode. Daarna maak je je account, gekoppeld aan je Google-account.</p><label>Pincode<input id="lp" type="password" inputmode="numeric" autofocus onkeydown="if(event.key==='Enter')pinLogin()"></label><div class="err" id="le"></div><button class="btn" onclick="pinLogin()">Openen</button><button class="btn ghost" style="margin-top:8px" onclick="newAcc()">Ik heb geen pincode: nieuw account maken</button><button class="btn ghost" style="margin-top:8px" onclick="clubsScreen()">Mijn clubs</button></div>`;
+ $('#app').innerHTML=`<div class="auth" id="gl"><h2>${esc(c.name)}</h2><p class="mu">Meld je aan met je Google-account. Gebruik het account waarmee je de spreadsheet van de club opent.</p><div class="err" id="le"></div><button class="btn" onclick="gLogin()">Aanmelden met Google</button><button class="btn ghost" style="margin-top:8px" onclick="gLogin('select_account')">Ander Google-account kiezen</button>
+ ${pwUsers()?`<details style="margin-top:12px"><summary>Aanmelden met gebruikersnaam en wachtwoord (oude manier)</summary><label>Gebruikersnaam<input id="lu" autocomplete="username" value="${esc(c.lastUser||'')}"></label><label>Wachtwoord<input id="lp" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></label><button class="btn ghost" onclick="doLogin()">Aanmelden en koppelen aan Google</button><p class="mu">Na het aanmelden wordt je account aan je Google-account gekoppeld en is het wachtwoord niet meer nodig.</p></details>`:''}
+ <button class="btn ghost" style="margin-top:8px" onclick="clubsScreen()">Mijn clubs</button><p class="mu" style="margin-top:16px"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`}
+async function gLogin(pr){const err=m=>{const e=$('#le');if(e)e.textContent=m};let em;
+ try{SI=true;em=await gEmail(pr);if(S.club.gid&&S.club.gok)await pullUsers()}catch(x){SI=false;return err(x.message)}SI=false;save();
+ const u=findE(em);if(u){if(u.st==='uit')return err('De Quaestor heeft je toegang ingetrokken.');return logIn(u)}
+ accAsk(em)}
+function accAsk(em){$('#app').innerHTML=`<div class="auth"><h2>${esc(S.club.name)}</h2><p class="mu">Je Google-account <b>${esc(em)}</b> hoort nog bij geen account in deze club.</p><button class="btn" onclick="newAcc()">Nieuw account maken</button>${pwUsers()?`<button class="btn ghost" style="margin-top:8px" onclick="pwLink()">Ik heb al een account met wachtwoord</button>`:''}<button class="btn ghost" style="margin-top:8px" onclick="gLogin('select_account')">Ander Google-account kiezen</button><button class="btn ghost" style="margin-top:8px" onclick="login()">Terug</button></div>`}
+function pwLink(){$('#app').innerHTML=`<div class="auth"><h2>Account koppelen</h2><p class="mu">Meld je één keer aan met je oude gebruikersnaam en wachtwoord. Daarna hoort je account bij je Google-account en wordt het wachtwoord gewist.</p><label>Gebruikersnaam<input id="lu" autocomplete="username" value="${esc(S.club.lastUser||'')}"></label><label>Wachtwoord<input id="lp" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></label><div class="err" id="le"></div><button class="btn" onclick="doLogin()">Koppelen en aanmelden</button><button class="btn ghost" style="margin-top:8px" onclick="login()">Terug</button></div>`}
 async function doLogin(){const n=($('#lu').value||'').trim(),p=$('#lp').value||'',err=m=>{const e=$('#le');if(e)e.textContent=m};
  if(!n||!p)return err('Vul je gebruikersnaam en wachtwoord in.');
  let u=findU(n);if(S.club.gid&&S.club.gok&&(haveTok()||!u||u.st==='uit')){try{SI=!u||u.st==='uit';await pullUsers()}catch(e){}finally{SI=false}u=findU(n)}
- if(!u)return err('Deze gebruikersnaam bestaat niet in deze club. Kies Nieuw account maken.');
+ if(!u)return err('Deze gebruikersnaam bestaat niet in deze club.');
+ if(!u.code)return err('Dit account gebruikt aanmelden met Google.');
  const ok=await pwCheck(p,u);
  if(!ok)return err('Gebruikersnaam of wachtwoord klopt niet.');
  if(u.st==='uit')return err('De Quaestor heeft je toegang ingetrokken.');
- if(String(u.code).indexOf('v2$')!==0){try{u.salt=rnd();u.code=await pwHash(p,u.salt);u.mt=Date.now();u.dirty=true;save()}catch(e){}}logIn(u)}
+ let em='';try{SI=true;em=await gEmail()}catch(e){}finally{SI=false}
+ if(em&&!findE(em))Object.assign(u,{e:em,salt:'',code:'',mt:Date.now(),dirty:true});
+ else if(String(u.code).indexOf('v2$')!==0){try{u.salt=rnd();u.code=await pwHash(p,u.salt);u.mt=Date.now();u.dirty=true}catch(e){}}
+ save();logIn(u)}
 async function pinLogin(){const p=$('#lp').value.trim(),c=S.club;let r=null;if(p){if(c.pinMe&&p===c.pinMe)r=accSt()==='q'?'q':'h';else if(!c.helperOnly&&await okPin('pinQ',p))r='q';else if(await okPin('pinH',p))r=accSt()==='q'?'q':'h'}
  if(!r){$('#le').textContent='Deze pincode klopt niet.';return}if(r==='q'&&accSt()==='h')r='h';newAcc(r)}
-function newAcc(r){r=r==='q'?'q':'h';$('#app').innerHTML=`<div class="auth"><h2>Nieuw account</h2><p class="mu">Voor ${esc(S.club.name)}. ${r==='q'?'Je wordt Quaestor.':'Je begint als helper. De Quaestor kan je later promoveren.'} Je gebruikersnaam staat bij elke boeking die je doet. Gebruik hetzelfde account op al je toestellen.</p>
-<label>Gebruikersnaam (je naam)<input id="nu" autocomplete="username" value="${esc(S.club.names[r]||'')}"></label><label>Wachtwoord<input id="np" type="password" autocomplete="new-password"></label><label>Wachtwoord herhalen<input id="np2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')newAccOk('${r}')"></label><p class="mu">${PWH}</p><div class="err" id="ne"></div><button class="btn" onclick="newAccOk('${r}')">Account maken</button><button class="btn ghost" style="margin-top:8px" onclick="login()">Ik heb al een account</button></div>`}
-async function newAccOk(r){const n=($('#nu').value||'').trim(),p=$('#np').value,p2=$('#np2').value,err=m=>{const e=$('#ne');if(e)e.textContent=m};
- const v=validU(n)||validP(p,p2);if(v)return err(v);
- if(S.club.gid&&S.club.gok){try{SI=true;await pullUsers()}catch(e){if(e.auth){SI=false;return err(e.message)}}finally{SI=false}}
- if(findU(n))return err('Deze gebruikersnaam bestaat al in deze club. Kies een andere, of meld je aan met je wachtwoord.');
+function newAcc(r){r=r==='q'?'q':'h';$('#app').innerHTML=`<div class="auth"><h2>Nieuw account</h2><p class="mu">Voor ${esc(S.club.name)}. ${r==='q'?'Je wordt Quaestor.':'Je begint als helper. De Quaestor kan je later promoveren.'} Je meldt je aan met je Google-account, zonder apart wachtwoord. Gebruik hetzelfde Google-account op al je toestellen.</p>
+<label>Jouw naam (zoals die bij je boekingen komt)<input id="nu" autocomplete="name" value="${esc(S.club.names[r]||'')}" onkeydown="if(event.key==='Enter')newAccOk('${r}')"></label><div class="err" id="ne"></div><button class="btn" onclick="newAccOk('${r}')">Account maken met Google</button><button class="btn ghost" style="margin-top:8px" onclick="login()">Terug</button></div>`}
+async function newAccOk(r){const n=($('#nu').value||'').trim(),err=m=>{const e=$('#ne');if(e)e.textContent=m};
+ const v=validU(n);if(v)return err(v);let em;
+ try{SI=true;em=await gEmail();if(S.club.gid&&S.club.gok)await pullUsers()}catch(e){SI=false;return err(e.message)}SI=false;
+ const ex=findE(em);if(ex){if(ex.st==='uit')return err('De Quaestor heeft je toegang ingetrokken.');toast('Je had al een account: '+ex.u);return logIn(ex)}
+ if(findU(n))return err('Deze naam bestaat al in deze club. Kies een andere, bijvoorbeeld met je achternaam erbij.');
  if(r==='q'&&!legacyPins())r='h';
- let u;try{u=await mkUser(n,p,r)}catch(e){return err('Wachtwoord versleutelen lukt niet op dit toestel.')}
- S.users.push(u);save();
- if(S.club.gid&&S.club.gok){try{SI=true;await pushUsers()}catch(e){}finally{SI=false}if(u.st==='weg'){S.users=S.users.filter(x=>x!==u);save();return err('Deze gebruikersnaam is net door iemand anders gekozen. Kies een andere.')}}
+ const u=await mkUser(n,null,r,em);S.users.push(u);save();
+ if(S.club.gid&&S.club.gok){try{SI=true;await pushUsers()}catch(e){}finally{SI=false}if(u.st==='weg'){S.users=S.users.filter(x=>x!==u);save();return err('Deze naam is net door iemand anders gekozen. Kies een andere.')}}
  logIn(u);toast('Account aangemaakt')}
 function enter(){if(USER){WHO=(me()||{}).u||WHO;tab='boek';render();queueSync();return}
  if(!S.club.names[role])return nameScreen();WHO=S.club.names[role];tab='boek';render();queueSync()}
 function nameScreen(){$('#app').innerHTML=`<div class="auth"><h2>Wie ben je?</h2><label>Je naam<input id="wn" autocomplete="name" value="${esc(S.club.names[role]||'')}" onkeydown="if(event.key==='Enter')saveName()"></label><div class="err" id="wne"></div><button class="btn" onclick="saveName()">Verder</button></div>`}
 function saveName(){const n=($('#wn').value||'').trim().slice(0,40);if(n.length<2){$('#wne').textContent='Vul je naam in (minstens 2 letters).';return}S.club.names[role]=n;WHO=n;LASTPULL=0;save();tab='boek';render();queueSync()}
 function chName(){const n=($('#wn2').value||'').trim().slice(0,40);if(n.length<2)return toast('Vul je naam in (minstens 2 letters)');S.club.names[role]=n;WHO=n;save();toast('Naam opgeslagen')}
-function logout(){role=null;USER='';WHO='';login()}
-function accCard(){const u=me();if(!u)return '';return `<div class="card"><h2>Je account</h2><p class="mu">Aangemeld als <b>${esc(u.u)}</b> (${u.r==='q'?'Quaestor':'helper'}). Gebruik dit account op al je toestellen.</p><button class="btn ghost" onclick="pwMine()">Wachtwoord wijzigen</button></div>`}
+function logout(){const u=me();if(u&&!u.e&&!u.code&&role)return toast('Verbind eerst met Google (Meer → Google Sheets), anders kan je niet meer aanmelden.');S.club.sess='';save();role=null;USER='';WHO='';login()}
+function accCard(){const u=me();if(!u)return '';return `<div class="card"><h2>Je account</h2><p class="mu">Aangemeld als <b>${esc(u.u)}</b> (${u.r==='q'?'Quaestor':'helper'})${u.e?` met Google-account ${esc(u.e)}`:''}. Gebruik hetzelfde account op al je toestellen.</p>${u.e?'':(u.code?'<p class="mu">Je account is nog niet gekoppeld aan Google. Dat gebeurt vanzelf bij de volgende synchronisatie.</p><button class="btn ghost" onclick="pwMine()">Wachtwoord wijzigen</button>':'<p class="mu">Verbind met Google om je account te koppelen.</p>')}</div>`}
 function pwMine(){modal(`<h3>Wachtwoord wijzigen</h3><label>Huidig wachtwoord<input id="po" type="password" autocomplete="current-password"></label><label>Nieuw wachtwoord<input id="pn" type="password" autocomplete="new-password"></label><label>Nieuw wachtwoord herhalen<input id="pn2" type="password" autocomplete="new-password"></label><p class="mu">${PWH}</p><button class="btn" onclick="pwMineOk()">Opslaan</button>`)}
 async function pwMineOk(){const u=me();if(!u)return;const ok=await pwCheck($('#po').value,u);if(!ok)return toast('Je huidige wachtwoord klopt niet');
  const v=validP($('#pn').value,$('#pn2').value);if(v)return toast(v);u.salt=rnd();u.code=await pwHash($('#pn').value,u.salt);u.mt=Date.now();u.dirty=true;save();closeM();queueSync();toast('Wachtwoord gewijzigd')}
@@ -535,7 +557,7 @@ function dropClub(id){let n=0,nm=(REG.list.find(x=>x.id===id)||{}).name||'deze c
   REG.list.length>1?clubsScreen():start();toast('Club verwijderd')})}
 let RST=null;
 function restoreScreen(fresh){RST={fresh:!!fresh};
- $('#app').innerHTML=`<div class="auth"><h2>Bestaande club ophalen</h2><p class="mu">Gebruik dit op een nieuw toestel voor een club die al bestaat. Je meldt aan bij Google en kiest de spreadsheet van de club. Daarna meld je je aan met je gebruikersnaam en wachtwoord, of maak je een account.</p><div class="err" id="re"></div><button class="btn" onclick="restorePick()">Spreadsheet kiezen</button><button class="btn ghost" style="margin-top:8px" onclick="restoreCancel()">Annuleren</button></div>`}
+ $('#app').innerHTML=`<div class="auth"><h2>Bestaande club ophalen</h2><p class="mu">Gebruik dit op een nieuw toestel voor een club die al bestaat. Je meldt aan bij Google en kiest de spreadsheet van de club. Ben je al lid van het team, dan word je meteen aangemeld. Anders maak je een account.</p><div class="err" id="re"></div><button class="btn" onclick="restorePick()">Spreadsheet kiezen</button><button class="btn ghost" style="margin-top:8px" onclick="restoreCancel()">Annuleren</button></div>`}
 function restoreCancel(){const f=RST&&RST.fresh,jn=RST&&RST.join;RST=null;if(S.club.gid&&!role&&!S.users.length&&!S.club.pinQh){S.club.gid='';S.club.gok=false}
  if(jn){JOIN=null;try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}if(emptyClub(S)&&REG.list.length>1){removeProfile(REG.active);S=null;loadProfile(REG.list[REG.list.length-1].id)}return start()}
  if(f){removeProfile(REG.active);S=null;loadProfile(REG.list[REG.list.length-1].id);start()}else setup()}
@@ -552,14 +574,15 @@ async function restorePick(){const e=m=>{const x=$('#re');if(x)x.textContent=m};
  setStatuses(Array.isArray(m['Statussen'])?m['Statussen']:S.statuses);takeAcc(m);
  try{SI=true;await pullUsers()}catch(x){}finally{SI=false}
  RST=null;JOIN=null;LPULL=true;try{history.replaceState(null,'',location.pathname+location.search)}catch(x){}save();theme();
- if(!actU().length&&!legacyPins())return newAcc('h');login()}
+ if(TEMAIL||haveTok()){try{SI=true;const em=await gEmail();const u=findE(em);if(u&&!u.st){SI=false;return logIn(u)}}catch(x){}finally{SI=false}}
+ if(!actU().length&&!legacyPins())return newAcc('h');if(TEMAIL&&!legacyPins())return accAsk(TEMAIL);login()}
 
 /* ================= OPBOUW ================= */
 function render(){if(S.club.blocked)return blockAfter();const Q=role==='q';
  if(!Q&&['dag','schuld','leden','inst','acc'].includes(tab))tab='boek';
  const nb=Q?bonTodo().length:0,tabs=Q?[['boek','Boeken'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'+(nb?' ('+nb+')':'')],['inst','Meer']]:[['boek','Boeken'],['vandaag','Vandaag'],['bon','Bonnen']];
  const v={boek:vBoek,vandaag:vVandaag,dag:vDag,schuld:vSchuld,leden:vLeden,inst:vInst,acc:vAcc,bon:vBon}[tab]();
- $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${Q?'Quaestor':'Helper'}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div><button onclick="logout()">Vergrendel</button></header>
+ $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${Q?'Quaestor':'Helper'}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div><button onclick="logout()">Afmelden</button></header>
  <main>${v}</main><nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</nav>`;
  if(tab==='boek')sug();if(tab==='leden')ml();refreshSt()}
 const row=(t,st)=>`<div class="row${t.void?' void':''}"><div><b>${esc(t.name||'Zonder naam')}</b>${t.exp&&!t.storno?` <span class="tag">${t.ref?'Terugbetaling':'Uitgave'}</span>`:''}<div class="mu">${esc(t.h)}${t.s?' · '+esc(t.s):''} · ${M[t.method]}${t.desc?' · '+esc(t.desc):''}${t.adv&&!t.ref?' · door '+esc(t.adv):''}${t.who?' · '+esc(t.who):''}${t.storno?' · storno':''}</div></div><div class="amt ${t.v<0?'neg':''}">${eur(t.v)}${st&&!t.void&&!t.storno?`<button class="sm" onclick="storno('${t.id}')">Storno</button>`:''}</div></div>`;
@@ -799,7 +822,7 @@ function inviteLink(){const c=S.club,o={v:1,i:c.gid,n:c.name,c:c.color,t:c.catTa
  return location.href.split('#')[0].split('?')[0]+'#join='+btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
 function invCard(){const c=S.club;
  if(!c.gid||!c.gok)return `<div class="card"><h2>Helpers uitnodigen</h2><p class="mu">Koppel eerst Google Sheets. Daarna kan je hier een uitnodigingslink voor helpers maken, zodat ze op hun eigen gsm meewerken in dezelfde spreadsheet.</p></div>`;
- return `<div class="card"><h2>Helpers uitnodigen</h2><p class="mu">Elke helper werkt op zijn eigen gsm, alles komt in dezelfde spreadsheet.</p><ol class="mu" style="padding-left:20px;margin:0 0 12px"><li>Open je spreadsheet, tik op Delen en voeg het Google-account van de helper toe als <b>bewerker</b>.</li><li>Stuur de helper de uitnodigingslink hieronder.</li><li>De helper opent de link, meldt aan bij Google, kiest de gedeelde spreadsheet en maakt een eigen account (gebruikersnaam en wachtwoord). Hij begint als helper. Bij Accounts kan je hem promoveren tot Quaestor.</li><li>Op een ander toestel meldt hij zich aan met hetzelfde account.</li></ol>
+ return `<div class="card"><h2>Helpers uitnodigen</h2><p class="mu">Elke helper werkt op zijn eigen gsm, alles komt in dezelfde spreadsheet.</p><ol class="mu" style="padding-left:20px;margin:0 0 12px"><li>Open je spreadsheet, tik op Delen en voeg het Google-account van de helper toe als <b>bewerker</b>.</li><li>Stuur de helper de uitnodigingslink hieronder.</li><li>De helper opent de link, meldt aan bij Google, kiest de gedeelde spreadsheet en maakt een account met zijn Google-account. Hij begint als helper. Bij Accounts kan je hem promoveren tot Quaestor.</li><li>Op een ander toestel meldt hij zich aan met hetzelfde Google-account.</li></ol>
  <button class="btn" onclick="shareInv()">Uitnodigingslink delen</button><button class="btn ghost" style="margin-top:8px" onclick="showT('Uitnodigingslink',inviteLink())">Link kopiëren</button><a class="btn ghost" style="margin-top:8px" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}">Spreadsheet openen om te delen</a>
  <p class="mu" style="margin-top:12px">De link bevat geen pincodes en geeft zelf geen toegang tot je gegevens. Dat gebeurt pas als je de spreadsheet deelt.</p></div>`}
 function shareInv(){const l=inviteLink();if(navigator.share)navigator.share({title:S.club.name,text:'Uitnodiging als helper bij '+S.club.name,url:l}).catch(()=>{});else showT('Uitnodigingslink',l)}
@@ -870,14 +893,14 @@ function vAcc(){const c=S.club,A=c.acc||{},dst=o=>(A[o.id]||{}).s||'';
   return `<div class="accd"><div>${esc(o.d||'Onbekend toestel')} ${tg.join('')}</div><div class="mu">Laatst actief ${dt(o.l)}</div>${mine?'':`<div class="accb"><button class="btn ghost" onclick="accRm('${esc(o.id)}')">Toestel verwijderen</button></div>`}</div>`};
  const usr=u=>{const mine=u.id===USER,ds=devs.filter(o=>uk(o.n)===uk(u.u)).sort((a,b)=>(+b.l||0)-(+a.l||0)),tg=[],b=[];
   if(mine)tg.push('<span class="tag">Jij</span>');if(ds.length>1)tg.push(`<span class="tag">${ds.length} toestellen</span>`);if(u.dirty)tg.push('<span class="tag">Nog niet gesynchroniseerd</span>');
-  if(!mine){if(u.st==='uit')b.push(['','Toegang teruggeven']);else{b.push(u.r==='q'?['h','Alleen helper maken']:['q','Promoveren tot Quaestor']);b.push(['uit','Toegang intrekken'])}b.push(['pw','Nieuw wachtwoord']);b.push(['weg','Account verwijderen'])}
-  return `<div class="acc"><b>${esc(u.u)}</b> ${tg.join('')}<div class="mu">Account sinds ${dt(u.ct)}${ds.length?'':' · nog op geen enkel toestel actief geweest'}</div>${b.length?`<div class="accb">${b.map(x=>`<button class="btn ghost" onclick="uAct('${esc(u.id)}','${x[0]}')">${x[1]}</button>`).join('')}</div>`:''}${ds.map(dev).join('')}</div>`};
+  if(!mine){if(u.st==='uit')b.push(['','Toegang teruggeven']);else{b.push(u.r==='q'?['h','Alleen helper maken']:['q','Promoveren tot Quaestor']);b.push(['uit','Toegang intrekken'])}if(!u.e&&u.code)b.push(['pw','Nieuw wachtwoord']);b.push(['weg','Account verwijderen'])}
+  return `<div class="acc"><b>${esc(u.u)}</b> ${tg.join('')}<div class="mu">${u.e?esc(u.e):'Nog niet gekoppeld aan Google (oud wachtwoord)'} · account sinds ${dt(u.ct)}${ds.length?'':' · nog op geen enkel toestel actief geweest'}</div>${b.length?`<div class="accb">${b.map(x=>`<button class="btn ghost" onclick="uAct('${esc(u.id)}','${x[0]}')">${x[1]}</button>`).join('')}</div>`:''}${ds.map(dev).join('')}</div>`};
  const sec=(t,l,e)=>`<div class="card"><h2>${t} (${l.length})</h2>${l.length?l.slice().sort((a,b)=>a.u.localeCompare(b.u)).map(usr).join(''):`<p class="mu">${e}</p>`}</div>`;
  const loose=devs.filter(o=>!names.has(uk(o.n)));
  return h+sec('Quaestors',U.filter(u=>u.r==='q'&&u.st!=='uit'),'Geen.')+sec('Helpers',U.filter(u=>u.r==='h'&&u.st!=='uit'),'Nog geen helpers. Nodig iemand uit bij Meer → Helpers uitnodigen.')
   +(U.some(u=>u.st==='uit')?sec('Toegang ingetrokken',U.filter(u=>u.st==='uit'),''):'')
   +(loose.length?`<div class="card"><h2>Toestellen zonder account (${loose.length})</h2><p class="mu">Toestellen die nog met een pincode werken of waarvan de naam bij geen account hoort. Ze moeten bij het volgende aanmelden een account maken.</p>${loose.map(o=>`<div class="acc"><b>${esc(o.n||'(geen naam)')}</b>${dev(o)}</div>`).join('')}</div>`:'')
-  +`<div class="card"><h2>Goed om te weten</h2><p class="mu">Iedereen meldt zich aan met een eigen gebruikersnaam en wachtwoord, op elk toestel hetzelfde. Nieuwe accounts beginnen als helper. Een wijziging werkt zodra het toestel opnieuw synchroniseert, meestal binnen een minuut.</p><p class="mu">De accounts staan in een verborgen tabblad Gebruikers van de spreadsheet, met een versleutelde code in plaats van het wachtwoord. Wie geen toegang meer mag hebben, haal je ook weg bij Delen in Google Drive.</p><a class="btn ghost" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}/edit" target="_blank" rel="noopener">Spreadsheet openen om te delen of weg te halen</a><button class="btn ghost" style="margin-top:8px" onclick="accOpen()">Lijst vernieuwen</button></div>`}
+  +`<div class="card"><h2>Goed om te weten</h2><p class="mu">Iedereen meldt zich aan met zijn eigen Google-account, op elk toestel hetzelfde. Er worden geen wachtwoorden bewaard. Nieuwe accounts beginnen als helper. Een wijziging werkt zodra het toestel opnieuw synchroniseert, meestal binnen een minuut.</p><p class="mu">De accounts (naam, rol en e-mailadres) staan in een verborgen tabblad Gebruikers van de spreadsheet. Wie geen toegang meer mag hebben, haal je ook weg bij Delen in Google Drive.</p><a class="btn ghost" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}/edit" target="_blank" rel="noopener">Spreadsheet openen om te delen of weg te halen</a><button class="btn ghost" style="margin-top:8px" onclick="accOpen()">Lijst vernieuwen</button></div>`}
 function uAct(id,a){const u=S.users.find(x=>x.id===id);if(!u||id===USER||role!=='q')return;const n=esc(u.u);
  if(a==='pw')return modal(`<h3>Nieuw wachtwoord voor ${n}</h3><p class="mu">Geef het daarna zelf aan ${n}. Die kan het later wijzigen bij Je account.</p><label>Nieuw wachtwoord<input id="rpw" type="password" autocomplete="new-password"></label><label>Herhalen<input id="rpw2" type="password" autocomplete="new-password"></label><button class="btn" onclick="uPwOk('${esc(id)}')">Opslaan</button>`);
  const q=a==='q'?`${n} promoveren tot Quaestor? ${n} kan dan alles wat jij kan: leden, prijzen en instellingen beheren, bonnetjes inboeken en accounts beheren.`:a==='h'?`${n} alleen helperrechten geven?`:a==='uit'?`Toegang van ${n} intrekken? ${n} wordt afgemeld zodra het toestel synchroniseert en kan niet meer aanmelden. Boekingen blijven staan.`:a==='weg'?`Account van ${n} verwijderen? ${n} wordt afgemeld en de naam komt vrij. Boekingen blijven staan.`:`Toegang teruggeven aan ${n}?`;
