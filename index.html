@@ -98,7 +98,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='14';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='15';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -226,8 +226,11 @@ async function pullCats(){const d=await api(`/${S.club.gid}/values/${enc(rng(S.c
  if(!h.length)return false;
  const ch=JSON.stringify(S.cats)!==JSON.stringify({h,s});S.cats={h,s};return ch}
 const rnd=()=>[...crypto.getRandomValues(new Uint8Array(12))].map(x=>x.toString(16).padStart(2,'0')).join('');
-async function hashPin(pin,salt){const te=new TextEncoder(),k=await crypto.subtle.importKey('raw',te.encode(pin),'PBKDF2',false,['deriveBits']);
- const b=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:te.encode(salt),iterations:100000},k,256);return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function hashPin(pin,salt,it){const te=new TextEncoder(),k=await crypto.subtle.importKey('raw',te.encode(pin),'PBKDF2',false,['deriveBits']);
+ const b=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:te.encode(salt),iterations:it||100000},k,256);return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+const PWIT=600000;
+const pwHash=async(pw,salt)=>'v2$'+await hashPin(pw,salt,PWIT);
+async function pwCheck(pw,u){try{const c=String(u.code||'');return c.indexOf('v2$')===0?await pwHash(pw,u.salt)===c:await hashPin(pw,u.salt)===c}catch(e){return false}}
 async function okPin(k,p){const c=S.club;if(c[k]&&p===c[k])return true;if(c[k+'h']&&c.salt){try{return await hashPin(p,c.salt)===c[k+'h']}catch(e){}}return false}
 const META='quaestor-club';
 async function metaGet(gid){const r=await api(`/${gid}/developerMetadata:search`,{method:'POST',body:JSON.stringify({dataFilters:[{developerMetadataLookup:{metadataKey:META}}]})});
@@ -437,7 +440,7 @@ function joinScreen(){$('#app').innerHTML=`<div class="auth"><h2>Uitnodiging</h2
 function joinPick(){const o=JOIN||{},sx=v=>typeof v==='string'&&/^[\w.-]{5,120}$/.test(v)?v:'',col=/^#[0-9a-f]{6}$/i.test(o.c||'')?o.c:'#8b1e3f';
  Object.assign(S.club,{name:String(o.n||'Club').slice(0,60),color:col,catTab:String(o.t||'Categorieën').slice(0,60),cid:sx(o.ci),akey:sx(o.ak),appid:sx(o.ap)});theme();
  RST=Object.assign(RST||{},{join:true,inv:o.i});restorePick()}
-const PWH='Minstens 4 tekens. Een pincode van cijfers mag ook.';
+const PWH='Minstens 6 tekens. Gebruik een wachtwoord dat je <b>nergens anders</b> gebruikt, dus niet dat van je e-mail, Google of bank.';
 function setup(){$('#app').innerHTML=`<div class="auth"><h2>Welkom bij je betalingsapp</h2><p class="mu">Een gratis app voor studentenclubs en verenigingen om tijdens een activiteit te registreren wie betaald heeft: cash, Payconiq, overschrijving of op de schuldenlijst. Alles komt in je eigen Google Sheet.</p><p class="mu">Maak een nieuwe club aan. Jij wordt de eerste Quaestor.</p>
 <label>Naam van de club<input id="sn" autocomplete="off"></label>
 <label>Jouw gebruikersnaam (je naam zoals anderen hem zien)<input id="su" autocomplete="username"></label>
@@ -456,8 +459,8 @@ const findU=n=>actU().find(u=>uk(u.u)===uk(n));
 const me=()=>S.users.find(u=>u.id===USER);
 const nQ=()=>actU().filter(u=>u.r==='q'&&u.st!=='uit').length;
 function validU(n){n=String(n||'').trim();if(n.length<2||n.length>30)return 'Een gebruikersnaam heeft 2 tot 30 tekens.';if(!/^[\wÀ-ÿ]/.test(n))return 'Begin je gebruikersnaam met een letter of cijfer.';return ''}
-function validP(p,p2){if(String(p||'').length<4)return 'Het wachtwoord heeft minstens 4 tekens.';if(p2!=null&&p!==p2)return 'De twee wachtwoorden zijn niet gelijk.';return ''}
-async function mkUser(name,pw,r){const salt=rnd(),now=Date.now();return{id:uid().replace(/-/g,''),u:String(name).trim().replace(/\s+/g,' '),r,st:'',salt,code:await hashPin(pw,salt),ct:now,mt:now,dirty:true}}
+function validP(p,p2){if(String(p||'').length<6)return 'Het wachtwoord heeft minstens 6 tekens.';if(/^(\d)\1+$|^(123456|1234567|12345678|654321|000000|111111|wachtwoord|password|azerty|qwerty)/i.test(String(p)))return 'Dit wachtwoord is te makkelijk te raden. Kies een ander.';if(p2!=null&&p!==p2)return 'De twee wachtwoorden zijn niet gelijk.';return ''}
+async function mkUser(name,pw,r){const salt=rnd(),now=Date.now();return{id:uid().replace(/-/g,''),u:String(name).trim().replace(/\s+/g,' '),r,st:'',salt,code:await pwHash(pw,salt),ct:now,mt:now,dirty:true}}
 const uRow=u=>[u.id,u.u,u.r==='q'?'Quaestor':'Helper',u.st==='uit'?'Ingetrokken':u.st==='weg'?'Verwijderd':'Actief',u.salt,u.code,u.ct,u.mt];
 async function uTab(){const g=S.club.gid,m=await api(`/${g}?fields=sheets.properties.title`);if(!(m.sheets||[]).some(s=>s.properties.title===TAB_U))await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:TAB_U,hidden:true}}}]})});
  await head(TAB_U,HEAD_U);S.club.uTab=true;save()}
@@ -490,9 +493,10 @@ async function doLogin(){const n=($('#lu').value||'').trim(),p=$('#lp').value||'
  if(!n||!p)return err('Vul je gebruikersnaam en wachtwoord in.');
  let u=findU(n);if(S.club.gid&&S.club.gok&&(haveTok()||!u||u.st==='uit')){try{SI=!u||u.st==='uit';await pullUsers()}catch(e){}finally{SI=false}u=findU(n)}
  if(!u)return err('Deze gebruikersnaam bestaat niet in deze club. Kies Nieuw account maken.');
- let ok=false;try{ok=await hashPin(p,u.salt)===u.code}catch(e){}
+ const ok=await pwCheck(p,u);
  if(!ok)return err('Gebruikersnaam of wachtwoord klopt niet.');
- if(u.st==='uit')return err('De Quaestor heeft je toegang ingetrokken.');logIn(u)}
+ if(u.st==='uit')return err('De Quaestor heeft je toegang ingetrokken.');
+ if(String(u.code).indexOf('v2$')!==0){try{u.salt=rnd();u.code=await pwHash(p,u.salt);u.mt=Date.now();u.dirty=true;save()}catch(e){}}logIn(u)}
 async function pinLogin(){const p=$('#lp').value.trim(),c=S.club;let r=null;if(p){if(c.pinMe&&p===c.pinMe)r=accSt()==='q'?'q':'h';else if(!c.helperOnly&&await okPin('pinQ',p))r='q';else if(await okPin('pinH',p))r=accSt()==='q'?'q':'h'}
  if(!r){$('#le').textContent='Deze pincode klopt niet.';return}if(r==='q'&&accSt()==='h')r='h';newAcc(r)}
 function newAcc(r){r=r==='q'?'q':'h';$('#app').innerHTML=`<div class="auth"><h2>Nieuw account</h2><p class="mu">Voor ${esc(S.club.name)}. ${r==='q'?'Je wordt Quaestor.':'Je begint als helper. De Quaestor kan je later promoveren.'} Je gebruikersnaam staat bij elke boeking die je doet. Gebruik hetzelfde account op al je toestellen.</p>
@@ -514,8 +518,8 @@ function chName(){const n=($('#wn2').value||'').trim().slice(0,40);if(n.length<2
 function logout(){role=null;USER='';WHO='';login()}
 function accCard(){const u=me();if(!u)return '';return `<div class="card"><h2>Je account</h2><p class="mu">Aangemeld als <b>${esc(u.u)}</b> (${u.r==='q'?'Quaestor':'helper'}). Gebruik dit account op al je toestellen.</p><button class="btn ghost" onclick="pwMine()">Wachtwoord wijzigen</button></div>`}
 function pwMine(){modal(`<h3>Wachtwoord wijzigen</h3><label>Huidig wachtwoord<input id="po" type="password" autocomplete="current-password"></label><label>Nieuw wachtwoord<input id="pn" type="password" autocomplete="new-password"></label><label>Nieuw wachtwoord herhalen<input id="pn2" type="password" autocomplete="new-password"></label><p class="mu">${PWH}</p><button class="btn" onclick="pwMineOk()">Opslaan</button>`)}
-async function pwMineOk(){const u=me();if(!u)return;let ok=false;try{ok=await hashPin($('#po').value,u.salt)===u.code}catch(e){}if(!ok)return toast('Je huidige wachtwoord klopt niet');
- const v=validP($('#pn').value,$('#pn2').value);if(v)return toast(v);u.salt=rnd();u.code=await hashPin($('#pn').value,u.salt);u.mt=Date.now();u.dirty=true;save();closeM();queueSync();toast('Wachtwoord gewijzigd')}
+async function pwMineOk(){const u=me();if(!u)return;const ok=await pwCheck($('#po').value,u);if(!ok)return toast('Je huidige wachtwoord klopt niet');
+ const v=validP($('#pn').value,$('#pn2').value);if(v)return toast(v);u.salt=rnd();u.code=await pwHash($('#pn').value,u.salt);u.mt=Date.now();u.dirty=true;save();closeM();queueSync();toast('Wachtwoord gewijzigd')}
 function busy(){if(SYNCING){toast('Even geduld, er loopt een synchronisatie.');return true}return false}
 function clubsScreen(){const l=REG.list.map(x=>{const a=x.id===REG.active;
   return `<div class="card"><div class="row" style="border:0;padding:0"><div><b style="color:${esc(x.color)}">●</b> <b>${esc(x.name||'Nieuwe club (niet ingesteld)')}</b><div class="mu">${x.user?esc(x.user):(x.helper?'Helper':'')}${a?(x.user?' · ':'')+'nu geopend':''}</div></div><div>${a?'':`<button class="sm" onclick="openClub('${x.id}')">Openen</button>`}<button class="sm" onclick="dropClub('${x.id}')">Verwijderen</button></div></div></div>`}).join('');
@@ -880,7 +884,7 @@ function uAct(id,a){const u=S.users.find(x=>x.id===id);if(!u||id===USER||role!==
  ask(q,a==='q'?'Promoveren':a==='h'?'Alleen helper':a==='uit'?'Intrekken':a==='weg'?'Verwijderen':'Teruggeven',()=>uSet(id,a==='q'||a==='h'?{r:a}:{st:a}))}
 function uSet(id,o){const u=S.users.find(x=>x.id===id);if(!u)return;Object.assign(u,o,{mt:Date.now(),dirty:true});save();render();queueSync();
  toast(o.r==='q'?'Gepromoveerd tot Quaestor':o.r==='h'?'Alleen nog helperrechten':o.st==='uit'?'Toegang ingetrokken':o.st==='weg'?'Account verwijderd':o.code?'Nieuw wachtwoord ingesteld':'Toegang teruggegeven')}
-async function uPwOk(id){const v=validP($('#rpw').value,$('#rpw2').value);if(v)return toast(v);const salt=rnd(),code=await hashPin($('#rpw').value,salt);closeM();uSet(id,{salt,code})}
+async function uPwOk(id){const v=validP($('#rpw').value,$('#rpw2').value);if(v)return toast(v);const salt=rnd(),code=await pwHash($('#rpw').value,salt);closeM();uSet(id,{salt,code})}
 const accName=id=>{const o=(ACCL||[]).find(x=>x.id===id);return o?esc((o.n||'dit toestel')+' ('+(o.d||'onbekend toestel')+')'):'dit toestel'};
 function accSet(id,s){if(id===S.club.dev)return;const n=accName(id);
  const q=s==='uit'?`Toegang van ${n} intrekken? Dat toestel kan niets meer boeken zodra het synchroniseert. Boekingen die het al deed, blijven staan.`:s==='h'?`${n} alleen helperrechten geven? Op dat toestel werkt de Quaestorpincode dan niet meer.`:s==='q'?`${n} Quaestor maken? Die persoon kan dan alles wat jij kan: leden, prijzen en instellingen beheren, bonnetjes inboeken en accounts beheren. Aanmelden gebeurt met de eigen pincode van dat toestel.`:`Toegang teruggeven aan ${n}?`;
