@@ -103,7 +103,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='19';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='22';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -456,7 +456,7 @@ function joinPick(){const o=JOIN||{},sx=v=>typeof v==='string'&&/^[\w.-]{5,120}$
 const PWH='Minstens 6 tekens. Gebruik een wachtwoord dat je <b>nergens anders</b> gebruikt, dus niet dat van je e-mail, Google of bank.';
 function setup(){$('#app').innerHTML=`<div class="auth"><h2>Welkom bij je betalingsapp</h2><p class="mu">Een gratis app voor studentenclubs en verenigingen om tijdens een activiteit te registreren wie betaald heeft: cash, Payconiq, overschrijving of op de schuldenlijst. Alles komt in je eigen Google Sheet.</p><p class="mu">Maak een nieuwe club aan. Jij wordt de eerste Quaestor. Je meldt je aan met je Google-account, zonder apart wachtwoord.</p>
 <label>Naam van de club<input id="sn" autocomplete="off"></label>
-<label>Jouw naam (zoals die bij je boekingen komt)<input id="su" autocomplete="name"></label>
+<label>Je clubnaam<input id="su" autocomplete="nickname" placeholder="bv. Spelt"></label>
 <div class="err" id="se"></div><button class="btn" onclick="doSetup()">Aanmelden met Google en starten</button><button class="btn ghost" style="margin-top:8px" onclick="restoreScreen(false)">Bestaande club ophalen</button><button class="btn ghost" style="margin-top:8px" onclick="pasteInv()">Ik heb een uitnodigingslink</button>${REG.list.length>1?'<button class="btn ghost" style="margin-top:8px" onclick="clubsScreen()">Mijn clubs</button>':''}<p class="mu" style="margin-top:16px"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`}
 async function doSetup(){const n=$('#sn').value.trim(),u=$('#su').value.trim(),err=m=>$('#se').textContent=m;
  const e=!n?'Vul de naam van de club in.':validU(u);if(e)return err(e);
@@ -529,13 +529,13 @@ async function doLogin(){const n=($('#lu').value||'').trim(),p=$('#lp').value||'
  save();logIn(u)}
 async function pinLogin(){const p=$('#lp').value.trim(),c=S.club;let r=null;if(p){if(c.pinMe&&p===c.pinMe)r=accSt()==='q'?'q':'h';else if(!c.helperOnly&&await okPin('pinQ',p))r='q';else if(await okPin('pinH',p))r=accSt()==='q'?'q':'h'}
  if(!r){$('#le').textContent='Deze pincode klopt niet.';return}if(r==='q'&&accSt()==='h')r='h';newAcc(r)}
-function newAcc(r){r=['q','h','d'].includes(r)?r:'p';$('#app').innerHTML=`<div class="auth"><h2>Nieuw account</h2><p class="mu">Voor ${esc(S.club.name)}. ${r==='d'?'Je bent de developer van deze app en krijgt alle rechten.':r==='q'?'Je wordt Quaestor.':r==='h'?'Je wordt helper.':'Je begint als praesidiumlid: je kan bonnetjes indienen, maar geen boekingen doen. De Quaestor kan je meer rechten geven.'} Je meldt je aan met je Google-account, zonder apart wachtwoord. Gebruik hetzelfde Google-account op al je toestellen.</p>
-<label>Jouw naam (zoals die bij je boekingen komt)<input id="nu" autocomplete="name" value="${esc(S.club.names[r]||'')}" onkeydown="if(event.key==='Enter')newAccOk('${r}')"></label><div class="err" id="ne"></div><button class="btn" onclick="newAccOk('${r}')">Account maken met Google</button><button class="btn ghost" style="margin-top:8px" onclick="login()">Terug</button></div>`}
+function newAcc(r){r=['q','h','d'].includes(r)?r:'p';$('#app').innerHTML=`<div class="auth"><h2>Nieuw account</h2><p class="mu">Voor ${esc(S.club.name)}. ${r==='d'?'Je bent de developer van deze app en krijgt alle rechten.':r==='q'?'Je wordt Quaestor.':r==='h'?'Je wordt helper.':'Je begint als praesidiumlid: je kan bonnetjes indienen. De Quaestor kan je meer rechten geven.'} Je meldt je aan met je Google-account.</p>
+<label>Je clubnaam<input id="nu" autocomplete="nickname" placeholder="bv. Spelt" value="${esc(S.club.names[r]||'')}" onkeydown="if(event.key==='Enter')newAccOk('${r}')"></label><div class="err" id="ne"></div><button class="btn" onclick="newAccOk('${r}')">Account maken met Google</button><button class="btn ghost" style="margin-top:8px" onclick="login()">Terug</button></div>`}
 async function newAccOk(r){const n=($('#nu').value||'').trim(),err=m=>{const e=$('#ne');if(e)e.textContent=m};
  const v=validU(n);if(v)return err(v);let em;
  try{SI=true;em=await gEmail();if(S.club.gid&&S.club.gok)await pullUsers()}catch(e){SI=false;return err(e.message)}SI=false;
  const ex=isDev(em)?S.users.find(u=>u.e===em):findE(em);if(ex){devFix(ex);if(ex.st==='uit'&&!isDev(em))return err('De Quaestor heeft je toegang ingetrokken.');toast('Je had al een account: '+ex.u);return logIn(ex)}
- if(findU(n))return err('Deze naam bestaat al in deze club. Kies een andere, bijvoorbeeld met je achternaam erbij.');
+ if(findU(n))return err('Deze clubnaam is al in gebruik. Kies een andere.');
  if(r==='q'&&!legacyPins())r='p';if(r==='h'&&!legacyPins())r='p';if(isDev(em))r='d';else if(r==='d')r='p';
  const u=await mkUser(n,null,r,em);S.users.push(u);save();
  if(S.club.gid&&S.club.gok){try{SI=true;await pushUsers()}catch(e){}finally{SI=false}if(u.st==='weg'){S.users=S.users.filter(x=>x!==u);save();return err('Deze naam is net door iemand anders gekozen. Kies een andere.')}}
@@ -587,8 +587,8 @@ async function restorePick(){const e=m=>{const x=$('#re');if(x)x.textContent=m};
 
 /* ================= OPBOUW ================= */
 function render(){if(S.club.blocked)return blockAfter();const Q=role==='q',P=role==='p';
- if(!Q&&!P&&['inst','acc'].includes(tab))tab='boek';if(P&&['inst','acc'].includes(tab))tab='bon';if(P&&!['bon','me','schuld','leden','dag'].includes(tab))tab='bon';if(!P&&tab==='me')tab='boek';
- const nb=Q?bonTodo().length:0,tabs=Q?[['boek','Boeken'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'+(nb?' ('+nb+')':'')],['inst','Meer']]:P?[['bon','Bonnen'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['me','Account']]:[['boek','Boeken'],['vandaag','Vandaag'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen']];
+ if(!Q&&!P&&['inst','acc'].includes(tab))tab='boek';if(P&&['inst','acc'].includes(tab))tab='bon';if(P&&!['bon','me','schuld','leden','dag'].includes(tab))tab='bon';if(Q&&tab==='me')tab='boek';if(!Q&&tab==='vandaag')tab='dag';
+ const nb=Q?bonTodo().length:0,tabs=Q?[['boek','Boeken'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'+(nb?' ('+nb+')':'')],['inst','Meer']]:P?[['bon','Bonnen'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['me','Account']]:[['boek','Boeken'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'],['me','Account']];
  const v={boek:vBoek,vandaag:vVandaag,dag:vDag,schuld:vSchuld,leden:vLeden,inst:vInst,acc:vAcc,bon:vBon,me:vMe}[tab]();
  $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${ISDEV?'Developer':RN[role]||''}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div><button onclick="logout()">Afmelden</button></header>
  <main>${v}</main><nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</nav>`;
