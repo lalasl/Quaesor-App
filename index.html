@@ -78,6 +78,7 @@ summary{color:var(--mu);font-size:.85rem;padding:4px 0}
 .bonbig{max-width:100%;display:block;margin:0 auto;border-radius:8px}
 .prog{height:6px;background:var(--in);border-radius:3px;overflow:hidden;margin:6px 0 10px}.prog>i{display:block;height:100%;width:0;background:var(--ac);transition:width .3s}
 details summary{cursor:pointer;color:var(--mu);font-size:.85rem;margin:6px 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 10px}.chips button{border:1px solid var(--bd);background:var(--in);color:var(--tx);border-radius:99px;padding:5px 11px;font:inherit;font-size:.85rem;cursor:pointer}.chips .mu{width:100%;margin:0}
 </style>
 </head>
 <body>
@@ -103,7 +104,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='23';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='25';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -691,13 +692,15 @@ function parseBon(txt,itxt){
  let total=null,best=-1;for(const [k,s] of cand){const v=+k;if(s>best||(s===best&&v>total)){best=s;total=v}}
  if(total==null){let b=null;L.forEach(l=>{if(BAD.test(l))return;nums(l).forEach(v=>{if(v>0&&v<10000&&(b==null||v>b))b=v})});total=b}
  // ---- datum
- let date='';const now=new Date(),ok=(y,mo,d)=>mo>=1&&mo<=12&&d>=1&&d<=31&&y>=2000&&new Date(y,mo-1,d)<=new Date(now.getTime()+864e5);
+ let date='';const dates=[],now=new Date(),ok=(y,mo,d)=>mo>=1&&mo<=12&&d>=1&&d<=31&&y>=2000&&new Date(y,mo-1,d)<=new Date(now.getTime()+864e5);
  for(const l of L){let m=l.match(/\b(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})\b/),y,mo,d;
   if(m){y=+m[1];mo=+m[2];d=+m[3]}else{m=l.match(/\b(\d{1,2})\s?[-\/.]\s?(\d{1,2})\s?[-\/.]\s?(\d{4}|\d{2})\b/);if(m){d=+m[1];mo=+m[2];y=+m[3];if(y<100)y+=2000;else if(y<2000)y=2000+(y%100)}}
-  if(m&&ok(y,mo,d)){date=`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;break}}
+  if(m&&ok(y,mo,d)){const x=`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;if(!dates.includes(x))dates.push(x);if(!date)date=x}}
  // ---- winkel
  const T=low(L.join(' ')),norm=s=>low(s).replace(/[^a-z0-9]/g,'');let shop='';
- const TN=norm(T);for(const s of SHOPS){if(TN.includes(norm(s))&&norm(s).length>=4){shop=s;break}}
+ const shops=[],sh=x=>{x=String(x||'').replace(/[^\wÀ-ÿ&'. -]/g,'').trim().slice(0,60);if(x&&!shops.some(y=>low(y)===low(x)))shops.push(x)};
+ const TN=norm(T);for(const s of SHOPS){if(TN.includes(norm(s))&&norm(s).length>=4){shop=s;break}}if(shop)sh(shop);
+ {const co=L.find(l=>/\b(bv|bvba|nv|n\.v\.|srl|sprl|vzw|comm\.?v|cvba|gmbh|ltd|sa)\b\.?\s*$/i.test(l)&&/[a-z]{3}/i.test(l));if(co)sh(co.replace(/\b(bvba|bv|nv|n\.v\.|srl|sprl|vzw|comm\.?v|cvba|gmbh|ltd|sa)\b\.?\s*$/i,''));const w=T.match(/(?:www\.)([a-z0-9-]{3,})\.(?:be|nl|com|eu|fr)/);if(w)sh(w[1].replace(/-/g,' ').replace(/^./,c=>c.toUpperCase()))}
  if(!shop){const co=L.find(l=>/\b(bv|bvba|nv|n\.v\.|srl|sprl|vzw|comm\.?v|bvba|cvba|gmbh|ltd|sa)\b\.?\s*$/i.test(l)&&/[a-z]{3}/i.test(l));if(co)shop=co.replace(/\b(bvba|bv|nv|n\.v\.|srl|sprl|vzw|comm\.?v|cvba|gmbh|ltd|sa)\b\.?\s*$/i,'').trim()}
  if(!shop){const w=T.match(/(?:www\.)([a-z0-9-]{3,})\.(?:be|nl|com|eu|fr)/);if(w)shop=w[1].replace(/-/g,' ').replace(/^./,c=>c.toUpperCase())}
  if(!shop){const SKIP=/(algemene|voorwaarden|ticket|pro ?forma|tussenrekening|kasticket|kassa|welkom|bienvenue|datum|tel\.?|btw|tva|factuur|rekening|bedankt|merci|quality|instituut|prijzen|openingsuren)/i;
@@ -712,7 +715,9 @@ function parseBon(txt,itxt){
   name=name.replace(/^\d+\s?[xX*]\s?/,'').replace(/[^\wÀ-ÿ%&,.'\/ -]/g,'').replace(/\s+/g,' ').trim();
   const letters=(name.match(/[A-Za-zÀ-ÿ]/g)||[]).length;if(letters<3||letters/name.length<.45||!/[A-Za-zÀ-ÿ]{4,}/.test(name))return;
   if(total!=null&&Math.abs(v)===total&&/totaal|total/i.test(l))return;items.push({n:name.slice(0,60),v})});
- return{shop,date,total,items}}
+ const amounts=[...cand.entries()].sort((a,b)=>b[1]-a[1]||b[0]-a[0]).map(x=>+x[0]);Object.keys(all).map(Number).sort((a,b)=>b-a).forEach(v=>{if(!amounts.includes(v))amounts.push(v)});
+ if(shop)sh(shop);if(shop&&shops[0]!==shop){shops.splice(shops.indexOf(shop),1);shops.unshift(shop)}
+ return{shop,date,total,items,amounts:amounts.slice(0,8),dates:dates.slice(0,4),shops:shops.slice(0,4)}}
 
 const PHK=id=>K+'-bon-'+id,PH=new Map();
 function phPut(id,d){try{localStorage.setItem(PHK(id),d);return true}catch(e){return false}}
@@ -728,23 +733,32 @@ function canv(img,max,gray){const k=Math.min(1,max/Math.max(img.naturalWidth||im
 async function bonFile(inp){const f=inp.files&&inp.files[0];if(!f)return;inp.value='';
  let img;try{img=await imgOf(f)}catch(e){return toast(e.message)}
  let q=.6,keep=canv(img,1400).toDataURL('image/jpeg',q);while(keep.length>320000&&q>.3){q-=.1;keep=canv(img,1100).toDataURL('image/jpeg',q)}
- BON={id:uid(),photo:keep,shop:'',date:today(),total:'',items:'',desc:'',adv:false,h:'',st:'read',text:'',err:''};render();
+ const id=uid();BON={id,photo:keep,shop:'',date:today(),total:'',items:'',desc:'',adv:false,h:'',st:'ok',reading:true,text:'',err:'',tch:{},sug:null};render();
+ let p=null,err='';
  try{let pass=0;const T=await loadTess(),w=await T.createWorker('nld',1,{logger:m=>{if(m&&m.status==='recognizing text'){const e=document.querySelector('#bonp>i');if(e)e.style.width=Math.round((pass+(m.progress||0))*50)+'%'}}});
   const cv=canv(img,2200,true),rd=r=>(r&&r.data&&r.data.text)||'';
-  try{await w.setParameters({tessedit_pageseg_mode:'4',preserve_interword_spaces:'1'})}catch(e){}const t4=rd(await w.recognize(cv));if(!BON)return;pass=1;
-  try{await w.setParameters({tessedit_pageseg_mode:'3'})}catch(e){}const t3=rd(await w.recognize(cv));try{await w.terminate()}catch(e){}if(!BON)return;
-  const tx=t4+'\n'+t3,p=parseBon(tx,t4);
-  Object.assign(BON,{shop:p.shop||'',date:p.date||today(),total:p.total!=null?fmt2(p.total):'',items:p.items.map(i=>i.n+'  '+fmt2(i.v)).join('\n'),text:tx,st:'ok'});
-  if(!p.total&&!p.shop)BON.err='Er werd weinig tekst herkend. Vul de gegevens zelf in of neem een scherpere foto.'}
- catch(e){if(!BON)return;BON.st='ok';BON.err='Tekst lezen lukte niet ('+(e.message||e)+'). Vul de gegevens zelf in.'}
- if(tab==='bon')render()}
+  try{await w.setParameters({tessedit_pageseg_mode:'4',preserve_interword_spaces:'1'})}catch(e){}const t4=rd(await w.recognize(cv));pass=1;
+  if(BON&&BON.id===id){try{await w.setParameters({tessedit_pageseg_mode:'3'})}catch(e){}var t3=rd(await w.recognize(cv))}try{await w.terminate()}catch(e){}
+  const tx=t4+'\n'+(t3||'');p=parseBon(tx,t4);p.text=tx}
+ catch(e){err='Tekst lezen lukte niet ('+(e.message||e)+'). Vul de gegevens zelf in.'}
+ const b=BON;if(!b||b.id!==id)return;b.reading=false;
+ if(p){const set=(k,v)=>{if(!b.tch[k]&&v){b[k]=v;const e=$({shop:'#bs',date:'#bd',total:'#bt',items:'#bi'}[k]);if(e)e.value=v}};
+  set('shop',p.shop);set('date',p.date);set('total',p.total!=null?fmt2(p.total):'');set('items',p.items.map(i=>i.n+'  '+fmt2(i.v)).join('\n'));b.text=p.text;b.sug=p;
+  if(!p.total&&!p.shop)err='Er werd weinig tekst herkend. Vul de gegevens zelf in of neem een scherpere foto.'}
+ b.err=err;const s=$('#bonst');if(s)s.outerHTML=bonSt();['shop','total','date'].forEach(k=>{const c=$('#bsug-'+k);if(c)c.outerHTML=bonSug(k)});if(!s&&tab==='bon')render()}
+function bonSt(){const b=BON;return `<div id="bonst">${b.reading?'<p class="mu">De app leest het bonnetje… Je kan intussen al invullen.</p><div class="prog" id="bonp"><i></i></div>':b.err?`<p class="err">${esc(b.err)}</p>`:'<p class="mu">Gelezen. Kijk alles na. Klopt iets niet, tik dan op een voorstel onder het veld of typ zelf.</p>'}</div>`}
+function bonSug(k){const b=BON,p=b&&b.sug,id=`bsug-${k}`;if(!p)return `<div id="${id}"></div>`;
+ const ch=list=>list.length?`<div class="chips" id="${id}">${list.map(x=>`<button type="button" data-k="${k}" data-v="${esc(x[1])}" onclick="bonPick(this.dataset.k,this.dataset.v)">${esc(x[0])}</button>`).join('')}</div>`:`<div id="${id}"></div>`;
+ if(k==='shop'){const recent=[...new Set(S.bons.slice().sort((a,c)=>(c.ts||0)-(a.ts||0)).map(x=>x.shop).filter(Boolean))];return ch([...new Set([...(p.shops||[]),...recent])].slice(0,5).map(s=>[s,s]))}
+ if(k==='total')return ch((p.amounts||[]).filter(v=>v>0).slice(0,6).map(v=>[eur(v),fmt2(v)]));
+ return ch((p.dates||[]).map(d=>[d.split('-').reverse().join('/'),d]))}
+function bonPick(k,v){const b=BON;if(!b)return;b.tch[k]=true;b[k]=v;const e=$({shop:'#bs',date:'#bd',total:'#bt'}[k]);if(e)e.value=v}
 function bonForm(){const b=BON,c=S.cats,Q=role==='q';
- if(b.st==='read')return `<div class="card"><h2>Bonnetje lezen…</h2><img class="bonimg" src="${b.photo}" alt="Bonnetje"><div class="prog" id="bonp"><i></i></div><p class="mu">De eerste keer duurt dit wat langer: de tekstherkenning wordt eenmalig gedownload.</p><button class="btn ghost" onclick="BON=null;render()">Annuleren</button></div>`;
- return `<div class="card"><h2>Bonnetje nakijken</h2><img class="bonimg" src="${b.photo}" alt="Bonnetje" style="cursor:zoom-in" onclick="modal('<img class=&quot;bonbig&quot; src=&quot;'+BON.photo+'&quot;><button class=&quot;btn ghost&quot; style=&quot;margin-top:8px&quot; onclick=&quot;closeM()&quot;>Sluiten</button>')"><p class="mu" style="text-align:center;margin-top:-4px">Tik op de foto om te vergroten.</p>${b.err?`<p class="err">${esc(b.err)}</p>`:'<p class="mu">Controleer wat de app las en verbeter waar nodig. Velden die de app niet kon lezen, zijn leeg.</p>'}
- <label>Winkel<input id="bs" value="${esc(b.shop)}" oninput="BON.shop=this.value"></label>
- <label>Datum van de aankoop<input id="bd" type="date" value="${esc(b.date)}" onchange="BON.date=this.value"></label>
- <label>Totaal in euro<input id="bt" inputmode="decimal" value="${esc(b.total)}" oninput="BON.total=this.value"></label>
- <label>Wat werd er gekocht<textarea id="bi" rows="4" oninput="BON.items=this.value">${esc(b.items)}</textarea></label>
+ return `<div class="card"><h2>Bonnetje</h2><img class="bonimg" src="${b.photo}" alt="Bonnetje" style="cursor:zoom-in" onclick="modal('<img class=&quot;bonbig&quot; src=&quot;'+BON.photo+'&quot;><button class=&quot;btn ghost&quot; style=&quot;margin-top:8px&quot; onclick=&quot;closeM()&quot;>Sluiten</button>')"><p class="mu" style="text-align:center;margin-top:-4px">Tik op de foto om te vergroten.</p>${bonSt()}
+ <label>Winkel<input id="bs" list="bsl" value="${esc(b.shop)}" oninput="BON.shop=this.value;BON.tch.shop=1"></label><datalist id="bsl">${[...new Set([...S.bons.map(x=>x.shop).filter(Boolean),...SHOPS])].slice(0,80).map(s=>`<option value="${esc(s)}">`).join('')}</datalist>${bonSug('shop')}
+ <label>Datum van de aankoop<input id="bd" type="date" value="${esc(b.date)}" onchange="BON.date=this.value;BON.tch.date=1"></label>${bonSug('date')}
+ <label>Totaal in euro<input id="bt" inputmode="decimal" value="${esc(b.total)}" oninput="BON.total=this.value;BON.tch.total=1"></label>${bonSug('total')}
+ <label>Wat werd er gekocht (niet verplicht)<textarea id="bi" rows="4" placeholder="Niet verplicht" oninput="BON.items=this.value;BON.tch.items=1">${esc(b.items)}</textarea></label>
  <label>Waarvoor (bv. cantus 12/11)<input id="bo" value="${esc(b.desc)}" oninput="BON.desc=this.value"></label>
  <label>Hoofdcategorie<select onchange="BON.h=this.value">${opts(c.h,b.h,true)}</select></label>
  <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" style="width:auto" ${b.adv?'checked':''} onchange="BON.adv=this.checked"> Ik heb dit zelf betaald, terugbetalen aan mij</label>
