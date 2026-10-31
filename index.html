@@ -104,7 +104,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='26';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='27';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -132,7 +132,7 @@ try{const r=localStorage.getItem(K);if(r)S=JSON.parse(r)}catch(e){}
 if(!S)S=DEF();
 function norm(){
  if(Array.isArray(S.cats)){const o=S.cats;S.cats={h:o.map(c=>c.h),s:[...new Set(o.flatMap(c=>c.s))]}}
- S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0,askName:false,pinMe:'',hOk:false,uTab:false,lastUser:'',sess:'',bonTab:false,dev:'',acc:{},accMid:0,accGid:'',accSig:'',accTs:0,accF:0,blocked:''},S.club);
+ S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0,askName:false,pinMe:'',hOk:false,uTab:false,lastUser:'',sess:'',closedAt:0,closed:0,bonTab:false,dev:'',acc:{},accMid:0,accGid:'',accSig:'',accTs:0,accF:0,blocked:''},S.club);
  if(!S.club.dev)S.club.dev=uid().replace(/-/g,'');if(!S.club.acc||typeof S.club.acc!=='object'||Array.isArray(S.club.acc))S.club.acc={};
  if(S.club.gscope!==SCOPE){if(String(S.club.gscope||'').indexOf('drive.file')<0&&(S.club.gid||S.club.gok)){S.club.gok=false;if(S.club.gmode==='existing')S.club.gpicked=false;try{sessionStorage.removeItem('qg')}catch(e){}}S.club.gscope=SCOPE}
  S.sync=Object.assign({last:0,err:'',auth:false,pick:false,warn:''},S.sync||{});
@@ -279,6 +279,8 @@ function blockedScreen(){const n=S.tx.filter(t=>!t.synced).length;
  $('#app').innerHTML=`<div class="auth"><h2>${esc(S.club.name)}</h2><p class="mu">De Quaestor heeft de toegang van dit toestel ${S.club.blocked==='weg'?'verwijderd':'ingetrokken'}. Je kan op dit toestel niet meer boeken voor deze club. ${S.club.blocked==='weg'?'':'Als de Quaestor je toegang teruggeeft, kan je gewoon verder.'}</p>${n?`<p class="mu">${n} boeking(en) van dit toestel zijn nog niet geüpload. Ze worden geüpload zodra er verbinding is.</p>`:''}
  <div class="err" id="be"></div><button class="btn" onclick="recheck()">Opnieuw controleren</button><button class="btn ghost" style="margin-top:8px" onclick="clubsScreen()">Mijn clubs</button></div>`}
 async function recheck(){if(SYNCING)return;LASTPULL=0;await sync(true,true);const c=S.club;if(c.blocked){if(c.blocked==='weg')return goneGo();blockedScreen();const e=$('#be');if(e)e.textContent=S.sync.err||'Je toegang is nog altijd ingetrokken.'}}
+function closedGo(){const nm=S.club.name||'deze club',u=S.tx.filter(t=>!t.synced).length;removeProfile(REG.active);S=null;role=null;USER='';WHO='';ISDEV=false;loadProfile(REG.list[0].id);
+ $('#app').innerHTML=`<div class="auth"><h2>Club afgesloten</h2><p class="mu">De developer heeft ${esc(nm)} afgesloten. De gegevens van die club zijn van dit toestel gewist${u?`, ook ${u} boeking(en) die nog niet geüpload waren`:''}. Hoort dit toestel bij een andere club, haal die dan op of vraag een nieuwe uitnodiging.</p><button class="btn" onclick="start()">OK</button></div>`}
 function goneGo(){if(S.tx.some(t=>!t.synced))return blockedScreen();const nm=S.club.name||'deze club';removeProfile(REG.active);S=null;loadProfile(REG.list[0].id);
  $('#app').innerHTML=`<div class="auth"><h2>Toegang verwijderd</h2><p class="mu">De Quaestor heeft dit toestel verwijderd uit ${esc(nm)}. De gegevens van die club zijn van dit toestel gewist. Wil je later opnieuw meehelpen, vraag dan een nieuwe uitnodiging.</p><button class="btn" onclick="start()">OK</button></div>`}
 async function oldTab(gid){
@@ -289,17 +291,18 @@ async function oldTab(gid){
  catch(e){if(e.auth)throw e;return null}}
 async function readSettings(gid){const o=await metaGet(gid);if(o)return{m:o,src:'meta'};const t=await oldTab(gid);return t?{m:t.o,src:'tab',id:t.id}:{m:{},src:null}}
 function mergeAcc(a,b){const r={};const add=o=>{if(!o||typeof o!=='object')return;for(const k in o){const v=o[k];if(!/^[\w-]{6,64}$/.test(k)||!v||typeof v!=='object')continue;if(!r[k]||(+v.t||0)>(+r[k].t||0))r[k]={s:['uit','h','weg','q'].includes(v.s)?v.s:'',t:+v.t||0}}};add(a);add(b);return r}
-function takeAcc(m){const c=S.club,n=mergeAcc(c.acc,m['Toegang']);if(JSON.stringify(n)!==JSON.stringify(c.acc)){c.acc=n;save()}}
+function takeAcc(m){const c=S.club,cl=+m['Afgesloten']||0;if(cl>0&&!c.closedAt&&!ISDEV&&!c.closed&&!c.reopen){c.closed=cl;save()}
+ const n=mergeAcc(c.acc,m['Toegang']);if(JSON.stringify(n)!==JSON.stringify(c.acc)){c.acc=n;save()}}
 async function syncSettings(){const c=S.club;
  if(c.helperOnly){const {m}=await readSettings(c.gid),ts=+m['Gewijzigd']||0;takeAcc(m);if(!(ts>(c.setTs||0)))return false;
   if(Array.isArray(m['Statussen']))setStatuses(m['Statussen']);
   if(m['Salt']&&m['Helper-code']){c.salt=String(m['Salt']);c.pinHh=String(m['Helper-code']);try{if(c.hOk&&c.pinH&&await hashPin(c.pinH,c.salt)!==c.pinHh)c.pinH=''}catch(e){}}
   c.setTs=ts;save();return true}
  const {m,src,id}=await readSettings(c.gid);let ch=false,wrote=false;takeAcc(m);
- if((c.setDirty&&role==='q')||!m['Naam']){if(!c.salt)c.salt=rnd();let qh=c.pinQh,hh=c.pinHh;
+ if(((c.setDirty&&role==='q')||!m['Naam'])&&!(c.closed&&!ISDEV)){if(!c.salt)c.salt=rnd();let qh=c.pinQh,hh=c.pinHh;
   try{if(c.pinQ)qh=await hashPin(c.pinQ,c.salt);if(c.pinH)hh=await hashPin(c.pinH,c.salt)}catch(e){}
   c.pinQh=qh||'';c.pinHh=hh||'';c.setTs=Date.now();
-  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Toegang':c.acc,'Gewijzigd':c.setTs},src==='meta');
+  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Toegang':c.acc,'Afgesloten':c.reopen?0:Math.max(+m['Afgesloten']||0,c.closedAt||0),'Gewijzigd':c.setTs},src==='meta');c.reopen=false;
   wrote=true;c.setDirty=false;save()}
  else{const ts=+m['Gewijzigd']||0;if(role!=='q')c.setDirty=false;
   if(ts>(c.setTs||0)){c.name=String(m['Naam']||c.name);if(/^#[0-9a-f]{6}$/i.test(String(m['Kleur'])))c.color=String(m['Kleur']);
@@ -388,6 +391,7 @@ async function sync(manual,force){
   try{changed=await pullUsers()||changed;await pushUsers()}catch(e){if(e.auth||e.pick)throw e;S.sync.warn='Accounts bijwerken lukte niet: '+(e.message||'onbekende fout')}
   try{if(await bindMe())changed=true}catch(e){if(e.auth)throw e}
   if(userCheck())changed=true;
+  if(S.club.closed&&!ISDEV){try{await pushTx()}catch(e){}LASTPULL=Date.now();setTimeout(closedGo,0);return}
   if(accCheck()){try{await pushTx()}catch(e){}LASTPULL=Date.now();S.sync.last=Date.now();S.sync.err='';save();setTimeout(blockAfter,0);return}
   changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;changed=await syncBons(true)||changed;LASTPULL=Date.now()}
   await pushTx();if(S.bons.some(b=>!b.synced||b.dirty))changed=await syncBons(false)||changed;
@@ -441,6 +445,7 @@ function parseJoin(s){const m=String(s==null?location.hash:s).trim().match(/#joi
 let JOIN=parseJoin();
 function start(){theme();
  if(JOIN){if(emptyClub(S))return joinScreen();return joinAsk()}
+ if(S.club.closed&&!ISDEV)return closedGo();
  if(S.club.blocked){role=null;return S.club.blocked==='weg'?goneGo():blockedScreen()}
  if(emptyClub(S))return setup();
  if(!role&&S.club.sess){const u=S.users.find(x=>x.id===S.club.sess);if(u&&!u.st)return logIn(u);S.club.sess='';save()}
@@ -580,6 +585,9 @@ async function restorePick(){const e=m=>{const x=$('#re');if(x)x.textContent=m};
  if(!m['Naam']){return e('In deze spreadsheet staan nog geen clubgegevens. Open de app op het toestel van de Quaestor, tik bovenaan op de status om te synchroniseren en probeer dan opnieuw.')}
  Object.assign(S.club,{name:String(m['Naam']),color:/^#[0-9a-f]{6}$/i.test(String(m['Kleur']))?String(m['Kleur']):'#8b1e3f',catTab:String(m['Categorietabblad']||'Categorieën'),salt:String(m['Salt']||''),pinQ:'',pinH:'',pinQh:String(m['Quaestor-code']||''),pinHh:String(m['Helper-code']||''),helperOnly:false,
   gid:r.id,inviteGid:r.id,gmode:'existing',gpicked:true,gname:r.name||'',gok:true,gcreated:false,setTs:+m['Gewijzigd']||0,setDirty:false,uTab:false});
+ if(+m['Afgesloten']>0){let em='';try{SI=true;em=await gEmail()}catch(x){}finally{SI=false}
+  if(!isDev(em)){S.club.gid='';S.club.gok=false;save();return e('Deze club werd afgesloten door de developer. Je kan ze niet meer ophalen.')}
+  S.club.closedAt=0;S.club.closed=0;S.club.setDirty=true;S.club.reopen=true;toast('Club heropend')}
  setStatuses(Array.isArray(m['Statussen'])?m['Statussen']:S.statuses);takeAcc(m);
  try{SI=true;await pullUsers()}catch(x){}finally{SI=false}
  RST=null;JOIN=null;LPULL=true;try{history.replaceState(null,'',location.pathname+location.search)}catch(x){}save();theme();
@@ -878,7 +886,7 @@ function invCard(){const c=S.club;
  <button class="btn" onclick="shareInv()">Uitnodigingslink delen</button><button class="btn ghost" style="margin-top:8px" onclick="showT('Uitnodigingslink',inviteLink())">Link kopiëren</button><a class="btn ghost" style="margin-top:8px" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}">Spreadsheet openen om te delen</a>
  <p class="mu" style="margin-top:12px">De link bevat geen pincodes en geeft zelf geen toegang tot je gegevens. Dat gebeurt pas als je de spreadsheet deelt.</p></div>`}
 function shareInv(){const l=inviteLink();if(navigator.share)navigator.share({title:S.club.name,text:'Uitnodiging als helper bij '+S.club.name,url:l}).catch(()=>{});else showT('Uitnodigingslink',l)}
-function resetAll(){S=DEF();norm();ENS='';TOKEN=null;TEXP=0;LASTPULL=0;PE=[];B=newB();
+function resetAll(){USER='';WHO='';ISDEV=false;S=DEF();norm();ENS='';TOKEN=null;TEXP=0;LASTPULL=0;PE=[];B=newB();
  try{sessionStorage.removeItem('qg')}catch(e){}save();role=null;tab='boek';start()}
 function devOff(){const n=S.tx.filter(t=>!t.synced).length;ask('Dit toestel loskoppelen? Alle gegevens op dit toestel worden gewist.'+(n?` ${n} boeking(en) zijn nog niet geüpload en gaan verloren.`:''),'Loskoppelen',()=>{resetAll();toast('Toestel losgekoppeld')})}
 function wipeTx(){const n=S.tx.length,u=S.tx.filter(t=>!t.synced).length,g=S.club.gid&&S.club.gok;
@@ -896,6 +904,13 @@ function wipeMem(){const g=S.club.gid&&S.club.gok;
   if(g){SI=true;try{await api(`/${S.club.gid}/values/${enc(rng(TAB_L,'A2:B'))}:clear`,{method:'POST',body:'{}'})}catch(e){SI=false;return toast(e.message||'Leegmaken in de spreadsheet is niet gelukt')}SI=false}
   S.members=[];save();render();toast('Ledenlijst leeggemaakt')})}
 function wipeAll(){const u=S.tx.filter(t=>!t.synced).length;modal(`<h3>Alles wissen</h3><p>Dit wist op dit toestel de instellingen, pincodes, leden, prijzen en boekingen.${u?` ${u} boeking(en) zijn nog niet geüpload en gaan verloren.`:''} Je spreadsheet blijft bestaan. Typ WISSEN om te bevestigen.</p><input id="wc" autocomplete="off"><button class="btn" style="margin-top:10px" onclick="wipeAllOk()">Alles wissen</button>`)}
+function closeClub(){if(!ISDEV)return;if(!S.club.gid||!S.club.gok)return toast('Verbind eerst met Google, anders bereikt het afsluiten de andere toestellen niet.');
+ modal(`<h3>Club afsluiten voor iedereen</h3><p>Alle toestellen van ${esc(S.club.name)} wissen deze club zodra ze synchroniseren. Niemand kan nog boeken of de club opnieuw ophalen, behalve jij als developer. Ook dit toestel wordt gewist.</p><p class="mu">De spreadsheet zelf blijft bestaan in Google Drive. Die kan je daar zelf verwijderen of bewaren als archief.</p><p>Typ AFSLUITEN om te bevestigen.</p><input id="wcc" autocomplete="off"><button class="btn" style="margin-top:10px" onclick="closeClubOk()">Afsluiten</button>`)}
+async function closeClubOk(){if(!ISDEV)return;if(($('#wcc').value||'').trim().toUpperCase()!=='AFSLUITEN')return toast('Typ AFSLUITEN om te bevestigen');closeM();
+ const c=S.club;c.closedAt=Date.now();c.setDirty=true;save();LASTPULL=0;await sync(true,true);
+ let m={};try{SI=true;m=(await readSettings(c.gid)).m}catch(e){}finally{SI=false}
+ if(!(+m['Afgesloten']>0)){c.closedAt=0;save();return toast('Afsluiten is niet gelukt: '+(S.sync.err||S.sync.warn||'controleer de verbinding'))}
+ resetAll();toast('Club afgesloten voor iedereen')}
 function wipeAllOk(){if(($('#wc').value||'').trim().toUpperCase()!=='WISSEN')return toast('Typ WISSEN om te bevestigen');closeM();resetAll();toast('Alles gewist')}
 function gCard(){const c=S.club,on=!!c.gid&&c.gok,ex=c.gmode==='existing',tg="document.getElementById('pk').style.display=this.value==='existing'?'block':'none'";
  return `<div class="card"><h2>Google Sheets</h2><p class="mu" id="gst">${esc(gStatus())}</p>
@@ -922,7 +937,7 @@ function vInst(){const c=S.club;
  <div class="card"><h2>Accounts</h2><p class="mu">Zie welke toestellen als Quaestor of helper toegang hebben tot deze club. Trek toegang in, geef ze terug of verwijder een toestel.</p><button class="btn ghost" onclick="accOpen()">Accounts beheren</button></div>
  </div>
  <div class="card" style="margin-top:12px"><h2>Back-up</h2><button class="btn ghost" onclick="showT('Boekingen als csv',csv())">Boekingen kopiëren (csv)</button><button class="btn ghost" style="margin-top:8px" onclick="showT('Volledige back-up',JSON.stringify(S))">Volledige back-up kopiëren</button><button class="btn ghost" style="margin-top:8px" onclick="restore()">Back-up terugzetten</button></div>
- <div class="card"><h2>Gegevens wissen</h2><p class="mu">Maak eerst een back-up als je twijfelt. Bij boekingen en de ledenlijst kies je of de spreadsheet ook meegaat. Bij Alles wissen blijft de spreadsheet staan.</p><button class="btn ghost" onclick="wipeTx()">Alle boekingen wissen</button><button class="btn ghost" style="margin-top:8px" onclick="wipeMem()">Ledenlijst leegmaken</button><button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="wipeAll()">Alles wissen en opnieuw beginnen</button></div>
+ <div class="card"><h2>Gegevens wissen</h2><p class="mu">Maak eerst een back-up als je twijfelt. Bij boekingen en de ledenlijst kies je of de spreadsheet ook meegaat. Bij Alles wissen blijft de spreadsheet staan.</p><button class="btn ghost" onclick="wipeTx()">Alle boekingen wissen</button><button class="btn ghost" style="margin-top:8px" onclick="wipeMem()">Ledenlijst leegmaken</button><button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="wipeAll()">Alles wissen op dit toestel</button>${ISDEV?`<button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="closeClub()">Club afsluiten voor iedereen (developer)</button><p class="mu" style="margin-top:6px">Alles wissen op dit toestel wist alleen jouw toestel. Club afsluiten wist de club ook op alle andere toestellen zodra die synchroniseren.</p>`:'<p class="mu" style="margin-top:6px">Alles wissen op dit toestel wist alleen dit toestel, niet bij de andere accounts.</p>'}</div>
  <p class="mu" style="text-align:center">Versie ${APP_VERSION}</p>`}
 let ACCL=null,ACCE='';
 function accOpen(){tab='acc';ACCL=null;ACCE='';render();scrollTo(0,0);accLoad()}
