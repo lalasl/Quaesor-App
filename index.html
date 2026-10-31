@@ -98,7 +98,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='13';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='14';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -151,7 +151,7 @@ function closeM(){$('#modal').classList.remove('on')}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeM()});
 function ask(t,yes,fn){ASK=fn;modal(`<h3>${t}</h3><button class="btn" onclick="askOk()">${yes}</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
 function askOk(){const f=ASK;ASK=null;closeM();if(f)f()}
-function theme(){const c=S.club,r=document.documentElement;r.style.setProperty('--ac',c.color);const n=parseInt(c.color.slice(1),16),l=.299*(n>>16)+.587*(n>>8&255)+.114*(n&255);r.style.setProperty('--on',l>150?'#111':'#fff');c.theme==='auto'?r.removeAttribute('data-theme'):r.setAttribute('data-theme',c.theme)}
+function theme(){const c=S.club,r=document.documentElement;r.style.setProperty('--ac',c.color);const n=parseInt(c.color.slice(1),16),l=.299*(n>>16)+.587*(n>>8&255)+.114*(n&255);r.style.setProperty('--on',l>150?'#111':'#fff');c.theme==='auto'?r.removeAttribute('data-theme'):r.setAttribute('data-theme',c.theme);document.querySelectorAll('meta[name=theme-color]').forEach(m=>m.setAttribute('content',c.color))}
 
 /* ================= GOOGLE SHEETS ================= */
 let WHO='',LOGVIA='',USER='',LPULL=false;
@@ -834,14 +834,14 @@ function gCard(){const c=S.club,on=!!c.gid&&c.gok,ex=c.gmode==='existing',tg="do
  ${c.gid?`<a class="btn ghost" style="margin-top:8px" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}">Spreadsheet openen</a><button class="btn ghost" style="margin-top:8px" onclick="unlink()">Ontkoppelen</button>`:''}
  <p class="mu" style="margin-top:12px">De app vraagt alleen toegang tot spreadsheets die ze zelf aanmaakt of die je zelf kiest. <a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`}
 function vInst(){const c=S.club;
- return `<div class="card"><h2>Club</h2><label>Naam<input id="in" value="${esc(c.name)}"></label><label>Clubkleur<input type="color" id="ic" value="${c.color}"></label>
+ return `<div onchange="autoSave(event)"><p class="mu" style="margin:0 0 10px">Wijzigingen worden meteen bewaard.</p><div class="card"><h2>Club</h2><label>Naam<input id="in" value="${esc(c.name)}"></label><label>Clubkleur<input type="color" id="ic" value="${c.color}" oninput="prevColor(this.value)"></label>
  <label>Logo<input type="file" accept="image/*" onchange="logo(this)"></label>${c.logo?'<button class="btn ghost" onclick="S.club.logo=\'\';save();render()">Logo verwijderen</button>':''}
  <label style="margin-top:12px">Weergave<select id="it2"><option value="auto"${c.theme==='auto'?' selected':''}>Volgt je toestel</option><option value="light"${c.theme==='light'?' selected':''}>Licht</option><option value="dark"${c.theme==='dark'?' selected':''}>Donker</option></select></label></div>
  ${accCard()}${USER?'':`<div class="card"><h2>Jouw naam</h2><label>Naam van de Quaestor<input id="iw" value="${esc(c.names.q)}"></label><label>Naam vragen bij elke keer inloggen<select id="ia"><option value="0">Nee</option><option value="1"${c.askName?' selected':''}>Ja, handig als meerdere mensen dit toestel gebruiken</option></select></label></div>`}
  ${legacyPins()||!USER?`<div class="card"><h2>Pincodes</h2><label>Pincode Quaestor<input id="iq" type="password" inputmode="numeric" value="${esc(c.pinQ)}" placeholder="${c.pinQh&&!c.pinQ?'(ongewijzigd)':''}"></label><label>Pincode Helper<input id="ih" type="password" inputmode="numeric" value="${esc(c.pinH)}" placeholder="${c.pinHh&&!c.pinH?'(ongewijzigd)':''}"></label>${c.pinMe?`<label>Jouw eigen pincode op dit toestel<input id="ime" type="password" inputmode="numeric" value="${esc(c.pinMe)}"></label><p class="mu">Je werd gepromoveerd tot Quaestor. Je meldt je aan met je eigen pincode. De Quaestorpincode hierboven is die van de club.</p>`:''}</div>`:''}
  ${catCard()}${statCard()}${prCard()}${gCard()}${invCard()}
  <div class="card"><h2>Accounts</h2><p class="mu">Zie welke toestellen als Quaestor of helper toegang hebben tot deze club. Trek toegang in, geef ze terug of verwijder een toestel.</p><button class="btn ghost" onclick="accOpen()">Accounts beheren</button></div>
- <button class="btn" onclick="saveSet()">Instellingen opslaan</button>
+ </div>
  <div class="card" style="margin-top:12px"><h2>Back-up</h2><button class="btn ghost" onclick="showT('Boekingen als csv',csv())">Boekingen kopiëren (csv)</button><button class="btn ghost" style="margin-top:8px" onclick="showT('Volledige back-up',JSON.stringify(S))">Volledige back-up kopiëren</button><button class="btn ghost" style="margin-top:8px" onclick="restore()">Back-up terugzetten</button></div>
  <div class="card"><h2>Gegevens wissen</h2><p class="mu">Maak eerst een back-up als je twijfelt. Bij boekingen en de ledenlijst kies je of de spreadsheet ook meegaat. Bij Alles wissen blijft de spreadsheet staan.</p><button class="btn ghost" onclick="wipeTx()">Alle boekingen wissen</button><button class="btn ghost" style="margin-top:8px" onclick="wipeMem()">Ledenlijst leegmaken</button><button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="wipeAll()">Alles wissen en opnieuw beginnen</button></div>
  <p class="mu" style="text-align:center">Versie ${APP_VERSION}</p>`}
@@ -890,7 +890,10 @@ function accApply(id,s){const c=S.club;c.acc=Object.assign({},c.acc,{[id]:{s,t:D
 function accRm(id){if(id===S.club.dev)return;const n=accName(id);
  ask(`${n} verwijderen? Dat toestel wist deze club zodra het synchroniseert. Boekingen die het nog niet geüpload had, worden eerst geüpload. Wil de persoon later terugkomen, dan nodig je hem opnieuw uit.`,'Verwijderen',async()=>{
   const o=(ACCL||[]).find(x=>x.id===id);ACCL=(ACCL||[]).filter(x=>x.id!==id);accApply(id,'weg');if(o&&o.mid!=null)try{SI=true;await accDel([o.mid])}catch(e){}finally{SI=false}})}
-function saveSet(){const q=$('#iq')?$('#iq').value.trim():'',h=$('#ih')?$('#ih').value.trim():'',c0=S.club;
+const AUTO=new Set(['in','ic','it2','iw','ia','iq','ih','ime','ich','ics','ist','ict','icid','iak','iap']);
+function autoSave(e){const t=e&&e.target;if(t&&AUTO.has(t.id))saveSet(true)}
+function prevColor(v){if(!/^#[0-9a-f]{6}$/i.test(v))return;const o=S.club.color;S.club.color=v;theme();S.club.color=o}
+function saveSet(quiet){const q=$('#iq')?$('#iq').value.trim():'',h=$('#ih')?$('#ih').value.trim():'',c0=S.club;
  if($('#iq')&&((q&&q.length<4)||(h&&h.length<4)||(!q&&!c0.pinQh)||(!h&&!c0.pinHh)||(q&&q===h)))return toast('Pincodes: minstens 4 cijfers en niet gelijk');
  if($('#ich')){const list=id=>[...new Set($(id).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean))];
   const ch=list('#ich'),cs=list('#ics');if(!ch.length)return toast('Voeg minstens één hoofdcategorie toe');S.cats={h:ch,s:cs}}
@@ -898,7 +901,7 @@ function saveSet(){const q=$('#iq')?$('#iq').value.trim():'',h=$('#ih')?$('#ih')
  Object.assign(S.club,{name:$('#in').value.trim()||S.club.name,color:$('#ic').value,theme:$('#it2').value,pinQ:q||S.club.pinQ,pinH:h||S.club.pinH,setDirty:true});
  if($('#ist')){const l=$('#ist').value.split(/\r?\n/).map(cleanSt).filter(Boolean);if(!l.length)return toast('Voeg minstens één status toe');const old=JSON.stringify(S.statuses);setStatuses(l);if(JSON.stringify(S.statuses)!==old){S.club.setDirty=true;if(S.prices.length)S.pricesDirty=true;S.members.forEach(m=>m.dirty=true)}}
  const iw=$('#iw')?($('#iw').value||'').trim().slice(0,40):'';if(iw.length>=2){S.club.names.q=iw;if(role==='q')WHO=iw}if($('#ia'))S.club.askName=$('#ia').value==='1';
- readG();theme();toast('Opgeslagen');render()}
+ readG();theme();toast('Opgeslagen');if(quiet){const h=document.querySelector('header h1');if(h&&h.firstChild)h.firstChild.textContent=S.club.name+' ▾ ';save();return}render()}
 function logo(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,160/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);S.club.logo=c.toDataURL('image/png');save();render()};im.src=r.result};r.readAsDataURL(f)}
 function csv(){const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';return ['id;datum;lid;omschrijving;hoofdcategorie;subcategorie;betaalwijze;bedrag;status;ingevoerd door'].concat(S.tx.map(t=>[t.id,t.date,t.name,t.desc,t.h,t.s,M[t.method],String(t.v).replace('.',','),t.storno?'storno':t.void?'gestorneerd':'ok',t.who||(t.by==='q'?'Quaestor':'Helper')].map(q).join(';'))).join('\n')}
 function showT(t,x){modal(`<h3>${t}</h3><textarea id="tx" readonly>${esc(x)}</textarea><button class="btn" style="margin-top:10px" onclick="cp()">Kopiëren</button>`)}
