@@ -104,7 +104,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='27';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='28';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -803,7 +803,7 @@ async function syncBons(pull){const c=S.club,g=c.gid;let ch=false;
  if(!pull&&!dir.length)return ch;
  const d=await api(`/${g}/values/${enc(rng(TAB_BN,'A2:K'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[],idx=new Map();
  rows.forEach((r,i)=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(id)idx.set(id,i)});
- if(dir.length){const data=[];dir.forEach(b=>{const i=idx.get(b.id);if(i!=null){data.push({range:rng(TAB_BN,'I'+(i+2)+':J'+(i+2)),values:[[b.status,b.txid?"'"+b.txid:'']]});rows[i][8]=b.status;rows[i][9]=b.txid}});
+ if(dir.length){const data=[];dir.forEach(b=>{const i=idx.get(b.id);if(i!=null){data.push({range:rng(TAB_BN,'A'+(i+2)+':K'+(i+2)),values:[bonRow(b)]});rows[i]=[b.id,b.date,b.shop,b.total,b.items,b.desc,b.who,rows[i][7],b.status,b.txid,b.adv||'']}});
   if(data.length)await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'USER_ENTERED',data})});dir.forEach(b=>b.dirty=false);ch=true}
  const by=new Map(S.bons.map(b=>[b.id,b])),seen=new Set();
  rows.forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(!id)return;seen.add(id);const tot=pnum(r[3]);
@@ -825,6 +825,22 @@ function bonBookOk(id){const b=S.bons.find(x=>x.id===id);if(!b)return;const a=pa
  if(!(a>0))return toast('Vul een bedrag in');if(m==='voorschot'&&!adv)return toast('Vul in wie het voorschoot');
  const tx={who:WHO,id:uid(),ts:Date.now(),date:$('#xd').value||today(),mid:null,name:b.shop,v:-a,method:m,h:$('#xh').value,s:$('#xs').value,desc:($('#xo').value||'').trim(),by:role,exp:true,bon:b.id,adv,void:false,synced:false};
  S.tx.push(tx);b.status='Ingeboekt';b.txid=tx.id;b.dirty=!!b.synced;closeM();save();render();queueSync();toast('Ingeboekt als uitgave')}
+function bonTx(b){const x=b&&b.txid&&S.tx.find(t=>t.id===b.txid);return x&&!x.void?x:null}
+function bonEdit(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q')return;const x=bonTx(b);
+ modal(`<h3>Bonnetje aanpassen</h3>${x?'<p class="mu">Dit bonnetje is al ingeboekt. Pas je winkel, datum of bedrag aan, dan wordt de boeking gestorneerd en opnieuw ingeboekt met de nieuwe gegevens.</p>':''}
+ <label>Winkel<input id="ebs" value="${esc(b.shop)}"></label><label>Datum van de aankoop<input id="ebd" type="date" value="${esc(b.date)}"></label><label>Totaal in euro<input id="ebt" inputmode="decimal" value="${fmt2(b.total)}"></label>
+ <label>Wat werd er gekocht<textarea id="ebi" rows="3">${esc(String(b.items||'').split('; ').join('\n'))}</textarea></label><label>Waarvoor<input id="ebo" value="${esc(b.desc)}"></label>
+ <label>Voorgeschoten door (leeg als het niet voorgeschoten werd)<input id="eba" value="${esc(b.adv||'')}"></label>
+ <button class="btn" onclick="bonEditOk('${esc(id)}')">Opslaan</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
+function bonEditOk(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q')return;
+ const n={shop:($('#ebs').value||'').trim().slice(0,80),date:$('#ebd').value||b.date,total:pamt($('#ebt').value),items:($('#ebi').value||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean).join('; ').slice(0,2000),desc:($('#ebo').value||'').trim().slice(0,200),adv:($('#eba').value||'').trim().slice(0,40)};
+ if(!n.shop)return toast('Vul de winkel in');if(!(n.total>0))return toast('Vul het totaal in');
+ const x=bonTx(b),money=x&&(n.total!==b.total||n.date!==b.date||n.shop!==b.shop||(!!n.adv)!==(x.method==='voorschot')||(n.adv&&n.adv!==x.adv));
+ if(money&&x.paidBy)return toast('Dit bedrag werd al terugbetaald. Storneer eerst de terugbetaling bij Dag.');
+ Object.assign(b,n);b.dirty=!!b.synced;
+ if(money){doStorno(x.id);const m=n.adv?'voorschot':(x.method==='voorschot'?'cash':x.method),nt={who:WHO,id:uid(),ts:Date.now(),date:n.date,mid:null,name:n.shop,v:-n.total,method:m,h:x.h,s:x.s,desc:n.desc||x.desc,by:role,exp:true,bon:b.id,adv:n.adv,void:false,synced:false};
+  S.tx.push(nt);b.txid=nt.id;b.status='Ingeboekt'}
+ closeM();save();render();queueSync();toast(money?'Aangepast en opnieuw ingeboekt':'Bonnetje aangepast')}
 function bonReject(id){const b=S.bons.find(x=>x.id===id);if(!b)return;ask(`Bonnetje van ${esc(b.shop)} (${eur(b.total)}) afwijzen? Het blijft bewaard in de spreadsheet met status Afgewezen.`,'Afwijzen',()=>{b.status='Afgewezen';b.dirty=!!b.synced;save();render();queueSync()})}
 const advOpen=()=>S.tx.filter(t=>t.method==='voorschot'&&t.exp&&!t.void&&!t.storno&&!t.paidBy);
 function refund(id){const d=S.tx.find(x=>x.id===id);if(!d)return;modal(`<h3>Terugbetalen</h3><p>${esc(d.adv)} · ${esc(d.name)} · ${eur(-d.v)}</p><label>Betaalwijze<select id="rm"><option value="overschrijving">Overschrijving</option><option value="cash">Cash uit de kas</option><option value="payconiq">Payconiq</option></select></label><label>Datum<input type="date" id="rd" value="${today()}"></label><button class="btn" onclick="refundOk('${id}')">Terugbetaald</button>`)}
@@ -833,7 +849,7 @@ function refundOk(id){const d=S.tx.find(x=>x.id===id);if(!d)return;S.tx.push({wh
 function vBon(){const Q=role==='q';if(BON)return bonForm();
  const st=b=>{const x=b.txid&&S.tx.find(t=>t.id===b.txid);if(b.status==='Ingeboekt'&&x&&x.void)return 'Boeking gestorneerd';return b.status+(b.synced?'':' · nog niet geüpload')};
  const it=(b,act)=>`<div class="row"><div><b>${esc(b.shop)}</b> <span class="tag">${esc(st(b))}</span><div class="mu">${esc(b.date)}${b.who?' · '+esc(b.who):''}${b.adv?' · voorgeschoten door '+esc(b.adv):''}${b.desc?' · '+esc(b.desc):''}</div>
-  <div class="accb"><button class="btn ghost" onclick="bonView('${b.id}')">Bekijken</button>${act&&Q?`<button class="btn ghost" onclick="bonBook('${b.id}')">Inboeken</button><button class="btn ghost" onclick="bonReject('${b.id}')">Afwijzen</button>`:''}</div></div><div class="amt">${eur(b.total)}</div></div>`;
+  <div class="accb"><button class="btn ghost" onclick="bonView('${b.id}')">Bekijken</button>${Q?`<button class="btn ghost" onclick="bonEdit('${b.id}')">Aanpassen</button>`:''}${act&&Q?`<button class="btn ghost" onclick="bonBook('${b.id}')">Inboeken</button><button class="btn ghost" onclick="bonReject('${b.id}')">Afwijzen</button>`:''}</div></div><div class="amt">${eur(b.total)}</div></div>`;
  const srt=l=>l.slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
  let h=`<div class="card"><h2>Bonnetje toevoegen</h2><p class="mu">Neem een foto van het bonnetje of kies er een uit je galerij. De app leest winkel, datum, totaal en artikelen. Jij kijkt alles na voor je het indient${Q?'':', daarna boekt de Quaestor het in'}.</p><label class="btn" style="cursor:pointer">📷 Foto nemen<input type="file" accept="image/*" capture="environment" style="display:none" onchange="bonFile(this)"></label><label class="btn ghost" style="cursor:pointer;margin-top:8px">Foto kiezen uit galerij<input type="file" accept="image/*" style="display:none" onchange="bonFile(this)"></label></div>`;
  if(Q){const td=srt(bonTodo()),ao=advOpen(),dn=srt(S.bons.filter(b=>!bonTodo().includes(b))).slice(0,30);
