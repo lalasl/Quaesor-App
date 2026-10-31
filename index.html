@@ -103,7 +103,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='22';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='23';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -669,24 +669,49 @@ function goBook(id){if(role==='p')return;tab='boek';pick(id)}
 
 
 /* ---------- bonnetjes ---------- */
-function parseBon(txt){
- const L=String(txt||'').split(/\r?\n/).map(s=>s.replace(/[|]/g,' ').replace(/\s+/g,' ').trim()).filter(Boolean);
+const SHOPS=['Colruyt','Delhaize','Aldi','Lidl','Carrefour','Albert Heijn','Jumbo','Spar','OKay','Action','Makro','Hanos','Bidfood','Kruidvat','Brico','Hubo','Gamma','Ikea','Hema','Zeeman','Intermarché','Cora','Match','Prik & Tik','Drinks & Food','Mediamarkt','Coolblue','Bol.com','Decathlon','Blokker','Trafic','Dreamland','Standaard Boekhandel','Club','Fnac','Vanden Borre','Krëfel','Total','Shell','Q8','Esso','Lukoil','Proxy','Panos','Exki','McDonald','Quick','Burger King','Domino','Pizza Hut','Brasserie','Frituur','Bakkerij'];
+function parseBon(txt,itxt){
+ const IL=itxt?String(itxt).split(/\r?\n/).map(s=>s.replace(/[|{}\[\]“”"]/g,' ').replace(/\s+/g,' ').trim()).filter(Boolean):null;
+ const L=String(txt||'').split(/\r?\n/).map(s=>s.replace(/[|{}\[\]“”"]/g,' ').replace(/\s+/g,' ').trim()).filter(Boolean);
  const NUM=/(-?)\s?(\d{1,5})\s?[.,]\s?(\d{2})(?![\d%])/g;
  const nums=s=>{const o=[];let m;NUM.lastIndex=0;while((m=NUM.exec(s)))o.push(Math.round((+(m[2]+'.'+m[3]))*100)/100*(m[1]?-1:1));return o};
- const TOT=/(te\s?betalen|totaal|totale|total|tot\.|som|bedrag|a payer|à payer)/i,NOT=/(sub\s?-?tota|btw|tva|vat|excl|incl\.?\s?btw|basis|wisselgeld|terug|retour|gespaard|korting totaal|aantal|items|artikelen)/i;
- const PAY=/(bancontact|maestro|visa|mastercard|payconiq|kaart|contant|cash|betaald|v pay|debit)/i;
- let total=null,ti=-1;
- L.forEach((l,i)=>{if(!TOT.test(l)||NOT.test(l))return;let n=nums(l);if(!n.length&&L[i+1]&&!/[a-z]{3}/i.test(L[i+1]))n=nums(L[i+1]);if(!n.length)return;const v=n[n.length-1];if(v>0&&(total==null||v>=total)){total=v;ti=i}});
- if(total==null){L.forEach((l,i)=>{if(!PAY.test(l)||NOT.test(l))return;const n=nums(l);if(n.length){const v=n[n.length-1];if(v>0&&(total==null||v>total)){total=v;ti=i}}})}
- if(total==null){let best=null;L.forEach((l,i)=>{if(NOT.test(l))return;nums(l).forEach(v=>{if(v>0&&v<10000&&(best==null||v>best)){best=v;ti=i}})});total=best}
- let date='';
- for(const l of L){let m=l.match(/\b(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})\b/);let y,mo,d;
-  if(m){y=+m[1];mo=+m[2];d=+m[3]}else{m=l.match(/\b(\d{1,2})\s?[-\/.]\s?(\d{1,2})\s?[-\/.]\s?(\d{4}|\d{2})\b/);if(m){d=+m[1];mo=+m[2];y=+m[3];if(y<100)y+=2000}}
-  if(m&&mo>=1&&mo<=12&&d>=1&&d<=31&&y>=2000&&y<=2100){date=`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;break}}
- let shop='';for(const l of L.slice(0,5)){const let_=(l.match(/[A-Za-zÀ-ÿ]/g)||[]).length;if(let_>=3&&let_/l.length>.5&&!/(kassa|ticket|bon\b|welkom|bienvenue|datum|tel\.?|btw|tva)/i.test(l)){shop=l.replace(/[^\wÀ-ÿ&'. -]/g,'').trim().slice(0,60);break}}
- const items=[];const end=ti>=0?ti:L.length;
- L.slice(0,end).forEach((l,i)=>{if(TOT.test(l)||NOT.test(l)||PAY.test(l))return;const m=l.match(/^(.*?[A-Za-zÀ-ÿ]{2,}.*?)\s+(-?\d{1,5}\s?[.,]\s?\d{2})\s*[A-Z€]{0,2}$/);if(!m)return;
-  const n=m[1].replace(/\s+\d+\s?[xX*]\s?\d{1,5}[.,]\d{2}\s*$/,'').replace(/^\d+\s?[xX*]\s?/,'').trim();const v=nums(m[2])[0];if(n&&v!=null&&Math.abs(v)<10000)items.push({n:n.slice(0,60),v})});
+ const low=s=>s.toLowerCase();
+ const BAD=/(sub\s?-?tota|btw|tva|vat|netto|excl|basis|wisselgeld|teruggave|terug\b|retour|gespaard|korting|leeggoed|goederen|food inc|aantal|items|artikelen|stuks|ticket ?nummer|kassa ?nr)/i;
+ const PAYW=/(bancontact|maestro|visa|mastercard|payconiq|contant|cash|kaart|v ?pay|debit|totaal betaald|betaald)/i;
+ // ---- totaal: kandidaten met score
+ const cand=new Map(),add=(v,s)=>{if(!(v>0&&v<100000))return;const k=v.toFixed(2);cand.set(k,(cand.get(k)||0)+s)};
+ L.forEach((l,i)=>{const ll=low(l);const n=nums(l);
+  const nx=()=>{for(let j=i+1;j<Math.min(L.length,i+3);j++){const m=nums(L[j]);if(m.length)return m}return []};
+  if(/te\s?betalen|a payer|à payer|to pay/i.test(ll)){(n.length?n:nx()).forEach((v,k,a)=>add(v,k===a.length-1?6:2))}
+  else if(PAYW.test(ll)&&!/teruggave|wisselgeld/i.test(ll)){n.forEach((v,k,a)=>add(v,k===a.length-1?4:1))}
+  else if(/\btota(a)?l\b|totale|\btotal\b/i.test(ll)&&!BAD.test(ll)){(n.length?n:nx()).forEach((v,k,a)=>add(v,k===a.length-1?4:1))}
+  if(/€\s?\d/.test(l))n.forEach(v=>add(v,1))});
+ const all={};L.forEach(l=>{if(!BAD.test(l))nums(l).forEach(v=>{if(v>0){const k=v.toFixed(2);all[k]=(all[k]||0)+1}})});
+ for(const [k,c] of Object.entries(all))if(c>1&&cand.has(k))cand.set(k,cand.get(k)+c);
+ let total=null,best=-1;for(const [k,s] of cand){const v=+k;if(s>best||(s===best&&v>total)){best=s;total=v}}
+ if(total==null){let b=null;L.forEach(l=>{if(BAD.test(l))return;nums(l).forEach(v=>{if(v>0&&v<10000&&(b==null||v>b))b=v})});total=b}
+ // ---- datum
+ let date='';const now=new Date(),ok=(y,mo,d)=>mo>=1&&mo<=12&&d>=1&&d<=31&&y>=2000&&new Date(y,mo-1,d)<=new Date(now.getTime()+864e5);
+ for(const l of L){let m=l.match(/\b(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})\b/),y,mo,d;
+  if(m){y=+m[1];mo=+m[2];d=+m[3]}else{m=l.match(/\b(\d{1,2})\s?[-\/.]\s?(\d{1,2})\s?[-\/.]\s?(\d{4}|\d{2})\b/);if(m){d=+m[1];mo=+m[2];y=+m[3];if(y<100)y+=2000;else if(y<2000)y=2000+(y%100)}}
+  if(m&&ok(y,mo,d)){date=`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;break}}
+ // ---- winkel
+ const T=low(L.join(' ')),norm=s=>low(s).replace(/[^a-z0-9]/g,'');let shop='';
+ const TN=norm(T);for(const s of SHOPS){if(TN.includes(norm(s))&&norm(s).length>=4){shop=s;break}}
+ if(!shop){const co=L.find(l=>/\b(bv|bvba|nv|n\.v\.|srl|sprl|vzw|comm\.?v|bvba|cvba|gmbh|ltd|sa)\b\.?\s*$/i.test(l)&&/[a-z]{3}/i.test(l));if(co)shop=co.replace(/\b(bvba|bv|nv|n\.v\.|srl|sprl|vzw|comm\.?v|cvba|gmbh|ltd|sa)\b\.?\s*$/i,'').trim()}
+ if(!shop){const w=T.match(/(?:www\.)([a-z0-9-]{3,})\.(?:be|nl|com|eu|fr)/);if(w)shop=w[1].replace(/-/g,' ').replace(/^./,c=>c.toUpperCase())}
+ if(!shop){const SKIP=/(algemene|voorwaarden|ticket|pro ?forma|tussenrekening|kasticket|kassa|welkom|bienvenue|datum|tel\.?|btw|tva|factuur|rekening|bedankt|merci|quality|instituut|prijzen|openingsuren)/i;
+  for(const l of L.slice(0,8)){const a=(l.match(/[A-Za-zÀ-ÿ]/g)||[]).length;if(a>=3&&a/l.length>.6&&!SKIP.test(l)){shop=l;break}}}
+ shop=shop.replace(/[^\wÀ-ÿ&'. -]/g,'').trim().slice(0,60);
+ // ---- artikelen
+ const items=[];
+ (IL||L).forEach(l=>{if(/te\s?betalen|tota(a)?l|btw|netto|wisselgeld|teruggave|ticketnummer|openingsuren|ter info|\btel\b|\d{1,2}[.:]\d{2}\s?-\s?\d{1,2}[.:]\d{2}|\d{3}\s?\d{2}\s?\d{2}\s?\d{2}/i.test(l)||PAYW.test(l))return;
+  const n=nums(l);if(!n.length)return;const v=n[n.length-1];if(!(Math.abs(v)<10000))return;
+  let name=l.replace(/^[^A-Za-zÀ-ÿ]*/,'').replace(/^[A-Za-z]{1,2}\b\s+(?=[A-Z0-9]{3,6}\s*[\/|])/,'').replace(/^[A-Z0-9]{3,6}\s*[\/|]\s*/,'').replace(/^[A-Za-z]{1,2}\b\s+(?=\d)/,'').replace(/^\d+\s*[\/|]?\s*/,'');
+  const cut=name.search(/[\s~+]-?\d{1,5}\s?[.,]\s?\d{2}(?![\d%])/);if(cut>0)name=name.slice(0,cut);
+  name=name.replace(/^\d+\s?[xX*]\s?/,'').replace(/[^\wÀ-ÿ%&,.'\/ -]/g,'').replace(/\s+/g,' ').trim();
+  const letters=(name.match(/[A-Za-zÀ-ÿ]/g)||[]).length;if(letters<3||letters/name.length<.45||!/[A-Za-zÀ-ÿ]{4,}/.test(name))return;
+  if(total!=null&&Math.abs(v)===total&&/totaal|total/i.test(l))return;items.push({n:name.slice(0,60),v})});
  return{shop,date,total,items}}
 
 const PHK=id=>K+'-bon-'+id,PH=new Map();
@@ -704,15 +729,18 @@ async function bonFile(inp){const f=inp.files&&inp.files[0];if(!f)return;inp.val
  let img;try{img=await imgOf(f)}catch(e){return toast(e.message)}
  let q=.6,keep=canv(img,1400).toDataURL('image/jpeg',q);while(keep.length>320000&&q>.3){q-=.1;keep=canv(img,1100).toDataURL('image/jpeg',q)}
  BON={id:uid(),photo:keep,shop:'',date:today(),total:'',items:'',desc:'',adv:false,h:'',st:'read',text:'',err:''};render();
- try{const T=await loadTess(),w=await T.createWorker('nld',1,{logger:m=>{if(m&&m.status==='recognizing text'){const e=document.querySelector('#bonp>i');if(e)e.style.width=Math.round((m.progress||0)*100)+'%'}}});
-  const r=await w.recognize(canv(img,2000,true));try{await w.terminate()}catch(e){}if(!BON)return;const tx=(r&&r.data&&r.data.text)||'',p=parseBon(tx);
+ try{let pass=0;const T=await loadTess(),w=await T.createWorker('nld',1,{logger:m=>{if(m&&m.status==='recognizing text'){const e=document.querySelector('#bonp>i');if(e)e.style.width=Math.round((pass+(m.progress||0))*50)+'%'}}});
+  const cv=canv(img,2200,true),rd=r=>(r&&r.data&&r.data.text)||'';
+  try{await w.setParameters({tessedit_pageseg_mode:'4',preserve_interword_spaces:'1'})}catch(e){}const t4=rd(await w.recognize(cv));if(!BON)return;pass=1;
+  try{await w.setParameters({tessedit_pageseg_mode:'3'})}catch(e){}const t3=rd(await w.recognize(cv));try{await w.terminate()}catch(e){}if(!BON)return;
+  const tx=t4+'\n'+t3,p=parseBon(tx,t4);
   Object.assign(BON,{shop:p.shop||'',date:p.date||today(),total:p.total!=null?fmt2(p.total):'',items:p.items.map(i=>i.n+'  '+fmt2(i.v)).join('\n'),text:tx,st:'ok'});
   if(!p.total&&!p.shop)BON.err='Er werd weinig tekst herkend. Vul de gegevens zelf in of neem een scherpere foto.'}
  catch(e){if(!BON)return;BON.st='ok';BON.err='Tekst lezen lukte niet ('+(e.message||e)+'). Vul de gegevens zelf in.'}
  if(tab==='bon')render()}
 function bonForm(){const b=BON,c=S.cats,Q=role==='q';
  if(b.st==='read')return `<div class="card"><h2>Bonnetje lezen…</h2><img class="bonimg" src="${b.photo}" alt="Bonnetje"><div class="prog" id="bonp"><i></i></div><p class="mu">De eerste keer duurt dit wat langer: de tekstherkenning wordt eenmalig gedownload.</p><button class="btn ghost" onclick="BON=null;render()">Annuleren</button></div>`;
- return `<div class="card"><h2>Bonnetje nakijken</h2><img class="bonimg" src="${b.photo}" alt="Bonnetje">${b.err?`<p class="err">${esc(b.err)}</p>`:'<p class="mu">Controleer wat de app las en verbeter waar nodig.</p>'}
+ return `<div class="card"><h2>Bonnetje nakijken</h2><img class="bonimg" src="${b.photo}" alt="Bonnetje" style="cursor:zoom-in" onclick="modal('<img class=&quot;bonbig&quot; src=&quot;'+BON.photo+'&quot;><button class=&quot;btn ghost&quot; style=&quot;margin-top:8px&quot; onclick=&quot;closeM()&quot;>Sluiten</button>')"><p class="mu" style="text-align:center;margin-top:-4px">Tik op de foto om te vergroten.</p>${b.err?`<p class="err">${esc(b.err)}</p>`:'<p class="mu">Controleer wat de app las en verbeter waar nodig. Velden die de app niet kon lezen, zijn leeg.</p>'}
  <label>Winkel<input id="bs" value="${esc(b.shop)}" oninput="BON.shop=this.value"></label>
  <label>Datum van de aankoop<input id="bd" type="date" value="${esc(b.date)}" onchange="BON.date=this.value"></label>
  <label>Totaal in euro<input id="bt" inputmode="decimal" value="${esc(b.total)}" oninput="BON.total=this.value"></label>
