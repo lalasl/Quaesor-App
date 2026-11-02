@@ -79,6 +79,7 @@ summary{color:var(--mu);font-size:.85rem;padding:4px 0}
 .prog{height:6px;background:var(--in);border-radius:3px;overflow:hidden;margin:6px 0 10px}.prog>i{display:block;height:100%;width:0;background:var(--ac);transition:width .3s}
 details summary{cursor:pointer;color:var(--mu);font-size:.85rem;margin:6px 0}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 10px}.chips button{border:1px solid var(--bd);background:var(--in);color:var(--tx);border-radius:99px;padding:5px 11px;font:inherit;font-size:.85rem;cursor:pointer}.chips .mu{width:100%;margin:0}
+.drow{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--bd);padding:10px 2px;font:inherit;color:var(--tx);cursor:pointer;gap:10px}.drow:last-child{border:0}.drow>span:first-child{display:flex;flex-direction:column;gap:3px}.drt{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}.dra{display:flex;flex-direction:column;align-items:flex-end}
 </style>
 </head>
 <body>
@@ -99,12 +100,12 @@ const RN={d:'Developer',q:'Quaestor',h:'Helper',p:'Praesidium'};
 const effR=u=>isDev(u.e)?'q':u.r==='d'?'q':u.r;
 /* Enkel toegang tot spreadsheets die de app zelf aanmaakt of die de gebruiker zelf kiest. */
 const SCOPE='https://www.googleapis.com/auth/drive.file openid email';
-const TAB_B='Boekingen',TAB_L='Leden',TAB_P='Prijzen',TAB_I='Instellingen',TAB_BN='Bonnetjes',TAB_BF='Bonnetjes-foto';
+const TAB_OV='Schulden (overzicht)',TAB_B='Boekingen',TAB_L='Leden',TAB_P='Prijzen',TAB_I='Instellingen',TAB_BN='Bonnetjes',TAB_BF='Bonnetjes-foto';
 const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingediend door','Ingediend op','Status','Boeking-ID','Voorgeschoten door'];
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='29';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='30';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -132,7 +133,7 @@ try{const r=localStorage.getItem(K);if(r)S=JSON.parse(r)}catch(e){}
 if(!S)S=DEF();
 function norm(){
  if(Array.isArray(S.cats)){const o=S.cats;S.cats={h:o.map(c=>c.h),s:[...new Set(o.flatMap(c=>c.s))]}}
- S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0,askName:false,debtTab:'',pinMe:'',hOk:false,uTab:false,lastUser:'',sess:'',closedAt:0,closed:0,bonTab:false,dev:'',acc:{},accMid:0,accGid:'',accSig:'',accTs:0,accF:0,blocked:''},S.club);
+ S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0,askName:false,debtTab:'',lim:{},bkImp:0,pinMe:'',hOk:false,uTab:false,lastUser:'',sess:'',closedAt:0,closed:0,bonTab:false,dev:'',acc:{},accMid:0,accGid:'',accSig:'',accTs:0,accF:0,blocked:''},S.club);
  if(!S.club.dev)S.club.dev=uid().replace(/-/g,'');if(!S.club.acc||typeof S.club.acc!=='object'||Array.isArray(S.club.acc))S.club.acc={};
  if(S.club.gscope!==SCOPE){if(String(S.club.gscope||'').indexOf('drive.file')<0&&(S.club.gid||S.club.gok)){S.club.gok=false;if(S.club.gmode==='existing')S.club.gpicked=false;try{sessionStorage.removeItem('qg')}catch(e){}}S.club.gscope=SCOPE}
  S.sync=Object.assign({last:0,err:'',auth:false,pick:false,warn:''},S.sync||{});
@@ -207,7 +208,7 @@ const rng=(tab,a)=>`'${tab.replace(/'/g,"''")}'!${a}`;
 const enc=encodeURIComponent;
 const cell=v=>typeof v==='string'&&/^[=+\-@]/.test(v)?"'"+v:v;
 const typ=t=>t.storno?'Storno':t.exp&&t.ref?'Terugbetaling':t.exp?'Uitgave':t.ref?'Afbetaling':'Boeking';
-const rowOf=t=>[ "'"+t.id,t.date,cell(t.name||''),cell(t.desc||''),cell(t.h||''),cell(t.s||''),M[t.method],t.v,typ(t),t.ref?"'"+t.ref:t.bon?"'"+t.bon:'',cell(t.who||(t.by==='q'?'Quaestor':'Helper')),"'"+new Date(t.ts).toISOString(),t.by==='q'?'Quaestor':'Helper',cell(t.adv||'')];
+const rowOf=t=>[ "'"+t.id,t.date,cell(t.name||''),cell(t.desc||''),cell(t.h||''),cell(t.s||''),M[t.method],t.v,typ(t),t.ref?"'"+t.ref:t.bon?"'"+t.bon:'',cell(t.who||(t.by==='q'?'Quaestor':'Helper')),"'"+new Date(t.ts).toISOString(),t.by==='q'?'Quaestor':'Helper',cell(t.adv||''),t.chk?'Ja':''];
 async function append(tab,cols,rows){for(let i=0;i<rows.length;i+=200)await api(`/${S.club.gid}/values/${enc(rng(tab,cols))}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,{method:'POST',body:JSON.stringify({values:rows.slice(i,i+200)})})}
 async function head(tab,hd){const d=await api(`/${S.club.gid}/values/${enc(rng(tab,'A1:Z1'))}`);const v=(d.values||[])[0];
  if(!v||!v.some(x=>String(x||'').trim())){await api(`/${S.club.gid}/values/${enc(rng(tab,'A1'))}?valueInputOption=RAW`,{method:'PUT',body:JSON.stringify({values:[hd]})});return}
@@ -226,7 +227,9 @@ async function ensureSheet(){const c=S.club;let created=[];
   const need=[TAB_B,TAB_L,c.catTab].filter((t,i,a)=>!titles.includes(t)&&a.indexOf(t)===i);
   if(need.length)await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:need.map(t=>({addSheet:{properties:{title:t}}}))})});
   created=need.filter(t=>t===c.catTab)}
- await head(TAB_B,HEAD_B);await rolCol();await advCol();await head(TAB_L,['Naam','Status'])}
+ await head(TAB_B,HEAD_B);await rolCol();await advCol();await chkCol();await head(TAB_L,['Naam','Status'])}
+async function chkCol(){const u=`/${S.club.gid}/values/${enc(rng(TAB_B,'O1'))}`,d=await api(u);
+ if(!(d.values&&d.values[0]&&String(d.values[0][0]||'').trim()))await api(u+'?valueInputOption=RAW',{method:'PUT',body:JSON.stringify({values:[['Gecontroleerd']]})})}
 async function advCol(){const u=`/${S.club.gid}/values/${enc(rng(TAB_B,'N1'))}`,d=await api(u);
  if(!(d.values&&d.values[0]&&String(d.values[0][0]||'').trim()))await api(u+'?valueInputOption=RAW',{method:'PUT',body:JSON.stringify({values:[['Voorgeschoten door']]})})}
 async function rolCol(){const u=`/${S.club.gid}/values/${enc(rng(TAB_B,'M1'))}`,d=await api(u);
@@ -293,7 +296,7 @@ async function oldTab(gid){
  catch(e){if(e.auth)throw e;return null}}
 async function readSettings(gid){const o=await metaGet(gid);if(o)return{m:o,src:'meta'};const t=await oldTab(gid);return t?{m:t.o,src:'tab',id:t.id}:{m:{},src:null}}
 function mergeAcc(a,b){const r={};const add=o=>{if(!o||typeof o!=='object')return;for(const k in o){const v=o[k];if(!/^[\w-]{6,64}$/.test(k)||!v||typeof v!=='object')continue;if(!r[k]||(+v.t||0)>(+r[k].t||0))r[k]={s:['uit','h','weg','q'].includes(v.s)?v.s:'',t:+v.t||0}}};add(a);add(b);return r}
-function adoptTabs(m){const c=S.club;if(m['Categorietabblad']&&String(m['Categorietabblad'])!==c.catTab){c.catTab=String(m['Categorietabblad']);ENS=''}if('Schuldtabblad' in m&&String(m['Schuldtabblad']||'')!==c.debtTab){c.debtTab=String(m['Schuldtabblad']||'');S.bk=null}}
+function adoptTabs(m){const c=S.club;if(m['Schuldlimieten']&&typeof m['Schuldlimieten']==='object')c.lim=m['Schuldlimieten'];if(+m['Schuldimport']>(c.bkImp||0))c.bkImp=+m['Schuldimport'];if(m['Categorietabblad']&&String(m['Categorietabblad'])!==c.catTab){c.catTab=String(m['Categorietabblad']);ENS=''}}
 function takeAcc(m){const c=S.club,cl=+m['Afgesloten']||0;if(cl>0&&!c.closedAt&&!ISDEV&&!c.closed&&!c.reopen){c.closed=cl;save()}
  const n=mergeAcc(c.acc,m['Toegang']);if(JSON.stringify(n)!==JSON.stringify(c.acc)){c.acc=n;save()}}
 async function syncSettings(){const c=S.club;
@@ -305,7 +308,7 @@ async function syncSettings(){const c=S.club;
  if(((c.setDirty&&role==='q')||!m['Naam'])&&!(c.closed&&!ISDEV)){if(!c.salt)c.salt=rnd();let qh=c.pinQh,hh=c.pinHh;
   try{if(c.pinQ)qh=await hashPin(c.pinQ,c.salt);if(c.pinH)hh=await hashPin(c.pinH,c.salt)}catch(e){}
   c.pinQh=qh||'';c.pinHh=hh||'';c.setTs=Date.now();
-  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Toegang':c.acc,'Schuldtabblad':c.debtTab||'','Afgesloten':c.reopen?0:Math.max(+m['Afgesloten']||0,c.closedAt||0),'Gewijzigd':c.setTs},src==='meta');c.reopen=false;
+  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Toegang':c.acc,'Schuldlimieten':c.lim||{},'Schuldimport':c.bkImp||0,'Afgesloten':c.reopen?0:Math.max(+m['Afgesloten']||0,c.closedAt||0),'Gewijzigd':c.setTs},src==='meta');c.reopen=false;
   wrote=true;c.setDirty=false;save()}
  else{const ts=+m['Gewijzigd']||0;if(role!=='q')c.setDirty=false;
   if(ts>(c.setTs||0)){adoptTabs(m);c.name=String(m['Naam']||c.name);if(/^#[0-9a-f]{6}$/i.test(String(m['Kleur'])))c.color=String(m['Kleur']);
@@ -354,17 +357,18 @@ const toDate=x=>{if(typeof x==='number')return new Date(Math.round(serial(x))).t
 const toTs=(x,date)=>{if(typeof x==='number')return Math.round(serial(x));const p=Date.parse(String(x||'').trim());return isFinite(p)?p:Date.parse(date+'T12:00:00')||0};
 const REV=Object.fromEntries(Object.entries(M).map(([k,v])=>[v.toLowerCase(),k]));
 function relink(){const by=new Map(S.tx.map(t=>[t.id,t]));
- S.tx.forEach(t=>{if(!t.storno)t.void=false;delete t.paidBy;delete t.paidDate});
+ S.tx.forEach(t=>{if(!t.storno)t.void=false;delete t.paidBy;delete t.paidDate;delete t.paid});
  S.tx.forEach(t=>{if(t.storno){const o=by.get(t.ref);if(o){o.void=true;if(o.exp)t.exp=true}}});
- S.tx.forEach(t=>{if(t.ref&&!t.storno&&!t.void){const d=by.get(t.ref);if(d){d.paidBy=t.id;d.paidDate=t.date}}})}
-async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(TAB_B,'A2:N'))}?valueRenderOption=UNFORMATTED_VALUE`),have=new Set(S.tx.map(t=>t.id));let add=0;
+ S.tx.forEach(t=>{if(t.ref&&!t.storno&&!t.void){const d=by.get(t.ref);if(d){d.paid=Math.round(((d.paid||0)+t.v)*100)/100;if(d.method!=='schuld'||d.paid>=d.v-.005){d.paidBy=t.id;d.paidDate=t.date}}}})}
+async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(TAB_B,'A2:O'))}?valueRenderOption=UNFORMATTED_VALUE`),have=new Set(S.tx.map(t=>t.id)),byId=new Map(S.tx.map(t=>[t.id,t]));let add=0,chg=false;
  const mem=new Map(S.members.map(m=>[m.name.toLowerCase(),m.id]));
  const inSheet=new Set();
- (d.values||[]).forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(id)inSheet.add(id);if(!id||have.has(id))return;
+ (d.values||[]).forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(id)inSheet.add(id);if(!id)return;if(have.has(id)){const x=byId.get(id);if(x&&!x.chkD){const k=/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim());if(!!x.chk!==k){x.chk=k;chg=true}}return}
   const v=pnum(r[7]);if(v==null)return;const date=toDate(r[1]),ts=toTs(String(r[11]||'').replace(/^'/,'')||r[11],date);
   if(c.wipeTs&&ts<c.wipeTs)return;const meth=REV[String(r[6]||'').trim().toLowerCase()];if(!meth)return;
   const k=String(r[10]||'').trim(),typ=String(r[8]||'').trim().toLowerCase(),ref=String(r[9]==null?'':r[9]).trim().replace(/^'/,''),name=String(r[2]||'').trim();
   const t={id,ts,date,mid:mem.get(name.toLowerCase())||null,name,v,method:meth,h:String(r[4]||'').trim(),s:String(r[5]||'').trim(),desc:String(r[3]||'').trim(),by:/quaestor/i.test(String(r[12]||'').trim()||k)?'q':'h',who:/^(quaestor|helper)$/i.test(k)?'':k,void:false,synced:true};
+  if(/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim()))t.chk=true;
   if(typ==='storno')t.storno=true;if(ref&&(typ==='storno'||typ==='afbetaling'||typ==='terugbetaling'))t.ref=ref;
   if(typ==='uitgave'||typ==='terugbetaling'){t.exp=true;if(typ==='uitgave'&&ref)t.bon=ref}const ad=String(r[13]||'').trim();if(ad)t.adv=ad;
   S.tx.push(t);have.add(id);add++});
@@ -372,16 +376,18 @@ async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(T
  if(goneT.length>=5&&goneT.length*2>=nSy)S.pendDel=goneT.map(t=>t.id);
  else{S.pendDel=[];S.tx=S.tx.filter(t=>!t.synced||inSheet.has(t.id));rem=goneT.length}
  const pc=JSON.stringify(S.pendDel)!==oldP;
- if(add||rem||pc){S.tx.sort((a,b)=>a.ts-b.ts);relink();save()}return add>0||rem>0||pc}
+ if(add||rem||pc||chg){S.tx.sort((a,b)=>a.ts-b.ts);relink();save()}return add>0||rem>0||pc||chg}
 function delBanner(){const n=(S.pendDel||[]).length;if(!n)return '';
  return `<div class="card banner"><h2>${n} boekingen staan niet meer in de spreadsheet</h2><p class="mu">Ze zijn uit het tabblad Boekingen verdwenen, bijvoorbeeld omdat de Quaestor ze gewist heeft of per ongeluk. Wil je ze ook op dit toestel verwijderen, of wil je ze bewaren en terugzetten in de spreadsheet?</p><button class="btn ghost" onclick="pendDo(0)">Bewaren en terugzetten in de spreadsheet</button><button class="btn" style="margin-top:8px" onclick="pendDo(1)">Ook op dit toestel verwijderen</button></div>`}
 function pendDo(del){const ids=new Set(S.pendDel);S.pendDel=[];
  if(del){S.tx=S.tx.filter(t=>!ids.has(t.id));relink()}else S.tx.forEach(t=>{if(ids.has(t.id))t.synced=false});
  save();render();if(!del)queueSync();toast(del?'Verwijderd op dit toestel':'Boekingen worden teruggezet')}
+async function pushChk(){const l=S.tx.filter(t=>t.chkD&&t.synced);if(!l.length)return;const g=S.club.gid,d=await api(`/${g}/values/${enc(rng(TAB_B,'A2:A'))}`),idx=new Map();(d.values||[]).forEach((r,i)=>idx.set(String(r[0]||'').replace(/^'/,''),i+2));
+ const data=l.filter(t=>idx.has(t.id)).map(t=>({range:rng(TAB_B,'O'+idx.get(t.id)),values:[[t.chk?'Ja':'']]}));if(data.length)await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data})});l.forEach(t=>delete t.chkD);save()}
 async function pushTx(){const p=S.tx.filter(t=>!t.synced);if(!p.length)return;
  const d=await api(`/${S.club.gid}/values/${enc(rng(TAB_B,'A2:A'))}`),ex=new Set((d.values||[]).map(r=>String(r[0]||'').trim().replace(/^'/,'')));
  const nw=p.filter(t=>!ex.has(t.id)).sort((a,b)=>a.ts-b.ts);
- if(nw.length)await append(TAB_B,'A:N',nw.map(rowOf));
+ if(nw.length)await append(TAB_B,'A:O',nw.map(rowOf));
  p.forEach(t=>t.synced=true);save()}
 async function sync(manual,force){
  if(SYNCING){AGAIN=true;return}AGAIN=false;const c=S.club;if(!force&&!autoOk())return;
@@ -396,9 +402,9 @@ async function sync(manual,force){
   if(userCheck())changed=true;
   if(S.club.closed&&!ISDEV){try{await pushTx()}catch(e){}LASTPULL=Date.now();setTimeout(closedGo,0);return}
   if(accCheck()){try{await pushTx()}catch(e){}LASTPULL=Date.now();S.sync.last=Date.now();S.sync.err='';save();setTimeout(blockAfter,0);return}
-  changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;changed=await syncBons(true)||changed;
-  if(c.debtTab&&(manual||!S.bk||S.bk.tab!==c.debtTab||Date.now()-(S.bk.at||0)>120000)){try{changed=await loadBk()||changed}catch(e){if(e.auth)throw e;S.bk={tab:c.debtTab,at:Date.now(),lines:[],sum:null,err:e.message||'Lezen lukte niet'};save();changed=true}}else if(!c.debtTab&&S.bk){S.bk=null;save();changed=true}LASTPULL=Date.now()}
-  await pushTx();if(S.bons.some(b=>!b.synced||b.dirty))changed=await syncBons(false)||changed;
+  changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;changed=await syncBons(true)||changed;LASTPULL=Date.now()}
+  await pushTx();await pushChk();if(role==='q')try{await pushOverview()}catch(e){if(e.auth)throw e}
+  if(S.bons.some(b=>!b.synced||b.dirty))changed=await syncBons(false)||changed;
   try{await accPing()}catch(e){if(e.auth)throw e}
   S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;S.sync.pick=false;save();
   if(manual)toast('Gesynchroniseerd')}
@@ -604,8 +610,8 @@ function render(){if(S.club.blocked)return blockAfter();const Q=role==='q',P=rol
  const nb=Q?bonTodo().length:0,tabs=Q?[['boek','Boeken'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'+(nb?' ('+nb+')':'')],['inst','Meer']]:P?[['bon','Bonnen'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['me','Account']]:[['boek','Boeken'],['dag','Dag'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'],['me','Account']];
  const v={boek:vBoek,vandaag:vVandaag,dag:vDag,schuld:vSchuld,leden:vLeden,inst:vInst,acc:vAcc,bon:vBon,me:vMe}[tab]();
  $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${ISDEV?'Developer':RN[role]||''}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div><button onclick="logout()">Afmelden</button></header>
- <main>${v}</main><nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</nav>`;
- if(tab==='boek')sug();if(tab==='leden')ml();refreshSt()}
+ <main>${v}</main><nav>${tabs.map(t=>`<button class="${tab===t[0]?'on':''}" onclick="tab='${t[0]}';SDN='';render()">${t[1]}</button>`).join('')}</nav>`;
+ if(tab!=='schuld')SDN='';if(tab==='boek')sug();if(tab==='leden')ml();refreshSt()}
 const row=(t,st)=>`<div class="row${t.void?' void':''}"><div><b>${esc(t.name||'Zonder naam')}</b>${t.exp&&!t.storno?` <span class="tag">${t.ref?'Terugbetaling':'Uitgave'}</span>`:''}<div class="mu">${esc(t.h)}${t.s?' · '+esc(t.s):''} · ${M[t.method]}${t.desc?' · '+esc(t.desc):''}${t.adv&&!t.ref?' · door '+esc(t.adv):''}${t.who?' · '+esc(t.who):''}${t.storno?' · storno':''}</div></div><div class="amt ${t.v<0?'neg':''}">${eur(t.v)}${st&&!t.void&&!t.storno?`<button class="sm" onclick="storno('${t.id}')">Storno</button>`:''}</div></div>`;
 const empty=t=>`<p class="mu">${t}</p>`;
 const opts=(l,sel,blank)=>(blank?'<option value="">(geen)</option>':'')+l.map(x=>`<option${x===sel?' selected':''}>${esc(x)}</option>`).join('');
@@ -655,12 +661,12 @@ function commit(a){const m=S.members.find(x=>x.id===B.mid);
  S.tx.push({who:WHO,id:uid(),ts:Date.now(),date:today(),mid:B.mid,name:m?m.name:B.name.trim(),v:a,method:B.method,h:B.h,s:B.s,desc:B.desc.trim(),by:role,void:false,synced:false});
  save();Object.assign(B,{mid:null,name:'',amt:'',desc:'',man:false});toast('Geboekt');render();queueSync()}
 function storno(id){if(RO())return;const t=S.tx.find(x=>x.id===id);if(!t)return;
- if(t.method==='schuld'&&t.paidBy)return toast('Storneer eerst de afbetaling van deze schuld');
+ if(t.method==='schuld'&&(t.paid||0)>0)return toast('Storneer eerst de afbetalingen van deze schuld');
  if(t.method==='voorschot'&&t.paidBy)return toast('Storneer eerst de terugbetaling');
  ask('Deze boeking storneren? Er komt een tegenboeking, er wordt niets gewist.','Storneren',()=>doStorno(id))}
 function doStorno(id){const t=S.tx.find(x=>x.id===id);if(!t||t.void)return;
  t.void=true;S.tx.push({...t,who:WHO,id:uid(),ts:Date.now(),date:today(),v:-t.v,storno:true,void:false,ref:t.id,by:role,synced:false});
- if(t.ref){const d=S.tx.find(x=>x.id===t.ref);if(d&&d.paidBy===t.id){delete d.paidBy;delete d.paidDate}}
+ relink();
  save();toast('Gestorneerd');render();queueSync()}
 function vMe(){return accCard()+`<div class="card"><h2>Dit toestel</h2><p class="mu">Gebruik je dit toestel niet meer voor ${esc(S.club.name)}? Koppel het dan los. De gegevens op dit toestel worden gewist, de spreadsheet blijft.</p><button class="btn ghost" onclick="devOff()">Dit toestel loskoppelen</button></div>`}
 function vVandaag(){const l=S.tx.filter(t=>t.date===today()&&!t.storno).reverse();return delBanner()+`<div class="card"><h2>Vandaag: ${l.filter(t=>!t.void).length} boekingen</h2>${l.length?l.map(t=>row(t,false)).join(''):empty('Nog niets geboekt vandaag.')}</div>${accCard()}${S.club.helperOnly||(USER&&role!=='q')?`<div class="card"><h2>Dit toestel</h2><p class="mu">Gebruik je dit toestel niet meer voor ${esc(S.club.name)}? Koppel het dan los. De gegevens op dit toestel worden gewist, de spreadsheet blijft.</p>${USER?'':`<label>Je naam<input id="wn2" value="${esc(S.club.names.h)}"></label><button class="btn ghost" style="margin-bottom:8px" onclick="chName()">Naam opslaan</button>`}<button class="btn ghost" onclick="devOff()">Dit toestel loskoppelen</button></div>`:''}`}
@@ -865,7 +871,8 @@ function vBon(){const Q=role==='q';if(BON)return bonForm();
  return h}
 
 /* ---------- schulden ---------- */
-const open=()=>S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno&&!t.paidBy);
+const rem=t=>Math.round((t.v-(t.paid||0))*100)/100;
+const open=()=>S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno&&rem(t)>.005);
 /* ---------- schulden uit de boekhouding (alleen lezen) ---------- */
 const BKT=[['ok',/^(oke|ok[ée]?|in orde|vereffend|afgehandeld|voldaan|betaald\s*\?|✓|✔)/i],['bal',/saldo|openstaand|nog te betalen|resterend/i],['s',/sub\s*-?cat/i],['h',/hoofd\s*-?cat|^categorie/i],['paid',/^(totaal\s+)?betaald\b|ontvangen|credit/i],['due',/te betalen|verschuldigd|bedrag|debet|kostprijs|prijs/i],['name',/^(club\s*naam|naam|lid|leden|persoon|wie|bijnaam|schachtennaam)\b/i],['date',/^datum|^date/i],['desc',/omschrijving|beschrijving|activiteit|reden|^wat\b|^item/i],['st',/^status/i]];
 const bkNum=v=>{if(typeof v==='number')return v;let s=String(v==null?'':v).replace(/[€\s ]/g,'');if(!s)return null;if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const n=parseFloat(s);return isFinite(n)?Math.round(n*100)/100:null};
@@ -878,39 +885,50 @@ function bkParse(rows){const hdr=r=>(rows[r]||[]).map(x=>String(x==null?'':x).tr
  const cell=(row,i)=>i==null?'':row[i];const lines=[];let sum=null,empty=0;
  if(tb)for(let r=hr+1;r<rows.length&&empty<200;r++){const row=rows[r]||[],nm=String(cell(row,tb.name)||'').trim();if(!nm){empty++;continue}empty=0;
   const due=bkNum(cell(row,tb.due))||0,paid=bkNum(cell(row,tb.paid))||0,b=tb.bal!=null&&bkNum(cell(row,tb.bal))!=null?bkNum(cell(row,tb.bal)):Math.round((due-paid)*100)/100,ok=tb.ok!=null&&bkOk(cell(row,tb.ok)),dv=cell(row,tb.date),date=dv===''||dv==null?'':toDate(dv);
-  const desc=String(cell(row,tb.desc)||'').trim();lines.push({key:[uk(nm),date,uk(desc),due,paid].join('|').slice(0,180),row:r+1,name:nm,date,desc,h:String(cell(row,tb.h)||'').trim(),s:String(cell(row,tb.s)||'').trim(),due,paid,bal:b,ok,open:!ok&&b>0?b:0})}
- if(sb){sum={};for(let r=hr+1;r<rows.length;r++){const row=rows[r]||[],nm=String(cell(row,sb.name)||'').trim();if(!nm)continue;const v=bkNum(cell(row,sb.bal));if(v!=null)sum[nm]=(sum[nm]||0)+v}}
+  const desc=String(cell(row,tb.desc)||'').trim();lines.push({st:String(cell(row,tb.st)||'').trim(),key:[uk(nm),date,uk(desc),due,paid].join('|').slice(0,180),row:r+1,name:nm,date,desc,h:String(cell(row,tb.h)||'').trim(),s:String(cell(row,tb.s)||'').trim(),due,paid,bal:b,ok,open:!ok&&b>0?b:0})}
+ var sst={};if(sb){sum={};for(let r=hr+1;r<rows.length;r++){const row=rows[r]||[],nm=String(cell(row,sb.name)||'').trim();if(!nm)continue;const v=bkNum(cell(row,sb.bal));if(v!=null)sum[nm]=(sum[nm]||0)+v;const s=String(cell(row,sb.st)||'').trim();if(s)sst[nm]=s}}
  if(!tb&&!sum)return{lines:[],sum:null,err:'De kopregel werd gevonden, maar de app herkent geen lijst met schulden of overzicht per lid.'};
  const nm=o=>Object.keys(o).filter(k=>o[k]!=null).map(k=>h[o[k]]).join(', ');
- return{lines,sum,hr:hr+1,info:(tb?`Lijst met ${lines.length} lijnen (kolommen: ${nm(tb)})`:'')+(tb&&sb?' en ':'')+(sb?`overzicht per lid (kolommen: ${nm(sb)})`:'')}}
+ return{lines,sum,sst,hr:hr+1,info:(tb?`Lijst met ${lines.length} lijnen (kolommen: ${nm(tb)})`:'')+(tb&&sb?' en ':'')+(sb?`overzicht per lid (kolommen: ${nm(sb)})`:'')}}
 async function loadBk(){const c=S.club;let rows=[],start=1;
  for(let k=0;k<20;k++){const d=await api(`/${c.gid}/values/${enc(rng(c.debtTab,'A'+start+':Z'+(start+499)))}?valueRenderOption=UNFORMATTED_VALUE`),v=d.values||[];for(let i=0;i<500;i++)rows.push(v[i]||[]);
   if(v.length<500||!v.slice(-150).some(r=>r.some(x=>typeof x==='string'&&x.trim())))break;start+=500}
  const r=bkParse(rows);r.at=Date.now();r.tab=c.debtTab;const old=S.bk?JSON.stringify([S.bk.lines,S.bk.sum,S.bk.err]):'';S.bk=r;save();return JSON.stringify([r.lines,r.sum,r.err])!==old}
-const dDiff=(a,b)=>Math.abs((Date.parse(a)||0)-(Date.parse(b)||0))/864e5;
-function debts(){const M={},g=n=>{const k=uk(n);return M[k]=M[k]||{name:n,bk:0,lines:[],app:[],pays:[]}};const bk=S.club.debtTab&&S.bk&&!S.bk.err?S.bk:null;
- if(bk){bk.lines.filter(l=>l.open>0).forEach(l=>g(l.name).lines.push(l));
-  if(bk.sum)Object.entries(bk.sum).forEach(([n,v])=>{g(n).bk+=v});else bk.lines.filter(l=>!l.ok).forEach(l=>{g(l.name).bk+=l.bal})}
- const openKeys=new Set(bk?bk.lines.filter(l=>l.open>0).map(l=>l.key):[]);
- open().forEach(t=>{if(bk&&bk.lines.some(l=>uk(l.name)===uk(t.name)&&Math.abs((l.due||l.bal)-t.v)<.005&&dDiff(l.date,t.date)<=3))return;g(t.name).app.push(t)});
- S.tx.filter(t=>String(t.ref||'').indexOf('bk:')===0&&!t.void&&!t.storno).forEach(t=>{if(!openKeys.has(t.ref.slice(3)))return;if(bk.lines.some(l=>uk(l.name)===uk(t.name)&&(Math.abs(l.paid-t.v)<.005||Math.abs(l.bal+t.v)<.005)&&l.paid>0&&dDiff(l.date,t.date)<=3))return;g(t.name).pays.push(t)});
- Object.values(M).forEach(o=>{o.tot=Math.round((o.bk+o.app.reduce((a,t)=>a+t.v,0)-o.pays.reduce((a,t)=>a+t.v,0))*100)/100});return M}
-const debtOf=n=>{const o=debts()[uk(n)];return o?o.tot:0};
-function bkPay(key){if(role!=='q')return;const l=S.bk&&S.bk.lines.find(x=>x.key===key);if(!l)return;
- modal(`<h3>Betaling ontvangen</h3><p>${esc(l.name)} · ${esc(l.desc||l.h)} · open ${eur(l.open)}</p><p class="mu">De app boekt de betaling in het tabblad Boekingen. In je boekhouding verander je zelf niets: dat doe jij. Tot je het daar verwerkt, toont de app de betaling hier al.</p><label>Bedrag<input id="bpa" inputmode="decimal" value="${fmt2(l.open)}"></label><label>Betaalwijze<select id="bpm"><option value="cash">Cash</option><option value="payconiq">Payconiq</option><option value="overschrijving">Overschrijving</option></select></label><label>Datum<input type="date" id="bpd" value="${today()}"></label><button class="btn" data-k="${esc(key)}" onclick="bkPayOk(this.dataset.k)">Betaling boeken</button>`)}
-function bkPayOk(key){if(role!=='q')return;const l=S.bk&&S.bk.lines.find(x=>x.key===key);if(!l)return;const a=pamt($('#bpa').value);if(!(a>0))return toast('Vul een bedrag in');
- const m=S.members.find(x=>uk(x.name)===uk(l.name));S.tx.push({who:WHO,id:uid(),ts:Date.now(),date:$('#bpd').value||today(),mid:m?m.id:null,name:l.name,v:a,method:$('#bpm').value,h:l.h,s:l.s,desc:'Afbetaling: '+(l.desc||'schuld'),by:role,ref:'bk:'+l.key,void:false,synced:false});
- save();closeM();render();queueSync();toast('Betaling geboekt')}
-function vSchuld(){const D=debts(),Q=role==='q',L=Object.values(D).filter(o=>o.tot>.005||o.app.length||o.pays.length).sort((a,b)=>a.name.localeCompare(b.name)),tot=L.reduce((a,o)=>a+Math.max(0,o.tot),0),bk=S.club.debtTab?S.bk:null;
- const ln=l=>`<div class="row"><div>${l.date?l.date.split('-').reverse().join('/')+' · ':''}${esc(l.desc||l.h||'Schuld')}<div class="mu">${esc([l.h,l.s].filter(Boolean).join(' · '))}${l.h||l.s?' · ':''}uit je boekhouding</div></div><div class="amt">${eur(l.open)}${Q?`<button class="sm" data-k="${esc(l.key)}" onclick="bkPay(this.dataset.k)">Betaald</button>`:''}</div></div>`;
- const ap=t=>`<div class="row"><div>${t.date.split('-').reverse().join('/')} · ${esc(t.h)}${t.s?' · '+esc(t.s):''}${t.desc?`<div class="mu">${esc(t.desc)}</div>`:''}${bk?'<div><span class="tag">Nieuw in de app, nog niet in je boekhouding</span></div>':''}</div><div class="amt">${eur(t.v)}${RO()?'':`<button class="sm" onclick="pay('${t.id}')">Betaald</button>`}</div></div>`;
- const py=t=>`<div class="row"><div>${t.date.split('-').reverse().join('/')} · ${esc(t.desc)} · ${M[t.method]||t.method}<div><span class="tag">Betaling in de app, nog te verwerken in je boekhouding</span></div></div><div class="amt">${eur(-t.v)}</div></div>`;
- const det=o=>o.lines.map(ln).join('')+o.app.map(ap).join('')+o.pays.map(py).join('')+(o.lines.length||o.app.length||o.pays.length?'':'<p class="mu">Geen details: het bedrag komt uit het overzicht in je boekhouding.</p>');
- return `<div class="grid"><div class="stat big">Totaal openstaand<b>${eur(tot)}</b>${bk?`<span class="mu">${bk.err?esc(bk.err):`Inclusief je boekhouding (tabblad ${esc(S.club.debtTab)}), alleen gelezen.`}</span>`:''}</div></div>`
-  +(L.length?L.map(o=>`<div class="card"><details><summary style="color:var(--tx);font-size:1rem"><b>${esc(o.name)}</b> · ${eur(o.tot)}</summary>${det(o)}</details></div>`).join(''):`<div class="card">${empty('Geen openstaande schulden.')}</div>`)}
-function pay(id){if(RO())return;const d=S.tx.find(x=>x.id===id);modal(`<h3>Schuld afbetalen</h3><p>${esc(d.name)} · ${eur(d.v)}</p><label>Betaalwijze<select id="pm"><option value="cash">Cash</option><option value="payconiq">Payconiq</option><option value="overschrijving">Overschrijving</option></select></label><label>Datum<input type="date" id="pd" value="${today()}"></label><button class="btn" onclick="payOk('${id}')">Markeer als betaald</button>`)}
-function payOk(id){const d=S.tx.find(x=>x.id===id),n={who:WHO,id:uid(),ts:Date.now(),date:$('#pd').value||today(),mid:d.mid,name:d.name,v:d.v,method:$('#pm').value,h:d.h,s:d.s,desc:'Afbetaling schuld',by:role,ref:d.id,void:false,synced:false};
- S.tx.push(n);d.paidBy=n.id;d.paidDate=n.date;save();closeM();toast('Schuld afbetaald');render();queueSync()}
+const stOf=n=>{const m=S.members.find(x=>uk(x.name)===uk(n));return m?m.status:''};
+function limitFor(st){const L=S.club.lim||{},k=Object.keys(L).find(x=>sk(x)===sk(st));if(k!=null&&L[k]!==''&&L[k]!=null)return +L[k];return /oud/i.test(st||'')?0:null}
+function debts(){const M={};open().forEach(t=>{const k=uk(t.name),o=M[k]=M[k]||{name:t.name,debts:[],pays:[],tot:0,due:0,paid:0};o.debts.push(t)});
+ S.tx.filter(t=>t.ref&&!t.storno&&!t.void&&!t.exp).forEach(t=>{const d=S.tx.find(x=>x.id===t.ref);if(!d||d.method!=='schuld')return;const o=M[uk(d.name)];if(o)o.pays.push(t)});
+ Object.values(M).forEach(o=>{o.st=stOf(o.name);o.tot=Math.round(o.debts.reduce((a,t)=>a+rem(t),0)*100)/100;const l=limitFor(o.st);o.warn=l===0&&o.tot>0?'Moet afbetalen':l>0&&o.tot>l?'Boven limiet '+eur(l):'';
+  const all=S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno&&uk(t.name)===uk(o.name));o.due=all.reduce((a,t)=>a+t.v,0);o.paid=all.reduce((a,t)=>a+(t.paid||0),0)});return M}
+const memDebt=n=>debts()[uk(n)];
+const debtOf=n=>{const o=memDebt(n);return o?o.tot:0};
+let SF='',SQ='',SDN='';
+const stTag=st=>{const s=String(st||''),c=/oud/i.test(s)?'background:#ECEDF1;color:#3F4452':/schacht/i.test(s)?'background:#E2F3EC;color:#0F5F4A':'background:#E3E8FB;color:#1E2A8A';return s?`<span class="tag" style="${c};border:0;font-weight:600">${esc(s)}</span>`:''};
+function vSchuld(){if(SDN)return vSchuldDet();const D=Object.values(debts()).sort((a,b)=>b.tot-a.tot),tot=D.reduce((a,o)=>a+o.tot,0),old=D.filter(o=>/oud/i.test(o.st)),stu=D.filter(o=>!/oud/i.test(o.st));
+ const sts=[...new Set(D.map(o=>o.st).filter(Boolean))],L=D.filter(o=>(!SF||o.st===SF)&&(!SQ||uk(o.name).includes(uk(SQ))));
+ const sum=(l)=>eur(l.reduce((a,o)=>a+o.tot,0));
+ return `<div class="grid"><div class="stat big">Totaal openstaand<b>${eur(tot)}</b><span class="mu">${D.length} ${D.length===1?'lid':'leden'} met een schuld</span></div>
+ ${old.length?`<div class="stat">Oud-studenten<b>${sum(old)}</b><span class="mu">${old.length} ${old.length===1?'lid':'leden'}${old.some(o=>o.warn)?' · moeten afbetalen':''}</span></div><div class="stat">Studenten<b>${sum(stu)}</b><span class="mu">${stu.length} ${stu.length===1?'lid':'leden'}${stu.filter(o=>o.warn).length?' · '+stu.filter(o=>o.warn).length+' boven limiet':''}</span></div>`:''}</div>
+ ${sts.length>1?`<div class="chips" style="margin:0 0 10px"><button type="button" onclick="SF='';render()" style="${SF?'':'background:var(--ac);color:var(--on);border-color:var(--ac)'}">Alle</button>${sts.map(s=>`<button type="button" data-s="${esc(s)}" onclick="SF=this.dataset.s;render()" style="${SF===s?'background:var(--ac);color:var(--on);border-color:var(--ac)':''}">${esc(s)}</button>`).join('')}</div>`:''}
+ <div class="card"><label>Zoek een lid<input value="${esc(SQ)}" oninput="SQ=this.value;clearTimeout(window._sq);window._sq=setTimeout(()=>{const p=this.selectionStart;render();const e=document.querySelector('#sqi');if(e){e.focus();e.setSelectionRange(p,p)}},250)" id="sqi" placeholder="Naam…"></label>
+ ${L.length?L.map(o=>`<button type="button" class="drow" data-n="${esc(o.name)}" onclick="SDN=this.dataset.n;render();scrollTo(0,0)"><span><b>${esc(o.name)}</b><span class="drt">${stTag(o.st)}${o.warn?`<span class="tag warn" style="font-weight:600">${esc(o.warn)}</span>`:''}</span></span><span class="dra"><b>${eur(o.tot)}</b><span class="mu">${o.debts.length} ${o.debts.length===1?'post':'posten'}</span></span></button>`).join(''):empty(D.length?'Niemand gevonden.':'Geen openstaande schulden.')}</div>`}
+function vSchuldDet(){const o=memDebt(SDN),Q=role==='q';const back=`<button class="btn ghost" style="margin-bottom:12px" onclick="SDN='';render()">← Alle schulden</button>`;
+ if(!o)return back+`<div class="card">${empty(esc(SDN)+' heeft geen openstaande schulden meer.')}</div>`;
+ const fd=d=>d?d.split('-').reverse().join('/'):'';
+ return back+`<div class="card"><div class="row" style="border:0;padding:0"><div><h2 style="margin:0">${esc(o.name)}</h2><div class="drt">${stTag(o.st)}${o.warn?`<span class="tag warn" style="font-weight:600">${esc(o.warn)}</span>`:''}</div></div><div style="text-align:right"><span class="mu">Openstaand</span><div style="font-size:1.5rem;font-weight:700">${eur(o.tot)}</div></div></div>
+ <div class="grid" style="margin-top:10px"><div class="stat">Totaal verschuldigd<b>${eur(o.due)}</b></div><div class="stat">Totaal betaald<b>${eur(o.paid)}</b></div></div>
+ ${RO()?'':`<button class="btn" style="margin-top:10px" data-n="${esc(o.name)}" onclick="payAll(this.dataset.n)">Afbetaling boeken</button>`}</div>
+ <div class="card"><h2>Openstaande schulden</h2>${Q?'<p class="mu" style="margin-top:-6px">Vink aan wat je gecontroleerd hebt.</p>':''}${o.debts.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(d=>`<div class="row"><div>${esc(d.desc||d.h||'Schuld')}<div class="mu">${esc([fd(d.date),d.h,d.s,d.paid?'al '+eur(d.paid)+' betaald':''].filter(Boolean).join(' · '))}</div></div><div class="amt" style="display:flex;align-items:center;gap:8px">${eur(rem(d))}${Q?`<label style="margin:0" title="Gecontroleerd"><input type="checkbox" style="width:20px;height:20px" ${d.chk?'checked':''} onchange="chkSet('${d.id}',this.checked)" aria-label="Gecontroleerd"></label>`:(d.chk?'<span class="mu" title="Gecontroleerd">✓</span>':'')}${RO()?'':`<button class="sm" onclick="pay('${d.id}')">Betaald</button>`}</div></div>`).join('')}</div>
+ <div class="card"><h2>Afbetalingen</h2>${o.pays.length?o.pays.slice().sort((a,b)=>b.ts-a.ts).map(t=>`<div class="row"><div>${esc(t.desc)}<div class="mu">${fd(t.date)} · ${M[t.method]||t.method}${t.who?' · '+esc(t.who):''}</div></div><div class="amt">${eur(t.v)}</div></div>`).join(''):empty('Nog geen afbetalingen.')}</div>`}
+function pay(id){if(RO())return;const d=S.tx.find(x=>x.id===id);if(!d)return;modal(`<h3>Schuld afbetalen</h3><p>${esc(d.name)} · ${esc(d.desc||d.h)} · nog ${eur(rem(d))}</p><label>Bedrag<input id="pa" inputmode="decimal" value="${fmt2(rem(d))}"></label><label>Betaalwijze<select id="pm"><option value="cash">Cash</option><option value="payconiq">Payconiq</option><option value="overschrijving">Overschrijving</option></select></label><label>Datum<input type="date" id="pd" value="${today()}"></label><button class="btn" onclick="payOk('${id}')">Afbetaling boeken</button>`)}
+function payTx(d,a,m,date){const n={who:WHO,id:uid(),ts:Date.now(),date,mid:d.mid,name:d.name,v:a,method:m,h:d.h,s:d.s,desc:'Afbetaling: '+(d.desc||d.h||'schuld'),by:role,ref:d.id,void:false,synced:false};S.tx.push(n);return n}
+function payOk(id){if(RO())return;const d=S.tx.find(x=>x.id===id);if(!d)return;const a=Math.min(pamt($('#pa').value)||0,rem(d));if(!(a>0))return toast('Vul een bedrag in');
+ payTx(d,a,$('#pm').value,$('#pd').value||today());relink();save();closeM();toast('Afbetaling geboekt');render();queueSync()}
+function payAll(name){if(RO())return;const o=memDebt(name);if(!o)return;modal(`<h3>Afbetaling van ${esc(o.name)}</h3><p class="mu">Openstaand ${eur(o.tot)}. Het bedrag wordt verdeeld over de oudste schulden eerst.</p><label>Bedrag<input id="pa" inputmode="decimal" value="${fmt2(o.tot)}"></label><label>Betaalwijze<select id="pm"><option value="cash">Cash</option><option value="payconiq">Payconiq</option><option value="overschrijving">Overschrijving</option></select></label><label>Datum<input type="date" id="pd" value="${today()}"></label><button class="btn" data-n="${esc(o.name)}" onclick="payAllOk(this.dataset.n)">Afbetaling boeken</button>`)}
+function payAllOk(name){if(RO())return;const o=memDebt(name);if(!o)return;let a=pamt($('#pa').value)||0;if(!(a>0))return toast('Vul een bedrag in');if(a>o.tot+.005)return toast('Dat is meer dan het openstaande bedrag');
+ const m=$('#pm').value,dt0=$('#pd').value||today();o.debts.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||'')||x.ts-y.ts).forEach(d=>{if(a<=.005)return;const p=Math.min(a,rem(d));payTx(d,Math.round(p*100)/100,m,dt0);a=Math.round((a-p)*100)/100});
+ relink();save();closeM();toast('Afbetaling geboekt');render();queueSync()}
+function chkSet(id,v){if(role!=='q')return;const t=S.tx.find(x=>x.id===id);if(!t)return;t.chk=!!v;t.chkD=true;save();queueSync()}
 
 /* ---------- leden ---------- */
 function vLeden(){if(RO())return `<div class="card"><h2>${S.members.length} leden</h2><p class="mu">Alleen lezen.</p><label>Zoeken<input oninput="LQ=this.value;ml()"></label><div id="ml"></div></div>`;return `<div class="card"><h2>Lid toevoegen</h2><label>Naam<input id="mn" autocomplete="off"></label><label>Status<select id="ms">${S.statuses.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select></label><label>Of een nieuwe status (niet verplicht)<input id="ms2" autocomplete="off" placeholder="bv. schacht"></label><button class="btn" onclick="addM()">Toevoegen</button>
@@ -930,16 +948,48 @@ function catCard(){const c=S.club;
  if(c.gid)return tabCard()+`<div class="card" style="display:none"><h2>Categorieën</h2><p class="mu">De categorieën worden gelezen uit het tabblad ‘${esc(c.catTab)}’ van je spreadsheet (kolom A hoofdcategorieën, kolom B subcategorieën). Pas ze daar aan en tik daarna op Opslaan en nu synchroniseren, of tik bovenaan op de status. Nu: ${S.cats.h.length} hoofd- en ${S.cats.s.length} subcategorieën.</p></div>`;
  return `<div class="card"><h2>Categorieën</h2><p class="mu">Kopieer de kolom met hoofdcategorieën uit je spreadsheet en plak ze in het eerste veld, doe hetzelfde met de subcategorieën in het tweede veld. Eén per regel. Zodra je een spreadsheet koppelt, worden ze daaruit gelezen.</p>
  <label>Hoofdcategorieën<textarea id="ich">${esc(S.cats.h.join('\n'))}</textarea></label><label>Subcategorieën<textarea id="ics">${esc(S.cats.s.join('\n'))}</textarea></label></div>`}
-let TABS=null,TABL=false;const APPT=()=>[TAB_B,TAB_L,TAB_P,TAB_I,TAB_BN,TAB_BF,TAB_U];
+let TABS=null,TABL=false;const APPT=()=>[TAB_B,TAB_L,TAB_P,TAB_I,TAB_BN,TAB_BF,TAB_U,TAB_OV];
 async function loadTabs(){if(TABL||!S.club.gid||!S.club.gok)return;TABL=true;try{const m=await api(`/${S.club.gid}?fields=sheets.properties(title,hidden)`);TABS=(m.sheets||[]).filter(s=>!s.properties.hidden).map(s=>s.properties.title).filter(x=>!APPT().includes(x))}catch(e){TABS=[]}finally{TABL=false}const e=$('#tabc');if(e)e.outerHTML=tabCard()}
 function tabCard(){const c=S.club;if(!TABS){setTimeout(loadTabs,0);return `<div class="card" id="tabc"><h2>Tabbladen uit je spreadsheet</h2><p class="mu">Tabbladen laden…</p></div>`}
  const o=(l,v,none)=>(none?`<option value="">${none}</option>`:'')+[...new Set([v,...l].filter(Boolean))].map(x=>`<option${x===v?' selected':''}>${esc(x)}</option>`).join('');const bk=c.debtTab&&S.bk&&S.bk.tab===c.debtTab?S.bk:null;
  return `<div class="card" id="tabc"><h2>Tabbladen uit je spreadsheet</h2><p class="mu">De app leest deze tabbladen alleen. Ze schrijft er nooit in.</p>
  <label>Categorieën (kolom A hoofd-, kolom B subcategorieën)<select onchange="setTab('cat',this.value)">${o(TABS,c.catTab)}</select></label><p class="mu">Nu: ${S.cats.h.length} hoofd- en ${S.cats.s.length} subcategorieën.</p>
- <label>Bestaande schulden inlezen uit<select onchange="setTab('debt',this.value)">${o(TABS,c.debtTab,'(niet inlezen)')}</select></label>
- ${c.debtTab?`<p class="${bk&&bk.err?'err':'mu'}">${bk?esc(bk.err||('Gevonden: '+bk.info+'.')):'Wordt gelezen bij de volgende synchronisatie.'}</p>`:'<p class="mu">Kies het tabblad met je schuldenlijst. De app zoekt zelf de tabel: een kopregel met een naam (bv. Clubnaam) en bedragen (bv. Te betalen, Betaald, Saldo). Een vinkje zoals Oke? betekent dat de lijn in orde is.</p>'}
- <button class="btn ghost" onclick="TABS=null;LASTPULL=0;sync(true).then(()=>render())">Opnieuw lezen</button></div>`}
-function setTab(k,v){const c=S.club;if(k==='cat'){if(!v)return;c.catTab=v;ENS=''}else{c.debtTab=v;S.bk=null}c.setDirty=true;save();LASTPULL=0;sync(true).then(()=>{if(tab==='inst')render()})}
+ <h3 style="margin:14px 0 4px">Bestaande schulden overnemen</h3><p class="mu">Eenmalig: de app neemt de openstaande schulden uit je oude schuldenlijst over. Daarna houd je schulden alleen nog in de app bij. Je oude tabblad blijft onaangeroerd.${c.bkImp?` Al eens overgenomen op ${new Date(c.bkImp).toLocaleDateString('nl-BE')}.`:''}</p>
+ <label>Tabblad met je schuldenlijst<select onchange="setTab('debt',this.value)">${o(TABS,c.debtTab,'(kies een tabblad)')}</select></label>
+ ${c.debtTab?(bk?(bk.err?`<p class="err">${esc(bk.err)}</p>`:bkPrev(bk)):'<p class="mu">Lezen…</p>'):''}
+ <button class="btn ghost" style="margin-top:8px" onclick="TABS=null;render()">Tabbladen opnieuw laden</button></div>`}
+function bkPlan(bk){const by={};bk.lines.filter(l=>!l.ok).forEach(l=>{const k=uk(l.name);(by[k]=by[k]||{name:l.name,st:l.st,lines:[],bal:0}).lines.push(l);by[k].bal+=l.bal});
+ const plan=[];Object.values(by).forEach(o=>{let target=o.bal;if(bk.sum){const k=Object.keys(bk.sum).find(x=>uk(x)===uk(o.name));if(k!=null)target=bk.sum[k]}
+  const ls=o.lines.filter(l=>l.bal>0).sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(l=>({l,v:l.bal}));let red=Math.round((ls.reduce((a,x)=>a+x.v,0)-Math.max(0,target))*100)/100;
+  for(const x of ls){if(red<=.005)break;const r=Math.min(red,x.v);x.v=Math.round((x.v-r)*100)/100;red=Math.round((red-r)*100)/100}
+  ls.filter(x=>x.v>.005).forEach(x=>plan.push({name:o.name,st:o.st||(bk.sst||{})[o.name]||'',l:x.l,v:x.v}))});return plan}
+function bkPrev(bk){const pl=bkPlan(bk),n=new Set(pl.map(x=>uk(x.name))).size,tot=pl.reduce((a,x)=>a+x.v,0);
+ return `<p class="mu">Gevonden: ${esc(bk.info)}.</p><div class="stat" style="margin:8px 0"><span class="mu">Over te nemen</span><b>${eur(tot)}</b><span class="mu">${pl.length} openstaande ${pl.length===1?'schuld':'schulden'} bij ${n} ${n===1?'lid':'leden'}${bk.sum?', afgestemd op je overzicht per lid':''}</span></div><button class="btn" onclick="bkImport()">Overnemen in de app</button>`}
+function bkImport(){if(role!=='q'||!S.bk||S.bk.err)return;const pl=bkPlan(S.bk);if(!pl.length)return toast('Er zijn geen openstaande schulden om over te nemen');
+ const go=()=>{let n=0,sk0=0,nm=0;const now=Date.now(),ex={},key=(nm,d,v)=>uk(nm)+'|'+d+'|'+(+v).toFixed(2);S.tx.filter(t=>t.method==='schuld'&&!t.void&&!t.storno&&t.v>0).forEach(t=>{const k=key(t.name,t.date,t.v);ex[k]=(ex[k]||0)+1});
+  pl.forEach((x,i)=>{const date=x.l.date||today(),k=key(x.name,date,x.v);if(ex[k]>0){ex[k]--;sk0++;return}
+   let m=S.members.find(y=>uk(y.name)===uk(x.name));if(!m){m={id:uid(),name:x.name,status:addSt(x.st)||S.statuses[0],dirty:true};S.members.push(m);nm++}
+   S.tx.push({who:WHO,id:uid(),ts:now+i,date,mid:m.id,name:m.name,v:x.v,method:'schuld',h:x.l.h||'',s:x.l.s||'',desc:x.l.desc||'Schuld uit vorige schuldenlijst',by:'q',chk:true,void:false,synced:false});n++});
+  Object.assign(S.club,{bkImp:Date.now(),debtTab:'',setDirty:true});S.bk=null;relink();save();render();queueSync();
+  toast(`${n} schulden overgenomen`+(nm?`, ${nm} nieuwe leden`:'')+(sk0?`, ${sk0} stonden er al`:''))};
+ ask(`${pl.length} openstaande schulden (${eur(pl.reduce((a,x)=>a+x.v,0))}) overnemen in de app? Daarna houd je schulden alleen nog in de app bij. Je oude tabblad verandert niet.`+(S.club.bkImp?' Let op: je deed dit al eens. Schulden die al in de app staan, worden overgeslagen.':''),'Overnemen',go)}
+function limCard(){const c=S.club,L=c.lim||{};return `<div class="card"><h2>Schuldbeleid per status</h2><p class="mu">Hoeveel schuld mag een lid hebben? Leeg = geen limiet. 0 = moet afbetalen. Boven de limiet krijgt het lid een waarschuwing bij Schulden.</p>${S.statuses.map((s,i)=>{const k=Object.keys(L).find(x=>sk(x)===sk(s)),v=k!=null?L[k]:(/oud/i.test(s)?0:'');return `<label>${esc(s)}<input inputmode="decimal" data-s="${esc(s)}" value="${v===''||v==null?'':fmt2(v)}" placeholder="geen limiet" onchange="setLim(this.dataset.s,this.value)"></label>`}).join('')}</div>`}
+function setLim(s,v){if(role!=='q')return;const c=S.club;c.lim=Object.assign({},c.lim);const n=String(v).trim()===''?'':pamt(v);c.lim[s]=n==null?'':n;c.setDirty=true;save();queueSync();toast('Opgeslagen')}
+let OVH='';
+async function pushOverview(){const c=S.club;if(!c.gid||!c.gok||!c.bkImp&&!S.tx.some(t=>t.method==='schuld'))return;
+ const fd=d=>d?d.split('-').reverse().join('/'):'';const D=Object.values(debts()).sort((a,b)=>a.name.localeCompare(b.name));
+ const all={};S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno).forEach(t=>{const k=uk(t.name);(all[k]=all[k]||{name:t.name,due:0,paid:0}).due+=t.v;all[k].paid+=(t.paid||0)});
+ const sumRows=Object.values(all).sort((a,b)=>a.name.localeCompare(b.name)).map(o=>[o.name,stOf(o.name),Math.round(o.due*100)/100,Math.round(o.paid*100)/100,Math.round((o.due-o.paid)*100)/100]);
+ const lineRows=[];D.forEach(o=>o.debts.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(d=>lineRows.push([fd(d.date),o.name,o.st,d.desc||'',d.h||'',d.s||'',d.v,d.paid||0,rem(d),d.chk?'Ja':''])));
+ const head=['Openstaande schulden (automatisch bijgehouden door de app, niet aanpassen)'],H1=['Datum','Clubnaam','Status','Omschrijving','Hoofdcategorie','Subcategorie','Bedrag','Betaald','Openstaand','Gecontroleerd'],H2=['Clubnaam','Status','Totaal verschuldigd','Totaal betaald','Openstaand'];
+ const n=Math.max(lineRows.length,sumRows.length),vals=[head.concat(Array(11).fill('')),Array(16).fill(''),H1.concat(['']).concat(H2)];
+ for(let i=0;i<n;i++)vals.push((lineRows[i]||Array(10).fill('')).concat(['']).concat(sumRows[i]||Array(5).fill('')));
+ const h=JSON.stringify(vals);if(h===OVH)return;
+ const m=await api(`/${c.gid}?fields=sheets.properties.title`);if(!(m.sheets||[]).some(s=>s.properties.title===TAB_OV))await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:TAB_OV}}}]})});
+ await api(`/${c.gid}/values/${enc(rng(TAB_OV,'A1:Z'))}:clear`,{method:'POST',body:'{}'});
+ await api(`/${c.gid}/values/${enc(rng(TAB_OV,'A1'))}?valueInputOption=RAW`,{method:'PUT',body:JSON.stringify({values:vals})});OVH=h}
+function setTab(k,v){const c=S.club;if(k==='cat'){if(!v)return;c.catTab=v;ENS='';c.setDirty=true;save();LASTPULL=0;return sync(true).then(()=>{if(tab==='inst')render()})}
+ c.debtTab=v;S.bk=null;save();if(!v)return render();render();(async()=>{try{SI=true;await loadBk()}catch(e){S.bk={tab:v,lines:[],sum:null,err:e.message||'Lezen lukte niet'}}finally{SI=false}if(tab==='inst'){const e=$('#tabc');if(e)e.outerHTML=tabCard()}})()}
 function statCard(){return `<div class="card"><h2>Ledenstatussen</h2><p class="mu">Eén status per regel, bijvoorbeeld schacht, actief student of oud student. Statussen die nog in gebruik zijn, blijven staan. Typ je in de spreadsheet een nieuwe status in het tabblad Leden, dan voegt de app ze zelf toe.</p><label>Statussen<textarea id="ist">${esc(S.statuses.join('\n'))}</textarea></label></div>`}
 function prCard(){const n=S.prices.length;return `<div class="card"><h2>Prijzen per ledenstatus</h2><p class="mu">Stel per categorie een bedrag in voor elke ledenstatus. Bij een boeking vult de app het bedrag zelf in.${S.club.gid?' De prijzen staan ook in het tabblad Prijzen van je spreadsheet. Je kan ze daar ook aanpassen.':''} Nu: ${n} ${n===1?'rij':'rijen'}.</p><button class="btn ghost" onclick="prEdit()">Prijzen bewerken</button></div>`}
 let PE=[];
@@ -967,7 +1017,7 @@ function wipeTx(){const n=S.tx.length,u=S.tx.filter(t=>!t.synced).length,g=S.clu
 function wipeTxSheet(){if(role!=='q')return;modal(`<h3>Ook uit de spreadsheet wissen</h3><p>Alle rijen in het tabblad Boekingen verdwijnen voor iedereen. Dit is niet ongedaan te maken in de app. Typ WISSEN om te bevestigen.</p><input id="wc2" autocomplete="off"><button class="btn" style="margin-top:10px" onclick="wipeTxSheetOk()">Definitief wissen</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
 function wipeTxSheetOk(){if(($('#wc2').value||'').trim().toUpperCase()!=='WISSEN')return toast('Typ WISSEN om te bevestigen');wipeTxGo(true)}
 async function wipeTxGo(sheet){if(role!=='q')return;closeM();
- if(sheet){SI=true;try{await api(`/${S.club.gid}/values/${enc(rng(TAB_B,'A2:N'))}:clear`,{method:'POST',body:'{}'})}catch(e){SI=false;return toast(e.message||'Wissen in de spreadsheet is niet gelukt')}SI=false}
+ if(sheet){SI=true;try{await api(`/${S.club.gid}/values/${enc(rng(TAB_B,'A2:O'))}:clear`,{method:'POST',body:'{}'})}catch(e){SI=false;return toast(e.message||'Wissen in de spreadsheet is niet gelukt')}SI=false}
  S.tx=[];S.club.wipeTs=Date.now();save();render();toast(sheet?'Boekingen gewist, ook in de spreadsheet':'Boekingen gewist op dit toestel')}
 function wipeMem(){const g=S.club.gid&&S.club.gok;
  ask('De ledenlijst leegmaken?'+(g?' Ook de lijst in het tabblad Leden van je spreadsheet wordt leeggemaakt, anders komt ze terug.':'')+' Bestaande boekingen blijven staan.','Leegmaken',async()=>{
@@ -1003,7 +1053,7 @@ function vInst(){const c=S.club;
  <label style="margin-top:12px">Weergave<select id="it2"><option value="auto"${c.theme==='auto'?' selected':''}>Volgt je toestel</option><option value="light"${c.theme==='light'?' selected':''}>Licht</option><option value="dark"${c.theme==='dark'?' selected':''}>Donker</option></select></label></div>
  ${accCard()}${USER?'':`<div class="card"><h2>Jouw naam</h2><label>Naam van de Quaestor<input id="iw" value="${esc(c.names.q)}"></label><label>Naam vragen bij elke keer inloggen<select id="ia"><option value="0">Nee</option><option value="1"${c.askName?' selected':''}>Ja, handig als meerdere mensen dit toestel gebruiken</option></select></label></div>`}
  ${legacyPins()||!USER?`<div class="card"><h2>Pincodes</h2><label>Pincode Quaestor<input id="iq" type="password" inputmode="numeric" value="${esc(c.pinQ)}" placeholder="${c.pinQh&&!c.pinQ?'(ongewijzigd)':''}"></label><label>Pincode Helper<input id="ih" type="password" inputmode="numeric" value="${esc(c.pinH)}" placeholder="${c.pinHh&&!c.pinH?'(ongewijzigd)':''}"></label>${c.pinMe?`<label>Jouw eigen pincode op dit toestel<input id="ime" type="password" inputmode="numeric" value="${esc(c.pinMe)}"></label><p class="mu">Je werd gepromoveerd tot Quaestor. Je meldt je aan met je eigen pincode. De Quaestorpincode hierboven is die van de club.</p>`:''}</div>`:''}
- ${catCard()}${statCard()}${prCard()}${gCard()}${invCard()}
+ ${catCard()}${statCard()}${limCard()}${prCard()}${gCard()}${invCard()}
  <div class="card"><h2>Accounts</h2><p class="mu">Zie welke toestellen als Quaestor of helper toegang hebben tot deze club. Trek toegang in, geef ze terug of verwijder een toestel.</p><button class="btn ghost" onclick="accOpen()">Accounts beheren</button></div>
  </div>
  <div class="card" style="margin-top:12px"><h2>Back-up</h2><button class="btn ghost" onclick="showT('Boekingen als csv',csv())">Boekingen kopiëren (csv)</button><button class="btn ghost" style="margin-top:8px" onclick="showT('Volledige back-up',JSON.stringify(S))">Volledige back-up kopiëren</button><button class="btn ghost" style="margin-top:8px" onclick="restore()">Back-up terugzetten</button></div>
