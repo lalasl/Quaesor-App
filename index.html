@@ -108,7 +108,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='35';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='36';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -411,7 +411,7 @@ async function sync(manual,force){
   if(S.club.closed&&!ISDEV){try{await pushTx()}catch(e){}LASTPULL=Date.now();setTimeout(closedGo,0);return}
   if(accCheck()){try{await pushTx()}catch(e){}LASTPULL=Date.now();S.sync.last=Date.now();S.sync.err='';save();setTimeout(blockAfter,0);return}
   changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;changed=await syncBons(true)||changed;LASTPULL=Date.now()}
-  await pushTx();await pushChk();if(role==='q')try{await pushOverview()}catch(e){if(e.auth)throw e}
+  await pushTx();await pushChk();if(role==='q'){try{await pushOverview()}catch(e){if(e.auth)throw e}try{await fmtSheets()}catch(e){if(e.auth)throw e;console.warn('Opmaak',e)}}
   if(S.bons.some(b=>!b.synced||b.dirty))changed=await syncBons(false)||changed;
   try{await accPing()}catch(e){if(e.auth)throw e}
   S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;S.sync.pick=false;save();
@@ -808,7 +808,7 @@ async function bonFetch(id){const g=S.club.gid;if(!g||!S.club.gok)throw new Erro
 async function bonTabs(){const g=S.club.gid,m=await api(`/${g}?fields=sheets.properties.title`),ti=(m.sheets||[]).map(s=>s.properties.title),rq=[];
  if(!ti.includes(TAB_BN))rq.push({addSheet:{properties:{title:TAB_BN}}});if(!ti.includes(TAB_BF))rq.push({addSheet:{properties:{title:TAB_BF,hidden:true}}});
  if(rq.length)await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:rq})});
- await head(TAB_BN,HEAD_BN);await head(TAB_BF,['ID','Foto (gebruikt door de app, niet aanpassen)']);S.club.bonTab=true;save()}
+ await head(TAB_BN,HEAD_BN);await head(TAB_BF,['ID','Foto (gebruikt door de app, niet aanpassen)']);S.club.bonTab=true;S.club.fmtK='';save()}
 const bonRow=b=>["'"+b.id,b.date,cell(b.shop),b.total,cell(b.items),cell(b.desc),cell(b.who),"'"+new Date(b.ts).toISOString(),b.status,b.txid?"'"+b.txid:'',cell(b.adv||'')];
 async function syncBons(pull){const c=S.club,g=c.gid;let ch=false;
  const nw=S.bons.filter(b=>!b.synced);
@@ -1043,16 +1043,57 @@ function bkImport(){if(role!=='q'||!S.bk||S.bk.err)return;const pl=bkPlan(S.bk);
 function limCard(){const c=S.club,L=c.lim||{};return `<div class="card"><h2>Schuldbeleid per status</h2><p class="mu">Hoeveel schuld mag een lid hebben? Leeg = geen limiet. 0 = moet afbetalen. Boven de limiet krijgt het lid een waarschuwing bij Schulden.</p>${S.statuses.map((s,i)=>{const k=Object.keys(L).find(x=>sk(x)===sk(s)),v=k!=null?L[k]:(/oud/i.test(s)?0:'');return `<label>${esc(s)}<input inputmode="decimal" data-s="${esc(s)}" value="${v===''||v==null?'':fmt2(v)}" placeholder="geen limiet" onchange="setLim(this.dataset.s,this.value)"></label>`}).join('')}</div>`}
 function setLim(s,v){if(role!=='q')return;const c=S.club;c.lim=Object.assign({},c.lim);const n=String(v).trim()===''?'':pamt(v);c.lim[s]=n==null?'':n;c.setDirty=true;save();queueSync();toast('Opgeslagen')}
 let OVH='';
+/* ---------- opmaak van de tabbladen ---------- */
+const FMT_V='1';
+async function fmtSheets(){const c=S.club;if(role!=='q'||!c.gid||!c.gok)return;const key=c.gid+'|'+FMT_V+'|'+c.color;if(c.fmtK===key||(c.fmtFail&&Date.now()-c.fmtFail<36e5))return;
+ const m=await api(`/${c.gid}?fields=sheets(properties(sheetId,title),bandedRanges(bandedRangeId),conditionalFormats(ranges))`),SH={};(m.sheets||[]).forEach(x=>SH[x.properties.title]=x);
+ const rgb=h=>{h=String(h||'#8B1E3F').replace('#','');return{red:parseInt(h.slice(0,2),16)/255,green:parseInt(h.slice(2,4),16)/255,blue:parseInt(h.slice(4,6),16)/255}};
+ const AC=rgb(c.color),TI={red:AC.red+(1-AC.red)*.86,green:AC.green+(1-AC.green)*.86,blue:AC.blue+(1-AC.blue)*.86},WH={red:1,green:1,blue:1},ZG=rgb('#F6F7F9'),GR=rgb('#8A8F99'),RD=rgb('#9B1C1C'),RB=rgb('#FBE3E3'),GN=rgb('#1E6B3A'),GB=rgb('#E2F3E8'),AM=rgb('#FDF0E1'),AT=rgb('#6B4A12');
+ const EUR={type:'CURRENCY',pattern:'"€ "#,##0.00;[Red]"-€ "#,##0.00'},DAT={type:'DATE',pattern:'dd/mm/yyyy'},TXT={type:'TEXT'};
+ const R=[],G=(id,r0,r1,c0,c1)=>{const g={sheetId:id};if(r0!=null)g.startRowIndex=r0;if(r1!=null)g.endRowIndex=r1;if(c0!=null)g.startColumnIndex=c0;if(c1!=null)g.endColumnIndex=c1;return g};
+ const fmt=(g,f,fields)=>R.push({repeatCell:{range:g,cell:{userEnteredFormat:f},fields:'userEnteredFormat('+fields+')'}});
+ const cond=(g,b,f)=>R.push({addConditionalFormatRule:{rule:{ranges:[g],booleanRule:{condition:b,format:f}},index:0}});
+ const formula=v=>({type:'CUSTOM_FORMULA',values:[{userEnteredValue:v}]});
+ const base=(t,o)=>{const x=SH[t];if(!x)return null;const id=x.properties.sheetId;
+  (x.bandedRanges||[]).forEach(b=>R.push({deleteBanding:{bandedRangeId:b.bandedRangeId}}));for(let i=(x.conditionalFormats||[]).length-1;i>=0;i--)R.push({deleteConditionalFormatRule:{sheetId:id,index:i}});
+  R.push({updateSheetProperties:{properties:{sheetId:id,tabColor:AC,gridProperties:{frozenRowCount:o.frz||1}},fields:'tabColor,gridProperties.frozenRowCount'}});
+  o.w.forEach((w,i)=>R.push({updateDimensionProperties:{range:{sheetId:id,dimension:'COLUMNS',startIndex:i,endIndex:i+1},properties:{pixelSize:w,hiddenByUser:(o.hide||[]).includes(i)},fields:'pixelSize,hiddenByUser'}}));
+  R.push({updateDimensionProperties:{range:{sheetId:id,dimension:'ROWS',startIndex:0,endIndex:o.frz||1},properties:{pixelSize:32},fields:'pixelSize'}});
+  fmt(G(id,1,null,0,o.w.length),{verticalAlignment:'MIDDLE',textFormat:{fontSize:10}},'verticalAlignment,textFormat.fontSize');
+  if(!o.ov){fmt(G(id,0,1,0,o.w.length),{backgroundColor:AC,textFormat:{bold:true,foregroundColor:WH,fontSize:10},verticalAlignment:'MIDDLE',wrapStrategy:'CLIP'},'backgroundColor,textFormat,verticalAlignment,wrapStrategy');
+   R.push({addBanding:{bandedRange:{range:G(id,0,null,0,o.w.length),rowProperties:{headerColor:AC,firstBandColor:WH,secondBandColor:ZG}}}})}
+  Object.entries(o.num||{}).forEach(([j,f])=>fmt(G(id,1,null,+j,+j+1),{numberFormat:f},'numberFormat'));return id};
+ let id=base(TAB_B,{w:[80,90,120,190,120,120,110,90,95,90,120,150,70,130,105],hide:[0,9,11,12],num:{1:DAT,7:EUR}});
+ if(id!=null){cond(G(id,1,null,0,15),formula('=$I2="Storno"'),{textFormat:{foregroundColor:GR,italic:true}});
+  cond(G(id,1,null,6,7),{type:'TEXT_EQ',values:[{userEnteredValue:M.schuld}]},{textFormat:{foregroundColor:AT,bold:true},backgroundColor:AM});
+  cond(G(id,1,null,14,15),{type:'TEXT_EQ',values:[{userEnteredValue:'Ja'}]},{textFormat:{foregroundColor:GN,bold:true}})}
+ id=base(TAB_L,{w:[160,130,140,150],num:{2:TXT}});
+ const ph=SH[TAB_P]?Math.max(5,S.statuses.length+2):5;id=base(TAB_P,{w:[150,150].concat(Array(ph-2).fill(110)),num:Object.fromEntries(Array.from({length:ph-2},(_,i)=>[i+2,EUR]))});
+ id=base(TAB_BN,{w:[80,90,150,90,260,200,130,150,100,90,140],hide:[0,7,9],num:{1:DAT,3:EUR}});
+ if(id!=null){cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Nieuw'}]},{backgroundColor:AM,textFormat:{foregroundColor:AT,bold:true}});
+  cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Ingeboekt'}]},{textFormat:{foregroundColor:GN,bold:true}});
+  cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Afgewezen'}]},{textFormat:{foregroundColor:GR,italic:true}})}
+ id=base(TAB_OV,{ov:1,frz:2,w:[90,110,110,200,120,120,85,85,95,105,24,110,110,105,95,105],num:{6:EUR,7:EUR,8:EUR,13:EUR,14:EUR,15:EUR}});
+ if(id!=null){R.push({unmergeCells:{range:G(id,0,1,0,16)}},{mergeCells:{range:G(id,0,1,0,10),mergeType:'MERGE_ALL'}},{mergeCells:{range:G(id,0,1,11,16),mergeType:'MERGE_ALL'}});
+  [[0,10],[11,16]].forEach(([a,b])=>{fmt(G(id,0,1,a,b),{backgroundColor:AC,textFormat:{bold:true,foregroundColor:WH,fontSize:11},verticalAlignment:'MIDDLE'},'backgroundColor,textFormat,verticalAlignment');
+   fmt(G(id,1,2,a,b),{backgroundColor:TI,textFormat:{bold:true,fontSize:10},verticalAlignment:'MIDDLE'},'backgroundColor,textFormat,verticalAlignment');
+   R.push({addBanding:{bandedRange:{range:G(id,1,null,a,b),rowProperties:{headerColor:TI,firstBandColor:WH,secondBandColor:ZG}}}})});
+  fmt(G(id,0,null,10,11),{backgroundColor:WH},'backgroundColor');
+  cond(G(id,2,null,8,9),{type:'NUMBER_GREATER',values:[{userEnteredValue:'0'}]},{textFormat:{foregroundColor:RD,bold:true}});
+  cond(G(id,2,null,15,16),{type:'NUMBER_GREATER',values:[{userEnteredValue:'0'}]},{backgroundColor:RB,textFormat:{foregroundColor:RD,bold:true}});
+  cond(G(id,2,null,15,16),formula('=AND(P3<>"",P3=0)'),{backgroundColor:GB,textFormat:{foregroundColor:GN,bold:true}});
+  cond(G(id,2,null,9,10),{type:'TEXT_EQ',values:[{userEnteredValue:'Ja'}]},{textFormat:{foregroundColor:GN,bold:true}})}
+ try{if(R.length)await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:R})})}catch(e){if(!e.auth){c.fmtFail=Date.now();save()}throw e}c.fmtK=key;c.fmtFail=0;save()}
 async function pushOverview(){const c=S.club;if(!c.gid||!c.gok||!c.bkImp&&!S.tx.some(t=>t.method==='schuld'))return;
  const fd=d=>d?d.split('-').reverse().join('/'):'';const D=Object.values(debts()).sort((a,b)=>a.name.localeCompare(b.name));
  const all={};S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno).forEach(t=>{const k=uk(t.name);(all[k]=all[k]||{name:t.name,due:0,paid:0}).due+=t.v;all[k].paid+=(t.paid||0)});
- const sumRows=Object.values(all).sort((a,b)=>a.name.localeCompare(b.name)).map(o=>[o.name,stOf(o.name),Math.round(o.due*100)/100,Math.round(o.paid*100)/100,Math.round((o.due-o.paid)*100)/100]);
+ const sumRows=Object.values(all).sort((a,b)=>(b.due-b.paid)-(a.due-a.paid)||a.name.localeCompare(b.name)).map(o=>[o.name,stOf(o.name),Math.round(o.due*100)/100,Math.round(o.paid*100)/100,Math.round((o.due-o.paid)*100)/100]);
  const lineRows=[];D.forEach(o=>o.debts.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(d=>lineRows.push([fd(d.date),o.name,o.st,d.desc||'',d.h||'',d.s||'',d.v,d.paid||0,rem(d),d.chk?'Ja':''])));
- const head=['Openstaande schulden (automatisch bijgehouden door de app, niet aanpassen)'],H1=['Datum','Clubnaam','Status','Omschrijving','Hoofdcategorie','Subcategorie','Bedrag','Betaald','Openstaand','Gecontroleerd'],H2=['Clubnaam','Status','Totaal verschuldigd','Totaal betaald','Openstaand'];
- const n=Math.max(lineRows.length,sumRows.length),vals=[head.concat(Array(11).fill('')),Array(16).fill(''),H1.concat(['']).concat(H2)];
+ const H1=['Datum','Clubnaam','Status','Omschrijving','Categorie','Subcategorie','Bedrag','Betaald','Openstaand','Gecontroleerd'],H2=['Clubnaam','Status','Totaal schuld','Al betaald','Openstaand'];
+ const n=Math.max(lineRows.length,sumRows.length),vals=[['Openstaande schulden per lijn (bijgehouden door de app, niet aanpassen)'].concat(Array(10).fill('')).concat(['Overzicht per lid','','','','']),H1.concat(['']).concat(H2)];
  for(let i=0;i<n;i++)vals.push((lineRows[i]||Array(10).fill('')).concat(['']).concat(sumRows[i]||Array(5).fill('')));
  const h=JSON.stringify(vals);if(h===OVH)return;
- const m=await api(`/${c.gid}?fields=sheets.properties.title`);if(!(m.sheets||[]).some(s=>s.properties.title===TAB_OV))await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:TAB_OV}}}]})});
+ const m=await api(`/${c.gid}?fields=sheets.properties.title`);if(!(m.sheets||[]).some(s=>s.properties.title===TAB_OV)){await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:TAB_OV}}}]})});c.fmtK=''}
  await api(`/${c.gid}/values/${enc(rng(TAB_OV,'A1:Z'))}:clear`,{method:'POST',body:'{}'});
  await api(`/${c.gid}/values/${enc(rng(TAB_OV,'A1'))}?valueInputOption=RAW`,{method:'PUT',body:JSON.stringify({values:vals})});OVH=h}
 function setTab(k,v){const c=S.club;if(k==='cat'){if(!v)return;c.catTab=v;ENS='';c.setDirty=true;save();LASTPULL=0;return sync(true).then(()=>{if(tab==='inst')render()})}
