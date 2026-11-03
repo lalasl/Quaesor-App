@@ -111,7 +111,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='45',APP_LABEL='1.2';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='47',APP_LABEL='1.3.1';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -265,8 +265,8 @@ async function ensureSheet(){const c=S.club;let created=[];
   if(need.length)await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:need.map(t=>({addSheet:{properties:{title:t}}}))})});
   created=need.filter(t=>t===c.catTab)}
  await head(TAB_B,HEAD_B);await rolCol();await advCol();await chkCol();await head(TAB_L,['Naam','Status']);await lCol()}
-async function lCol(){const u=`/${S.club.gid}/values/${enc(rng(TAB_L,'C1:D1'))}`,d=await api(u),v=(d.values||[])[0]||[];
- if(!String(v[0]||'').trim()||!String(v[1]||'').trim())await api(u+'?valueInputOption=RAW',{method:'PUT',body:JSON.stringify({values:[[String(v[0]||'').trim()||'Telefoon',String(v[1]||'').trim()||'Herinnerd']]})})}
+async function lCol(){const u=`/${S.club.gid}/values/${enc(rng(TAB_L,'C1:E1'))}`,d=await api(u),v=(d.values||[])[0]||[];
+ if(!String(v[0]||'').trim()||!String(v[1]||'').trim()||!String(v[2]||'').trim())await api(u+'?valueInputOption=RAW',{method:'PUT',body:JSON.stringify({values:[[String(v[0]||'').trim()||'Telefoon',String(v[1]||'').trim()||'Herinnerd',String(v[2]||'').trim()||'ID (niet aanpassen)']]})})}
 async function chkCol(){const u=`/${S.club.gid}/values/${enc(rng(TAB_B,'O1'))}`,d=await api(u);
  if(!(d.values&&d.values[0]&&String(d.values[0][0]||'').trim()))await api(u+'?valueInputOption=RAW',{method:'PUT',body:JSON.stringify({values:[['Gecontroleerd']]})})}
 async function advCol(){const u=`/${S.club.gid}/values/${enc(rng(TAB_B,'N1'))}`,d=await api(u);
@@ -362,20 +362,24 @@ async function syncMembers(){const gid=S.club.gid;
   if(del.length){const mt=await api(`/${gid}?fields=sheets.properties(sheetId,title)`),sh=(mt.sheets||[]).find(x=>x.properties.title===TAB_L);
    if(sh)await api(`/${gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:del.sort((x,y)=>y-x).map(i=>({deleteDimension:{range:{sheetId:sh.properties.sheetId,dimension:'ROWS',startIndex:i+1,endIndex:i+2}}}))})})}
   S.delM=[];save()}
- const d=await api(`/${gid}/values/${enc(rng(TAB_L,'A2:D'))}`),rows=d.values||[],idx=new Map();let changed=false;
- rows.forEach((r,i)=>{const n=String(r[0]||'').trim();if(n&&!idx.has(n.toLowerCase()))idx.set(n.toLowerCase(),{row:i+2,st:cleanSt(r[1]),tel:String(r[2]==null?'':r[2]).trim(),rem:remParse(r[3])})});
- const upd=[],out=[],mine=new Set(),gone=new Set();
+ const d=await api(`/${gid}/values/${enc(rng(TAB_L,'A2:E'))}`),rows=d.values||[],idx=new Map();let changed=false;const upd=[],out=[],mine=new Set(),gone=new Set();
+ /* Kolom E bevat het vaste ID van elk lid. Zo herkent de app een clubnaam die in de spreadsheet werd aangepast als hetzelfde lid. */
+ const byId=new Map(S.members.map(m=>[m.id,m]));
+ rows.forEach((r,i)=>{const n=String(r[0]||'').trim(),id=String(r[4]==null?'':r[4]).trim(),m=id&&byId.get(id);if(!n||!m||m.ren||uk(m.name)===uk(n))return;
+  if(S.members.some(x=>x!==m&&uk(x.name)===uk(n)))return;renameM(m,n);changed=true});
+ rows.forEach((r,i)=>{const n=String(r[0]||'').trim();if(n&&!idx.has(n.toLowerCase()))idx.set(n.toLowerCase(),{row:i+2,st:cleanSt(r[1]),tel:String(r[2]==null?'':r[2]).trim(),rem:remParse(r[3]),id:String(r[4]==null?'':r[4]).trim()})});
+ S.members.forEach(m=>{if(!m.ren)return;const e=idx.get(m.ren.toLowerCase());if(e&&!idx.has(m.name.toLowerCase())){upd.push({range:rng(TAB_L,'A'+e.row),values:[[m.name]]});idx.delete(m.ren.toLowerCase());idx.set(m.name.toLowerCase(),e);rows[e.row-2][0]=m.name}delete m.ren});
  S.members.forEach(m=>{const k=m.name.toLowerCase();mine.add(k);const e=idx.get(k);
   if(!e){if(m.on&&!m.dirty){gone.add(m.id);return}out.push(m);m.dirty=false;m.on=true;return}
-  m.on=true;
+  m.on=true;if(!e.id)upd.push({range:rng(TAB_L,'E'+e.row),values:[[m.id]]});else if(e.id!==m.id&&!byId.has(e.id)){const old=m.id;byId.delete(old);m.id=e.id;byId.set(m.id,m);S.tx.forEach(t=>{if(t.mid===old)t.mid=m.id});if(B.mid===old)B.mid=m.id;changed=true}
   if(m.telDirty){upd.push({range:rng(TAB_L,'C'+e.row),values:[[m.tel||'']]});m.telDirty=false}else if((m.tel||'')!==e.tel){m.tel=e.tel;changed=true}
   if(m.remDirty){upd.push({range:rng(TAB_L,'D'+e.row),values:[[remStr(m.rem)]]});m.remDirty=false}else if(JSON.stringify(m.rem||null)!==JSON.stringify(e.rem)){m.rem=e.rem;changed=true}
   if(m.dirty){if(sk(e.st)!==sk(m.status))upd.push({range:rng(TAB_L,'B'+e.row),values:[[m.status]]});m.dirty=false}
   else if(e.st&&sk(e.st)!==sk(m.status)){m.status=addSt(e.st);changed=true}});
  if(gone.size){S.members=S.members.filter(m=>!gone.has(m.id));changed=true}
- idx.forEach((e,k)=>{if(mine.has(k))return;const n=String(rows[e.row-2][0]).trim();S.members.push({id:uid(),name:n,status:e.st?addSt(e.st):S.statuses[0],on:true,tel:e.tel,rem:e.rem});changed=true});
+ idx.forEach((e,k)=>{if(mine.has(k))return;const n=String(rows[e.row-2][0]).trim(),id=e.id&&!byId.has(e.id)?e.id:uid();if(id!==e.id)upd.push({range:rng(TAB_L,'E'+e.row),values:[[id]]});S.members.push({id,name:n,status:e.st?addSt(e.st):S.statuses[0],on:true,tel:e.tel,rem:e.rem});changed=true});
  if(upd.length)await api(`/${gid}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data:upd})});
- if(out.length){await append(TAB_L,'A:D',out.map(m=>[cell(m.name),cell(m.status),m.tel||'',remStr(m.rem)]));out.forEach(m=>{m.telDirty=false;m.remDirty=false})}
+ if(out.length){await append(TAB_L,'A:E',out.map(m=>[cell(m.name),cell(m.status),m.tel||'',remStr(m.rem),m.id]));out.forEach(m=>{m.telDirty=false;m.remDirty=false})}
  save();return changed}
 const pnum=v=>{if(v===''||v==null)return null;const n=typeof v==='number'?v:parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null};
 async function hasTab(t){const m=await api(`/${S.club.gid}?fields=sheets.properties.title`);return (m.sheets||[]).some(x=>x.properties.title===t)}
@@ -405,7 +409,7 @@ async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(T
  const mem=new Map(S.members.map(m=>[m.name.toLowerCase(),m.id]));
  const inSheet=new Set();
  const RM=new Set(c.rmIds||[]);if(RM.size){const n0=S.tx.length;S.tx=S.tx.filter(t=>!RM.has(t.id));if(S.tx.length!==n0){chg=true;have.clear();S.tx.forEach(t=>have.add(t.id))}}
- (d.values||[]).forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(RM.has(id))return;if(id)inSheet.add(id);if(!id)return;if(have.has(id)){const x=byId.get(id);if(x&&!x.chkD){const k=/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim());if(!!x.chk!==k){x.chk=k;chg=true}}return}
+ (d.values||[]).forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(RM.has(id))return;if(id)inSheet.add(id);if(!id)return;if(have.has(id)){const x=byId.get(id);{const nm=String(r[2]||'').trim();if(x&&nm&&!x.renD&&!x.exp&&nm!==x.name){x.name=nm;const mm=S.members.find(z=>uk(z.name)===uk(nm));if(mm)x.mid=mm.id;chg=true}}if(x&&!x.chkD){const k=/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim());if(!!x.chk!==k){x.chk=k;chg=true}}return}
   const v=pnum(r[7]);if(v==null)return;const date=toDate(r[1]),ts=toTs(String(r[11]||'').replace(/^'/,'')||r[11],date);
   if(c.wipeTs&&ts<c.wipeTs)return;const meth=REV[String(r[6]||'').trim().toLowerCase()];if(!meth)return;
   const k=String(r[10]||'').trim(),typ=String(r[8]||'').trim().toLowerCase(),ref=String(r[9]==null?'':r[9]).trim().replace(/^'/,'');let name=String(r[2]||'').trim(),desc=String(r[3]||'').trim();
@@ -450,7 +454,7 @@ async function sync(manual,force){
   if(S.club.closed){try{await pushTx()}catch(e){}LASTPULL=Date.now();setTimeout(closedGo,0);return}
   if(accCheck()){try{await pushTx()}catch(e){}LASTPULL=Date.now();S.sync.last=Date.now();S.sync.err='';save();setTimeout(blockAfter,0);return}
   try{if(await repairShift())changed=true}catch(e){if(e.auth)throw e}changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;changed=await syncBons(true)||changed;LASTPULL=Date.now()}
-  if(role==='q')try{await purgeRm()}catch(e){if(e.auth)throw e}await pushTx();await pushChk();if(role==='q'){try{await fixShopRows()}catch(e){if(e.auth)throw e}try{await sortTabs()}catch(e){if(e.auth)throw e}try{await pushOverview()}catch(e){if(e.auth)throw e}try{await fmtSheets()}catch(e){if(e.auth)throw e;console.warn('Opmaak',e)}}
+  if(role==='q')try{await purgeRm()}catch(e){if(e.auth)throw e}await pushTx();await pushChk();await pushRen();if(role==='q'){try{await fixShopRows()}catch(e){if(e.auth)throw e}try{await sortTabs()}catch(e){if(e.auth)throw e}try{await pushOverview()}catch(e){if(e.auth)throw e}try{await fmtSheets()}catch(e){if(e.auth)throw e;console.warn('Opmaak',e)}}
   if(S.bons.some(b=>!b.synced||b.dirty))changed=await syncBons(false)||changed;
   try{await accPing()}catch(e){if(e.auth)throw e}
   S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;S.sync.pick=false;save();
@@ -1054,7 +1058,23 @@ function vLeden(){if(RO())return `<div class="card"><h2>${S.members.length} lede
  <label>Zoeken<input oninput="LQ=this.value;ml()" placeholder="Naam…"></label><p class="mu" style="margin-top:-6px">De status kan je hier aanpassen, of in het tabblad Leden van je spreadsheet.</p><div id="ml"></div></div>`}
 function addMOpen(){if(RO())return;modal(`<h3>Lid toevoegen</h3><label>Clubnaam<input id="mn" autocomplete="off" placeholder="bv. Spelt"></label><label>Status<select id="ms">${S.statuses.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select></label><label>Of een nieuwe status (niet verplicht)<input id="ms2" autocomplete="off" placeholder="bv. schacht"></label><button class="btn" onclick="addM()">Toevoegen</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`);setTimeout(()=>{const e=$('#mn');if(e)e.focus()},50)}
 function ml(){const e=$('#ml');if(!e)return;const q=LQ.toLowerCase(),o=open(),l=S.members.filter(m=>m.name.toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name));
- e.innerHTML=l.length?l.map(m=>{const d=Math.max(0,debtOf(m.name));return `<div class="row"><div>${esc(m.name)}${role==='q'&&m.tel?`<div class="mu">${esc(m.tel)}</div>`:''}${d?`<div class="neg" style="white-space:nowrap">Schuld ${eur(d)}</div>`:''}</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">${RO()?`<span class="mu">${esc(m.status)}</span>`:`<select class="ss" aria-label="Status van ${esc(m.name)}" onchange="stSel(this,'${m.id}',false)">${stOpts(m.status)}</select><button class="lnk" onclick="delM('${m.id}')" aria-label="${esc(m.name)} verwijderen">Verwijderen</button>`}</div></div>`}).join(''):empty('Geen leden gevonden.')}
+ e.innerHTML=l.length?l.map(m=>{const d=Math.max(0,debtOf(m.name));return `<div class="row"><div>${esc(m.name)}${role==='q'&&m.tel?`<div class="mu">${esc(m.tel)}</div>`:''}${d?`<div class="neg" style="white-space:nowrap">Schuld ${eur(d)}</div>`:''}</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">${RO()?`<span class="mu">${esc(m.status)}</span>`:`<select class="ss" aria-label="Status van ${esc(m.name)}" onchange="stSel(this,'${m.id}',false)">${stOpts(m.status)}</select><span style="display:flex;gap:10px"><button class="lnk" onclick="editM('${m.id}')" aria-label="${esc(m.name)} aanpassen">Aanpassen</button><button class="lnk" onclick="delM('${m.id}')" aria-label="${esc(m.name)} verwijderen">Verwijderen</button></span>`}</div></div>`}).join(''):empty('Geen leden gevonden.')}
+function editM(id){if(RO())return;const m=S.members.find(x=>x.id===id);if(!m)return;const nc=/geen\s*contact/i.test(m.tel||'');
+ modal(`<h3>Lid aanpassen</h3><label>Clubnaam<input id="en" autocomplete="off" value="${esc(m.name)}"></label><label>Status<select id="es">${S.statuses.map(x=>`<option value="${esc(x)}"${x===m.status?' selected':''}>${esc(x)}</option>`).join('')}</select></label><label>Of een nieuwe status (niet verplicht)<input id="es2" autocomplete="off" placeholder="bv. schacht"></label>
+ <label>Gsm-nummer<input id="et" inputmode="tel" autocomplete="off" value="${nc?'':esc(m.tel||'')}" placeholder="bv. 0485 12 34 56"${nc?' disabled':''}></label><label style="display:flex;gap:8px;align-items:center;margin-top:-4px"><input type="checkbox" id="eg" style="width:20px;height:20px"${nc?' checked':''} onchange="$('#et').disabled=this.checked">Wenst geen contact</label>
+ <p class="mu">Pas je de clubnaam aan, dan verandert die ook bij alle boekingen en schulden van dit lid, in de app en in de spreadsheet.</p><button class="btn" data-id="${esc(id)}" onclick="editMOk(this.dataset.id)">Opslaan</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
+function editMOk(id){if(RO())return;const m=S.members.find(x=>x.id===id);if(!m)return;const n=$('#en').value.trim().replace(/\s+/g,' ');if(!n)return toast('Vul een clubnaam in');
+ const o=S.members.find(x=>x!==m&&uk(x.name)===uk(n));if(o)return toast(n+' staat al in de ledenlijst');
+ const st=cleanSt($('#es2').value)?addSt($('#es2').value):$('#es').value,tel=$('#eg').checked?'Wenst geen contact':$('#et').value.trim();let ch=[];
+ if(n!==m.name){if(!m.ren)m.ren=m.name;renameM(m,n);m.dirty=true;ch.push('clubnaam')}
+ if(st&&sk(st)!==sk(m.status)){m.status=canonSt(st)||st;m.dirty=true;ch.push('status')}
+ if(tel!==(m.tel||'')){m.tel=tel;m.telDirty=true;ch.push('gsm-nummer')}
+ closeM();if(!ch.length)return toast('Er was niets veranderd');relink();save();render();queueSync();toast(m.name+': '+ch.join(', ')+' aangepast')}
+/* Een lid een andere clubnaam geven: overal in de app mee aanpassen (boekingen, schulden, herinneringen). */
+function renameM(m,n){const old=m.name;if(old===n)return;S.tx.forEach(t=>{if(t.mid===m.id||(!t.mid&&uk(t.name)===uk(old))||(uk(t.name)===uk(old)&&!t.exp)){if(t.name!==n){t.name=n;t.mid=t.mid||m.id;if(t.synced)t.renD=true}}});
+ if(uk(SDN)===uk(old))SDN=n;RQ=RQ.map(x=>uk(x)===uk(old)?n:x);if(uk(B.name)===uk(old)&&B.mid===m.id)B.name=n;Object.keys(RIDX).forEach(k=>{if(k.startsWith(old+'|')){RIDX[n+k.slice(old.length)]=RIDX[k];delete RIDX[k]}});m.name=n}
+async function pushRen(){const l=S.tx.filter(t=>t.renD&&t.synced);if(!l.length)return;const g=S.club.gid,d=await api(`/${g}/values/${enc(rng(TAB_B,'A2:A'))}`),idx=new Map();(d.values||[]).forEach((r,i)=>idx.set(String(r[0]||'').replace(/^'/,''),i+2));
+ const data=l.filter(t=>idx.has(t.id)&&!isShop(t)).map(t=>({range:rng(TAB_B,'C'+idx.get(t.id)),values:[[t.name]]}));if(data.length)await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data})});l.forEach(t=>delete t.renD);save()}
 function addM(){if(RO())return;const n=$('#mn').value.trim();if(!n)return toast('Vul een naam in');if(memOf(n))return toast(n+' staat al in de ledenlijst');unDel(n);S.members.push({id:uid(),name:n,status:cleanSt($('#ms2').value)?addSt($('#ms2').value):$('#ms').value,dirty:true});save();closeM();toast(n+' toegevoegd');render();queueSync()}
 const unDel=n=>{S.delM=S.delM.filter(x=>x.toLowerCase()!==String(n).toLowerCase())};
 function delM(id){if(RO())return;const m0=S.members.find(x=>x.id===id);if(!m0)return;
@@ -1111,7 +1131,7 @@ function limCard(){const c=S.club,L=c.lim||{};return `<div class="card"><h2>Schu
 function setLim(s,v){if(role!=='q')return;const c=S.club;c.lim=Object.assign({},c.lim);const n=String(v).trim()===''?'':pamt(v);c.lim[s]=n==null?'':n;c.setDirty=true;save();queueSync();toast('Opgeslagen')}
 let OVH='';
 /* ---------- opmaak van de tabbladen ---------- */
-const FMT_V='6';
+const FMT_V='7';
 async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)return;const key=c.gid+'|'+FMT_V+'|'+c.color;if(!force&&(c.fmtK===key||(c.fmtFailK===key&&Date.now()-c.fmtFail<36e5)))return;
  const m=await api(`/${c.gid}?fields=sheets(properties(sheetId,title),bandedRanges(bandedRangeId),conditionalFormats(ranges))`),SH={};(m.sheets||[]).forEach(x=>SH[x.properties.title]=x);
  const rgb=h=>{h=String(h||'#8B1E3F').replace('#','');return{red:parseInt(h.slice(0,2),16)/255,green:parseInt(h.slice(2,4),16)/255,blue:parseInt(h.slice(4,6),16)/255}};
@@ -1135,7 +1155,7 @@ async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)ret
  if(id!=null){cond(G(id,1,null,0,15),formula('=$I2="Storno"'),{textFormat:{foregroundColor:GR,italic:true}});
   cond(G(id,1,null,6,7),{type:'TEXT_EQ',values:[{userEnteredValue:M.schuld}]},{textFormat:{foregroundColor:AT,bold:true},backgroundColor:AM});
   cond(G(id,1,null,14,15),{type:'TEXT_EQ',values:[{userEnteredValue:'Ja'}]},{textFormat:{foregroundColor:GN,bold:true}})}
- id=base(TAB_L,{w:[160,130,140,150],num:{2:TXT}});
+ id=base(TAB_L,{w:[160,130,140,150,120],hide:[4],num:{2:TXT}});
  const ph=SH[TAB_P]?Math.max(5,S.statuses.length+2):5;id=base(TAB_P,{w:[150,150].concat(Array(ph-2).fill(110)),num:Object.fromEntries(Array.from({length:ph-2},(_,i)=>[i+2,EUR]))});
  id=base(TAB_BN,{w:[80,90,150,90,260,200,130,150,100,90,140],hide:[0,7,9],num:{1:DAT,3:EUR}});
  if(id!=null){cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Nieuw'}]},{backgroundColor:AM,textFormat:{foregroundColor:AT,bold:true}});
