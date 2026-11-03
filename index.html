@@ -110,7 +110,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='41',APP_LABEL='1.0';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='42',APP_LABEL='1.0.1';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -335,7 +335,7 @@ async function oldTab(gid){
 async function readSettings(gid){const o=await metaGet(gid);if(o)return{m:o,src:'meta'};const t=await oldTab(gid);return t?{m:t.o,src:'tab',id:t.id}:{m:{},src:null}}
 function mergeAcc(a,b){const r={};const add=o=>{if(!o||typeof o!=='object')return;for(const k in o){const v=o[k];if(!/^[\w-]{6,64}$/.test(k)||!v||typeof v!=='object')continue;if(!r[k]||(+v.t||0)>(+r[k].t||0))r[k]={s:['uit','h','weg','q'].includes(v.s)?v.s:'',t:+v.t||0}}};add(a);add(b);return r}
 function adoptTabs(m){const c=S.club;if(Array.isArray(m['Verwijderd'])){c.rmIds=[...new Set((c.rmIds||[]).concat(m['Verwijderd']))].slice(-3000);const R=new Set(c.rmIds),n0=S.tx.length;S.tx=S.tx.filter(t=>!R.has(t.id));if(S.tx.length!==n0)relink()}if(m['Herinnering']&&typeof m['Herinnering']==='object'&&!c.rmdDirty)c.rmd=m['Herinnering'];if(m['Schuldlimieten']&&typeof m['Schuldlimieten']==='object')c.lim=m['Schuldlimieten'];if(+m['Schuldimport']>(c.bkImp||0))c.bkImp=+m['Schuldimport'];if(m['Categorietabblad']&&String(m['Categorietabblad'])!==c.catTab){c.catTab=String(m['Categorietabblad']);ENS=''}}
-function takeAcc(m){const c=S.club,cl=+m['Afgesloten']||0;if(cl>0&&!c.closedAt&&!c.closed&&!c.reopen){c.closed=cl;save()}
+function takeAcc(m){const c=S.club,cl=+m['Afgesloten']||0;if(+m['Schuldimport']>(c.bkImp||0))c.bkImp=+m['Schuldimport'];if(cl>0&&!c.closedAt&&!c.closed&&!c.reopen){c.closed=cl;save()}
  const n=mergeAcc(c.acc,m['Toegang']);if(JSON.stringify(n)!==JSON.stringify(c.acc)){c.acc=n;save()}}
 async function syncSettings(){const c=S.club;
  if(c.helperOnly){const {m}=await readSettings(c.gid),ts=+m['Gewijzigd']||0;takeAcc(m);if(!(ts>(c.setTs||0)))return false;
