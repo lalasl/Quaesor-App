@@ -1,4 +1,4 @@
-const CACHE = 'quaestor-v55';
+const CACHE = 'quaestor-v56';
 const FILES = ['./', './index.html', './config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -26,4 +26,13 @@ self.addEventListener('fetch', e => {
       })
       .catch(() => caches.match(req).then(r => r || caches.match('./index.html')))
   );
+});
+
+// Tik op een melding: open (of toon) de app.
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(l => {
+    for (const c of l) if ('focus' in c) return c.focus();
+    return self.clients.openWindow('./');
+  }));
 });

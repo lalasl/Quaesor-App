@@ -24,6 +24,9 @@ header .hd{flex:1;min-width:0}
 header h1{font-size:1.05rem;margin:0;font-weight:700}
 header small{opacity:.85}
 header button{background:#0003;color:inherit;border:0;border-radius:8px;padding:7px 12px;font:inherit;font-size:.85rem}
+header button.bell{position:relative;padding:7px 9px;display:flex;align-items:center}header .bd{position:absolute;top:-4px;right:-4px;background:#fff;color:var(--ac);border-radius:99px;font-size:.68rem;font-weight:700;min-width:17px;height:17px;line-height:17px;text-align:center;padding:0 4px}
+.nt{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--bd);padding:10px 2px;font:inherit;color:var(--tx);cursor:pointer}.nt:last-child{border:0}.nt.new b{color:var(--ac)}.nt .mu{font-size:.78rem}
+.tg{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--bd);margin:0;color:var(--tx)}.tg:last-child{border:0}.tg input{width:22px;height:22px;flex-shrink:0;margin:0}.tg span{display:flex;flex-direction:column}.tg small{color:var(--mu);font-size:.78rem}
 header button.st{display:block;background:none;padding:0;margin-top:2px;font-size:.75rem;opacity:.9;text-align:left;border-radius:0}
 main{flex:1;overflow-y:auto;padding:12px;max-width:640px;width:100%;margin:0 auto}
 nav{display:flex;background:var(--card);border-top:1px solid var(--bd);overflow-x:auto}
@@ -111,7 +114,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='47',APP_LABEL='1.3.1';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='48',APP_LABEL='1.4';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -301,9 +304,9 @@ function devLabel(){const u=navigator.userAgent||'';const os=/iPhone/.test(u)?'i
 async function accList(gid){const r=await api(`/${gid}/developerMetadata:search`,{method:'POST',body:JSON.stringify({dataFilters:[{developerMetadataLookup:{metadataKey:ACC}}]})});
  return (r.matchedDeveloperMetadata||[]).map(x=>{const d=x.developerMetadata||{};try{const o=JSON.parse(d.metadataValue);if(!o||!/^[\w-]{6,64}$/.test(String(o.id)))return null;o.mid=d.metadataId;return o}catch(e){return null}}).filter(Boolean)}
 async function accDel(mids){if(!mids.length)return;await api(`/${S.club.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:mids.map(i=>({deleteDeveloperMetadata:{dataFilter:{developerMetadataLookup:{metadataId:i}}}}))})})}
-async function accPing(){const c=S.club;if(!role||!c.gid)return;const n=WHO||c.names[role]||'';if(!n)return;const d=devLabel(),sig=JSON.stringify([n,role,d,APP_VERSION,c.gid]);
+async function accPing(){const c=S.club;if(!role||!c.gid)return;const n=WHO||c.names[role]||'';if(!n)return;const d=devLabel(),un=S.tx.filter(t=>!t.synced),uo=un.length?Math.min(...un.map(t=>t.ts)):0,sig=JSON.stringify([n,role,d,APP_VERSION,c.gid,un.length?Math.floor((Date.now()-uo)/864e5):-1]);
  if(c.accMid&&c.accGid===c.gid&&c.accSig===sig&&Date.now()-(c.accTs||0)<36e5)return;
- if(!c.accF)c.accF=Date.now();const v=JSON.stringify({id:c.dev,n,r:role,d,f:c.accF,l:Date.now(),v:APP_VERSION});
+ if(!c.accF)c.accF=Date.now();const v=JSON.stringify({id:c.dev,n,r:role,d,f:c.accF,l:Date.now(),v:APP_VERSION,u:un.length,uo});
  const up=c.accMid&&c.accGid===c.gid;
  const rq=up?{updateDeveloperMetadata:{dataFilters:[{developerMetadataLookup:{metadataId:c.accMid}}],developerMetadata:{metadataValue:v},fields:'metadataValue'}}
   :{createDeveloperMetadata:{developerMetadata:{metadataKey:ACC,metadataValue:v,location:{spreadsheet:true},visibility:'DOCUMENT'}}};
@@ -418,7 +421,7 @@ async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(T
   if(/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim()))t.chk=true;
   if(typ==='storno')t.storno=true;if(ref&&(typ==='storno'||typ==='afbetaling'||typ==='terugbetaling'))t.ref=ref;
   if(typ==='uitgave'||typ==='terugbetaling'){t.exp=true;if(typ==='uitgave'&&ref)t.bon=ref}const ad=String(r[13]||'').trim();if(ad)t.adv=ad;
-  S.tx.push(t);have.add(id);add++});
+  S.tx.push(t);have.add(id);add++;NEW.tx.push(t)});
  const goneT=S.tx.filter(t=>t.synced&&!inSheet.has(t.id)),nSy=S.tx.filter(t=>t.synced).length,oldP=JSON.stringify(S.pendDel);let rem=0;
  if(goneT.length>=5&&goneT.length*2>=nSy)S.pendDel=goneT.map(t=>t.id);
  else{S.pendDel=[];S.tx=S.tx.filter(t=>!t.synced||inSheet.has(t.id));rem=goneT.length}
@@ -457,7 +460,7 @@ async function sync(manual,force){
   if(role==='q')try{await purgeRm()}catch(e){if(e.auth)throw e}await pushTx();await pushChk();await pushRen();if(role==='q'){try{await fixShopRows()}catch(e){if(e.auth)throw e}try{await sortTabs()}catch(e){if(e.auth)throw e}try{await pushOverview()}catch(e){if(e.auth)throw e}try{await fmtSheets()}catch(e){if(e.auth)throw e;console.warn('Opmaak',e)}}
   if(S.bons.some(b=>!b.synced||b.dirty))changed=await syncBons(false)||changed;
   try{await accPing()}catch(e){if(e.auth)throw e}
-  S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;S.sync.pick=false;save();
+  S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;S.sync.pick=false;save();try{await notifyRun()}catch(e){if(e.auth)throw e;console.warn('Meldingen',e)}
   if(manual)toast('Alles bijgewerkt')}
  catch(e){S.sync.err=e.message||'Onbekende fout';S.sync.auth=!!e.auth;S.sync.pick=!!e.pick;if(!e.auth)ENS='';save();if(manual)toast(S.sync.err)}
  finally{SYNCING=false;SI=false;if(AGAIN){AGAIN=false;queueSync()}}
@@ -554,7 +557,7 @@ async function pullUsers(){const c=S.club,g=c.gid;if(!g||!c.gok)return false;
  const d=await api(`/${g}/values/${enc(rng(TAB_U,'A2:I'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[],by=new Map(S.users.map(u=>[u.id,u])),seen=new Set();let ch=false;
  rows.forEach((r,i)=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(!id||!r[1])return;seen.add(id);const st=String(r[3]||'').trim().toLowerCase();
   const o={u:String(r[1]).trim(),r:(x=>/^developer$/i.test(x)?'d':/^quaestor$/i.test(x)?'q':/^praesidium/i.test(x)?'p':'h')(String(r[2]||'').trim()),st:st==='ingetrokken'?'uit':st==='verwijderd'?'weg':'',salt:String(r[4]||''),code:String(r[5]||''),ct:+r[6]||0,mt:+r[7]||0,e:String(r[8]||'').trim().toLowerCase()};
-  const l=by.get(id);if(!l){S.users.push(Object.assign({id,row:i+2,dirty:false},o));ch=true;return}
+  const l=by.get(id);if(!l){S.users.push(Object.assign({id,row:i+2,dirty:false},o));NEW.users.push(Object.assign({id},o));ch=true;return}
   l.row=i+2;if(l.dirty&&(+l.mt||0)>=o.mt)return;for(const k in o)if(l[k]!==o[k]){l[k]=o[k];ch=true}l.dirty=false});
  const n0=S.users.length;S.users=S.users.filter(u=>seen.has(u.id)||(u.dirty&&!u.row));if(S.users.length!==n0)ch=true;
  if(ch)save();return ch}
@@ -571,7 +574,7 @@ function userCheck(){if(!USER||!role)return false;const u=me();
  {const h=S.users.find(isHQ);if(h&&role==='q'&&(h.st||(h.r!=='q'&&h.r!=='d'))){Object.assign(h,{st:'',r:h.r==='d'?'d':'q',mt:Date.now(),dirty:true});save();queueSync()}}
  if(ISDEV){if(devFix(u))queueSync();return false}
  if(!u||u.st==='weg'||u.st==='uit'){const m=!u||u.st==='weg'?'Je account bestaat niet meer in deze club.':'De Quaestor heeft je toegang ingetrokken.';setTimeout(()=>{logout();const e=$('#le');if(e)e.textContent=m;toast(m)},0);return true}
- const nr=effR(u);if(nr!==role){const was=role;role=nr;if(role==='p'&&tab!=='me')tab='bon';else if(was==='p')tab='boek';setTimeout(()=>{render();toast(nr==='q'?'Je bent nu Quaestor':nr==='h'?'Je bent nu helper: je kan boekingen doen':'Je kan nu alleen bonnetjes indienen')},0);return true}return false}
+ const nr=effR(u);if(nr!==role){note('role',nr==='q'?'Je bent nu Quaestor: je kan alles beheren.':nr==='h'?'Je bent nu helper: je kan boekingen doen.':'Je kan nu alleen bonnetjes indienen.',{tab:nr==='p'?'bon':'boek'});const was=role;role=nr;if(role==='p'&&tab!=='me')tab='bon';else if(was==='p')tab='boek';setTimeout(()=>{render();toast(nr==='q'?'Je bent nu Quaestor':nr==='h'?'Je bent nu helper: je kan boekingen doen':'Je kan nu alleen bonnetjes indienen')},0);return true}return false}
 function logIn(u){USER=u.id;ISDEV=isDev(u.e);role=effR(u);WHO=u.u;S.club.lastUser=u.u;S.club.sess=u.id;LOGVIA='';save();tab=role==='p'?'bon':'boek';render();LASTPULL=0;queueSync()}
 const legacyPins=()=>!nQ()&&!!(S.club.pinQ||S.club.pinQh||S.club.pinH||S.club.pinHh);
 function login(){const c=S.club;
@@ -662,10 +665,10 @@ async function restorePick(){const e=m=>{const x=$('#re');if(x)x.textContent=m};
 
 /* ================= OPBOUW ================= */
 function render(){if(S.club.blocked)return blockAfter();const Q=role==='q',P=role==='p';
- if(!Q&&!P&&['inst','acc'].includes(tab))tab='boek';if(P&&['inst','acc'].includes(tab))tab='bon';if(P&&!['bon','me','schuld','leden','dag'].includes(tab))tab='bon';if(Q&&tab==='me')tab='boek';if(!Q&&tab==='vandaag')tab='dag';
+ if(!Q&&!P&&['inst','acc'].includes(tab))tab='boek';if(P&&['inst','acc'].includes(tab))tab='bon';if(P&&!['bon','me','schuld','leden','dag','meld'].includes(tab))tab='bon';if(Q&&tab==='me')tab='boek';if(!Q&&tab==='vandaag')tab='dag';
  const nb=Q?bonTodo().length:0,tabs=Q?[['boek','Boeken'],['dag','Overzicht'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'+(nb?' ('+nb+')':'')],['inst','Meer']]:P?[['bon','Bonnen'],['dag','Overzicht'],['schuld','Schulden'],['leden','Leden'],['me','Account']]:[['boek','Boeken'],['dag','Overzicht'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'],['me','Account']];
- const v={boek:vBoek,vandaag:vVandaag,dag:vDag,schuld:vSchuld,leden:vLeden,inst:vInst,acc:vAcc,bon:vBon,me:vMe}[tab]();
- $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${ISDEV?'Developer':HQ()?'Hoofdquaestor':RN[role]||''}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div><button onclick="logout()">Afmelden</button></header>
+ const v={boek:vBoek,vandaag:vVandaag,dag:vDag,schuld:vSchuld,leden:vLeden,inst:vInst,acc:vAcc,bon:vBon,me:vMe,meld:vMeld}[tab]();
+ $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${ISDEV?'Developer':HQ()?'Hoofdquaestor':RN[role]||''}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div>${bellHtml()}<button onclick="logout()">Afmelden</button></header>
  <main>${v}</main><nav>${tabs.map(t=>`<button class="${tab===t[0]||(tab==='acc'&&t[0]==='inst')?'on':''}" onclick="tab='${t[0]}';SDN='';SUBM='';RQ=[];render()">${t[1]}</button>`).join('')}</nav>`;
  if(tab!=='schuld')SDN='';if(tab==='boek')sug();if(tab==='leden')ml();refreshSt()}
 const row=(t,st)=>`<div class="row${t.void?' void':''}"><div><b>${esc(t.name||'Zonder naam')}</b>${t.exp&&!t.storno?` <span class="tag">${t.ref?'Terugbetaling':'Uitgave'}</span>`:''}<div class="mu">${esc(t.h)}${t.s?' · '+esc(t.s):''} · ${ML[t.method]}${t.desc?' · '+esc(t.desc):''}${t.adv&&!t.ref?' · door '+esc(t.adv):''}${t.who?' · '+esc(t.who):''}${t.storno?' · annulering':''}</div></div><div class="amt ${t.v<0?'neg':''}">${eur(t.v)}${st&&!t.void&&!t.storno?`<button class="sm" onclick="storno('${t.id}')">Annuleren</button>`:''}</div></div>`;
@@ -724,7 +727,7 @@ function doStorno(id){const t=S.tx.find(x=>x.id===id);if(!t||t.void)return;
  t.void=true;S.tx.push({...t,who:WHO,id:uid(),ts:Date.now(),date:today(),v:-t.v,storno:true,void:false,ref:t.id,by:role,synced:false});
  relink();
  save();toast('Boeking geannuleerd');render();queueSync()}
-function vMe(){return accCard()+`<div class="card"><h2>Dit toestel</h2><p class="mu">Gebruik je dit toestel niet meer voor ${esc(S.club.name)}? Koppel het dan los. De gegevens op dit toestel worden gewist, de spreadsheet blijft.</p><button class="btn ghost" onclick="devOff()">Dit toestel loskoppelen</button></div>`}
+function vMe(){return accCard()+nCard()+`<div class="card"><h2>Dit toestel</h2><p class="mu">Gebruik je dit toestel niet meer voor ${esc(S.club.name)}? Koppel het dan los. De gegevens op dit toestel worden gewist, de spreadsheet blijft.</p><button class="btn ghost" onclick="devOff()">Dit toestel loskoppelen</button></div>`}
 function vVandaag(){const l=S.tx.filter(t=>t.date===today()&&!t.storno).reverse();return delBanner()+`<div class="card"><h2>Vandaag: ${l.filter(t=>!t.void).length} boekingen</h2>${l.length?l.map(t=>row(t,false)).join(''):empty('Nog niets geboekt vandaag.')}</div>${accCard()}${S.club.helperOnly||(USER&&role!=='q')?`<div class="card"><h2>Dit toestel</h2><p class="mu">Gebruik je dit toestel niet meer voor ${esc(S.club.name)}? Koppel het dan los. De gegevens op dit toestel worden gewist, de spreadsheet blijft.</p>${USER?'':`<label>Je naam<input id="wn2" value="${esc(S.club.names.h)}"></label><button class="btn ghost" style="margin-bottom:8px" onclick="chName()">Naam opslaan</button>`}<button class="btn ghost" onclick="devOff()">Dit toestel loskoppelen</button></div>`:''}`}
 
 /* ---------- dag ---------- */
@@ -876,8 +879,8 @@ async function syncBons(pull){const c=S.club,g=c.gid;let ch=false;
  rows.forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(!id)return;seen.add(id);const tot=pnum(r[3]);
   const o={date:toDate(r[1]),shop:String(r[2]||'').trim(),total:tot==null?0:tot,items:String(r[4]||''),desc:String(r[5]||''),who:String(r[6]||'').trim(),status:String(r[8]||'Nieuw').trim()||'Nieuw',txid:String(r[9]==null?'':r[9]).trim().replace(/^'/,''),adv:String(r[10]||'').trim()};
   if(o.status==='Nieuw'&&role==='q'){const x=S.tx.find(t=>t.bon===id&&t.exp&&!t.void&&!t.storno);if(x){o.status='Ingeboekt';o.txid=x.id;HEAL.add(id)}}
-  const b=by.get(id);if(!b){S.bons.push(Object.assign({id,ts:toTs(String(r[7]||'').replace(/^'/,''),o.date),h:'',synced:true,dirty:false,mine:false},o));ch=true;return}
-  if(b.dirty)return;for(const k in o)if(String(b[k])!==String(o[k])){b[k]=o[k];ch=true}});
+  const b=by.get(id);if(!b){S.bons.push(Object.assign({id,ts:toTs(String(r[7]||'').replace(/^'/,''),o.date),h:'',synced:true,dirty:false,mine:false},o));NEW.bons.push(S.bons[S.bons.length-1]);ch=true;return}
+  if(b.dirty)return;if(String(b.status)!==String(o.status))NEW.bst.push({b,from:b.status,to:o.status});for(const k in o)if(String(b[k])!==String(o[k])){b[k]=o[k];ch=true}});
  if(HEAL.size){S.bons.forEach(b=>{if(HEAL.has(b.id)&&b.synced)b.dirty=true});HEAL.clear();queueSync()}
  const before=S.bons.length;S.bons=S.bons.filter(b=>!b.synced||seen.has(b.id));if(S.bons.length!==before)ch=true;
  if(ch)save();return ch}
@@ -963,6 +966,58 @@ function debts(){const M={};open().forEach(t=>{const k=uk(t.name),o=M[k]=M[k]||{
 const memDebt=n=>debts()[uk(n)];
 const debtOf=n=>{const o=memDebt(n);return o?o.tot:0};
 let SF='',SQ='',SDN='';
+/* ---------- meldingen ---------- */
+/* De app heeft geen eigen server: meldingen ontstaan op dit toestel wanneer het bijwerkt (app open of op de achtergrond). */
+const NEW={tx:[],bons:[],bst:[],users:[]};
+const NT=[['hbook','Boekingen van helpers','Wie boekte hoeveel, gebundeld per activiteit','q',1],['bon','Nieuwe bonnetjes','Een helper of praesidiumlid diende een bonnetje in','q',1],['acc','Nieuwe accounts','Iemand maakte een account aan en wacht op een rol','q',1],['lim','Schuldlimiet','Een lid gaat over zijn limiet of moet afbetalen en krijgt een nieuwe schuld','q',1],['bonOld','Bonnetje blijft liggen','Een bonnetje wacht al 7 dagen om verwerkt te worden','q',1],['adv','Voorschot niet terugbetaald','Iemand wacht al 14 dagen op een terugbetaling','q',1],['dev','Niet verstuurde boekingen','Een toestel heeft al 2 dagen boekingen die niet in de spreadsheet staan','q',1],['storno','Annuleringen','Een andere Quaestor annuleerde een boeking','q',1],['week','Wekelijkse samenvatting','Elke maandag: ontvangen, nieuwe schulden, open bonnetjes','q',0],['mybon','Mijn bonnetjes','Je bonnetje werd ingeboekt of afgewezen','*',1],['refund','Terugbetaald','Je kreeg je voorschot terugbetaald','*',1],['mystorno','Mijn boekingen','Een boeking van jou werd geannuleerd','h',1],['role','Mijn rol','Je rol in de club werd gewijzigd','*',1]];
+const nOn=k=>{const x=(S.nset||{})[k];if(x!=null)return !!x;const d=NT.find(n=>n[0]===k);return d?!!d[4]:true};
+const nUnread=()=>(S.notes||[]).filter(n=>!n.read).length;
+function bellHtml(){const n=nUnread();return `<button class="bell" onclick="tab='meld';SDN='';SUBM='';render()" aria-label="Meldingen${n?', '+n+' nieuw':''}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>${n?`<span class="bd">${n>99?'99+':n}</span>`:''}</button>`}
+function note(k,t,go){if(!nOn(k))return;S.notes=S.notes||[];S.notes.unshift({id:uid(),ts:Date.now(),k,t,go:go||null,read:false});if(S.notes.length>150)S.notes.length=150;save();
+ const b=document.querySelector('header .bell');if(b)b.outerHTML=bellHtml();
+ if(S.nset&&S.nset.os&&window.Notification&&Notification.permission==='granted'&&document.hidden&&navigator.serviceWorker){navigator.serviceWorker.ready.then(r=>r.showNotification(S.club.name,{body:t,tag:k+'-'+Date.now(),icon:'icon-192.png',badge:'icon-192.png'})).catch(()=>{})}
+ else if(!document.hidden)toast(t)}
+async function notifyRun(){const c=S.club,Q=role==='q',now=Date.now();if(!S.nSince){S.nSince=now;S.nDone={};NEW.tx=[];NEW.bons=[];NEW.bst=[];NEW.users=[];S.nLim=null;save()}
+ const since=S.nSince,me=uk(WHO),fd=d=>d?d.split('-').reverse().join('/'):'',done=S.nDone=S.nDone||{},once=(key,f)=>{if(done[key])return;done[key]=now;f()};
+ const tx=NEW.tx.filter(t=>(+t.ts||0)>=since),bons=NEW.bons.filter(b=>(+b.ts||0)>=since),bst=NEW.bst,us=NEW.users.filter(u=>(+u.ct||0)>=since);NEW.tx=[];NEW.bons=[];NEW.bst=[];NEW.users=[];
+ if(Q){const G={};tx.filter(t=>!t.exp&&!t.storno&&!t.ref&&t.by==='h'&&uk(t.who||'')!==me).forEach(t=>{const k=(t.who||'Een helper')+'|'+t.date+'|'+(t.h||'');(G[k]=G[k]||{who:t.who||'Een helper',date:t.date,h:t.h,n:0,v:0,l:0}).n++;G[k].v+=t.v;if(t.method==='schuld')G[k].l+=t.v});
+  Object.values(G).forEach(g=>note('hbook',`${g.who} boekte ${g.n} ${g.n===1?'betaling':'betalingen'} (${eur(g.v)})${g.h?' op '+g.h:''}${g.date!==today()?' ('+fd(g.date)+')':''}${g.l>.005?', waarvan '+eur(g.l)+' later te betalen':''}.`,{tab:'dag',day:g.date}));
+  tx.filter(t=>t.storno&&uk(t.who||'')!==me).forEach(t=>note('storno',`${t.who||'Iemand'} annuleerde een boeking van ${t.name||'?'} (${eur(-t.v)}).`,{tab:'dag',day:t.date}));
+  bons.filter(b=>!b.mine&&uk(b.who||'')!==me&&b.status==='Nieuw').forEach(b=>note('bon',`${b.who||'Iemand'} diende een bonnetje in: ${b.shop} ${eur(b.total)}.`,{tab:'bon'}));
+  us.filter(u=>u.r==='p'&&!u.st&&uk(u.u)!==me).forEach(u=>note('acc',`${u.u} maakte een account aan en wacht op een rol.`,{tab:'acc'}));
+  const D=debts(),W={};Object.values(D).forEach(o=>{if(o.warn)W[uk(o.name)]=o});
+  if(S.nLim){Object.values(W).forEach(o=>{if(!S.nLim.includes(uk(o.name))&&!/moet/i.test(o.warn))note('lim',`${o.name} staat boven de schuldlimiet: ${eur(o.tot)} open (${o.warn.toLowerCase()}).`,{tab:'schuld',sdn:o.name})});
+   tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.storno&&uk(t.who||'')!==me).forEach(t=>{const o=D[uk(t.name)];if(o&&/moet/i.test(o.warn))note('lim',`${t.name} moet afbetalen en kreeg een nieuwe schuld van ${eur(t.v)}${t.h?' ('+t.h+')':''}.`,{tab:'schuld',sdn:t.name})})}
+  S.nLim=Object.keys(W);
+  S.bons.filter(b=>b.status==='Nieuw'&&(+b.ts||0)<now-7*864e5).forEach(b=>once('bonOld:'+b.id,()=>note('bonOld',`Het bonnetje van ${b.who||'?'} (${b.shop}, ${eur(b.total)}) wacht al een week om verwerkt te worden.`,{tab:'bon'})));
+  advOpen().filter(t=>t.date&&Date.parse(t.date)<now-14*864e5).forEach(t=>once('adv:'+t.id,()=>note('adv',`${t.adv} wacht al 2 weken op ${eur(-t.v)} terugbetaling voor ${t.name}.`,{tab:'bon'})));
+  if(nOn('dev')&&c.gid&&c.gok&&now-(S.nDevTs||0)>36e5){S.nDevTs=now;try{const l=await accList(c.gid);l.filter(o=>o.id!==c.dev&&+o.u>0&&+o.uo>0&&now-+o.uo>2*864e5).forEach(o=>once('dev:'+o.id+':'+o.uo,()=>note('dev',`Het toestel van ${o.n||'?'} (${o.d||'onbekend toestel'}) heeft al ${Math.floor((now-o.uo)/864e5)} dagen ${o.u} ${+o.u===1?'boeking':'boekingen'} die niet in de spreadsheet staan. Vraag om de app te openen met internet.`,{tab:'acc'})))}catch(e){if(e.auth)throw e}}
+  if(nOn('week')){const d=new Date(),wk=d.getFullYear()+'-'+Math.floor((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(2024,0,1))/(7*864e5));
+   if(S.nWeek!==wk&&(d.getDay()!==1||d.getHours()>=8)){S.nWeek=wk;const from=new Date(now-7*864e5).toISOString().slice(0,10),L=S.tx.filter(t=>t.date>=from&&!t.void&&!t.storno),rec=L.filter(t=>!t.exp&&t.method!=='schuld').reduce((a,t)=>a+t.v,0),nd=L.filter(t=>t.method==='schuld'&&t.v>0).reduce((a,t)=>a+t.v,0),tot=Object.values(D).reduce((a,o)=>a+o.tot,0),nb=bonTodo().length;
+    note('week',`Afgelopen week: ${eur(rec)} ontvangen en ${eur(nd)} nieuwe schulden. In totaal staat er ${eur(tot)} open${nb?', en '+nb+' '+(nb===1?'bonnetje wacht':'bonnetjes wachten')+' op verwerking':''}.`,{tab:'schuld'})}}}
+ bst.filter(x=>x.b&&(x.b.mine||uk(x.b.who||'')===me)).forEach(x=>{if(x.to==='Ingeboekt')note('mybon',`Je bonnetje van ${x.b.shop} (${eur(x.b.total)}) is ingeboekt.`,{tab:'bon'});else if(x.to==='Afgewezen')note('mybon',`Je bonnetje van ${x.b.shop} (${eur(x.b.total)}) werd afgewezen.`,{tab:'bon'})});
+ tx.filter(t=>t.exp&&t.ref&&!t.storno&&uk(t.name)===me&&uk(t.who||'')!==me).forEach(t=>note('refund',`Je kreeg ${eur(-t.v)} terugbetaald${t.desc?': '+t.desc.replace(/^Terugbetaling\s*/,''):''}.`,{tab:'bon'}));
+ if(!Q)tx.filter(t=>t.storno&&uk(t.who||'')!==me).forEach(t=>{const o=S.tx.find(x=>x.id===t.ref);if(o&&uk(o.who||'')===me)note('mystorno',`Je boeking van ${o.name||'?'} (${eur(o.v)}) werd geannuleerd door ${t.who||'de Quaestor'}.`,{tab:'dag',day:o.date})});
+ Object.keys(done).forEach(k=>{if(now-done[k]>90*864e5)delete done[k]});save();const b=document.querySelector('header .bell');if(b)b.outerHTML=bellHtml()}
+function nGo(id){const n=(S.notes||[]).find(x=>x.id===id);if(!n)return;n.read=true;save();const g=n.go||{};
+ if(g.tab==='acc'&&role==='q'){accOpen();return}if(g.tab==='dag'&&g.day)DAY=g.day;tab=g.tab&&(role==='q'||!['inst','acc'].includes(g.tab))?g.tab:tab;if(g.sdn)SDN=g.sdn;render();scrollTo(0,0)}
+function nAllRead(){(S.notes||[]).forEach(n=>n.read=true);save();render()}
+function nClear(){ask('Alle meldingen wissen?','Wissen',()=>{S.notes=[];save();render()})}
+const ago=ts=>{const m=Math.round((Date.now()-ts)/6e4);return m<1?'net nu':m<60?m+' min geleden':m<1440?Math.round(m/60)+' u geleden':new Date(ts).toLocaleDateString('nl-BE',{day:'numeric',month:'short'})};
+function vMeld(){const L=S.notes||[],n=nUnread();
+ return `<div class="card"><div class="row" style="border:0;padding:0 0 6px"><h2 style="margin:0">Meldingen</h2>${n?`<button class="sm" style="margin:0" onclick="nAllRead()">Alles gelezen</button>`:''}</div>
+ ${L.length?L.map(x=>`<button class="nt${x.read?'':' new'}" onclick="nGo('${x.id}')"><b>${x.read?'':'● '}${esc(x.t)}</b><div class="mu">${ago(x.ts)}</div></button>`).join(''):empty('Nog geen meldingen. Ze verschijnen hier wanneer de app bijwerkt.')}</div>
+ <div class="btns"><button class="btn ghost" onclick="${role==='q'?"tab='inst';SUBM='meld'":"tab='me'"};render()">Instellingen</button>${L.length?'<button class="btn ghost" onclick="nClear()">Alles wissen</button>':''}</div>`}
+function nCard(){const Q=role==='q',L=NT.filter(n=>n[3]==='*'||n[3]===role||(n[3]==='h'&&role==='h')),os=!!(S.nset&&S.nset.os),perm=window.Notification?Notification.permission:'none';
+ return `<div class="card"><h2>Meldingen</h2><p class="mu" style="margin-top:-6px">Kies welke meldingen je op dit toestel krijgt. Ze verschijnen bij het belletje bovenaan.</p>
+ ${L.map(n=>`<label class="tg"><span>${n[1]}<small>${n[2]}</small></span><input type="checkbox" ${nOn(n[0])?'checked':''} onchange="nSet('${n[0]}',this.checked)"></label>`).join('')}</div>
+ <div class="card"><h2>Ook buiten de app</h2><label class="tg"><span>Melding op dit toestel tonen<small>Ook als de app op de achtergrond staat. Is de app helemaal gesloten, dan zie je ze pas bij het openen.</small></span><input type="checkbox" ${os&&perm==='granted'?'checked':''} onchange="nOs(this.checked)"></label>${perm==='denied'?'<p class="err" style="margin-top:6px">Meldingen zijn geblokkeerd voor deze app. Zet ze aan in de instellingen van je browser of gsm.</p>':perm==='none'?'<p class="mu" style="margin-top:6px">Deze browser ondersteunt geen meldingen. Op een iPhone werkt het alleen als de app op je beginscherm staat.</p>':''}</div>`}
+function nSet(k,v){S.nset=Object.assign({},S.nset,{[k]:!!v});save();toast(v?'Melding aan':'Melding uit')}
+async function nOs(v){if(!v){S.nset=Object.assign({},S.nset,{os:false});save();return render()}
+ if(!window.Notification){toast('Deze browser ondersteunt geen meldingen');return render()}
+ let p=Notification.permission;if(p==='default'){try{p=await Notification.requestPermission()}catch(e){}}
+ S.nset=Object.assign({},S.nset,{os:p==='granted'});save();render();toast(p==='granted'?'Meldingen op dit toestel staan aan':'Meldingen werden niet toegestaan')}
+
 /* ---------- herinneringen ---------- */
 const RMD_T1=['De kas van {club} mist je nog even! Er staat nog {bedrag} open voor {lijst}.\nHoe sneller de kas vol, hoe sneller het volgende vat er staat! 🍻','Pluk de dag… en betaal je schuld 😉 Nog {bedrag} voor {lijst}. Je bent er in een halve minuut vanaf!','Je Quaestor hier met goed nieuws: je kan vandaag schuldenvrij worden! Nog {bedrag} te gaan voor {lijst}. Je bent een topper!','Even een seintje van de kas: er staat nog {bedrag} op jouw naam voor {lijst}. Regel je het vandaag nog? Dan drinken we er straks eentje op! 🍻'];
 const RMD_T2=['Vorige keer stuurde ik je al een berichtje, maar de {bedrag} voor {lijst} staat nog open. Zou je het vandaag even regelen? Dan kan ik je uit mijn lijstje schrappen 😄','Ik weet het, betalen is minder leuk dan cantussen 😉 Maar de {bedrag} voor {lijst} staat nog altijd open. Doe je het vandaag nog even?','Nog eens je Quaestor! De {bedrag} voor {lijst} wacht nog op je. Twee minuten werk, en de kas is je eeuwig dankbaar 🙏'];
@@ -1265,7 +1320,7 @@ function gCardEnd(c,on){return `<button class="btn" onclick="connect()">${on?'Op
  ${c.gid?`<a class="btn ghost" style="margin-top:8px" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}">Spreadsheet openen</a><button class="btn ghost" style="margin-top:8px" onclick="unlink()">Ontkoppelen</button>`:''}
  <p class="mu" style="margin-top:12px">De app vraagt alleen toegang tot spreadsheets die ze zelf aanmaakt of die je zelf kiest. <a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>${sheetTip()}`}
 let SUBM='';
-const MSEC=[['club','Club en uiterlijk','Naam, kleur, logo en weergave'],['mensen','Accounts en helpers','Wie toegang heeft, helpers uitnodigen, rollen'],['leden','Leden, prijzen en schuldbeleid','Statussen, prijzen per status en schuldlimieten'],['rmd','Herinneringen','Rekeningnummer en berichten voor schulden'],['sheet','Spreadsheet en tabbladen','Google Sheets, categorieën en schulden overnemen'],['data','Back-up en wissen','Back-up maken, terugzetten en gegevens wissen']];
+const MSEC=[['club','Club en uiterlijk','Naam, kleur, logo en weergave'],['mensen','Accounts en helpers','Wie toegang heeft, helpers uitnodigen, rollen'],['leden','Leden, prijzen en schuldbeleid','Statussen, prijzen per status en schuldlimieten'],['rmd','Herinneringen','Rekeningnummer en berichten voor schulden'],['meld','Meldingen','Kies welke meldingen je krijgt'],['sheet','Spreadsheet en tabbladen','Google Sheets, categorieën en schulden overnemen'],['data','Back-up en wissen','Back-up maken, terugzetten en gegevens wissen']];
 function mSum(k){const c=S.club;if(k==='sheet'&&!(c.gid&&c.gok))return '<span class="neg">Niet verbonden</span>';if(k==='mensen'){const n=actU().length;return n?n+'&nbsp;'+(n===1?'account':'accounts'):''}return ''}
 function vInst(){const c=S.club;
  if(!SUBM)return `<div class="card">${MSEC.map(x=>`<button class="drow" onclick="SUBM='${x[0]}';render();scrollTo(0,0)"><span><b>${x[1]}</b><span class="mu" style="font-size:13px">${x[2]}</span></span><span class="dra"><span class="mu" style="font-size:12px;text-align:right;white-space:nowrap">${mSum(x[0])}</span><span aria-hidden="true">›</span></span></button>`).join('')}</div><p class="mu" style="text-align:center">Versie ${APP_LABEL}</p>`;
@@ -1279,6 +1334,7 @@ ${USER?'':`<div class="card"><h2>Jouw naam</h2><label>Naam van de Quaestor<input
   leden:()=>`${statCard()}${limCard()}${prCard()}`,
   sheet:()=>`${gCard()}${catCard()}`,
   rmd:()=>rmdSetCard(),
+  meld:()=>nCard(),
   data:()=>`<div class="card"><h2>Back-up</h2><button class="btn ghost" onclick="showT('Boekingen als csv',csv())">Boekingen kopiëren (voor Excel)</button><button class="btn ghost" style="margin-top:8px" onclick="showT('Volledige back-up',JSON.stringify(S))">Volledige back-up kopiëren</button><button class="btn ghost" style="margin-top:8px" onclick="restore()">Back-up terugzetten</button></div><div class="card"><h2>Gegevens wissen</h2><p class="mu">Maak eerst een back-up als je twijfelt. Bij boekingen en de ledenlijst kies je of de spreadsheet ook meegaat. Bij Alles wissen blijft de spreadsheet staan.</p><button class="btn ghost" onclick="wipeTx()">Alle boekingen wissen</button><button class="btn ghost" style="margin-top:8px" onclick="wipeMem()">Ledenlijst leegmaken</button><button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="wipeAll()">Alles wissen op dit toestel</button>${ISDEV||HQ()?`<button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="closeClub()">Club afsluiten voor iedereen</button><p class="mu" style="margin-top:6px">Alles wissen op dit toestel wist alleen jouw toestel. Club afsluiten wist de club ook op alle andere toestellen zodra die synchroniseren.</p>`:'<p class="mu" style="margin-top:6px">Alles wissen op dit toestel wist alleen dit toestel, niet bij de andere accounts.</p>'}</div>`}[SUBM];
  if(!body){SUBM='';return vInst()}
  return `<button class="back" onclick="SUBM='';render();scrollTo(0,0)">← Meer</button><h2 style="margin:0 0 4px">${t}</h2>${['club','leden','rmd'].includes(SUBM)?'<p class="mu" style="margin:0 0 10px">Wijzigingen worden meteen bewaard.</p>':'<div style="height:8px"></div>'}<div onchange="autoSave(event)">${body()}</div>`}
