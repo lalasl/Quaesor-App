@@ -108,7 +108,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='38';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='39';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -212,7 +212,9 @@ const rng=(tab,a)=>`'${tab.replace(/'/g,"''")}'!${a}`;
 const enc=encodeURIComponent;
 const cell=v=>typeof v==='string'&&/^[=+\-@]/.test(v)?"'"+v:v;
 const typ=t=>t.storno?'Storno':t.exp&&t.ref?'Terugbetaling':t.exp?'Uitgave':t.ref?'Afbetaling':'Boeking';
-const rowOf=t=>[ "'"+t.id,t.date,cell(t.name||''),cell(t.desc||''),cell(t.h||''),cell(t.s||''),M[t.method],t.v,typ(t),t.ref?"'"+t.ref:t.bon?"'"+t.bon:'',cell(t.who||(t.by==='q'?'Quaestor':'Helper')),"'"+new Date(t.ts).toISOString(),t.by==='q'?'Quaestor':'Helper',cell(t.adv||''),t.chk?'Ja':''];
+const isShop=t=>{if(t.storno){const o=S.tx.find(x=>x.id===t.ref);return !!o&&!o.storno&&isShop(o)}return !!t.exp&&!t.ref};
+const shopDesc=t=>t.name?(t.desc?t.name+' – '+t.desc:t.name):(t.desc||'');
+const rowOf=t=>[ "'"+t.id,t.date,isShop(t)?'':cell(t.name||''),cell(isShop(t)?shopDesc(t):(t.desc||'')),cell(t.h||''),cell(t.s||''),M[t.method],t.v,typ(t),t.ref?"'"+t.ref:t.bon?"'"+t.bon:'',cell(t.who||(t.by==='q'?'Quaestor':'Helper')),"'"+new Date(t.ts).toISOString(),t.by==='q'?'Quaestor':'Helper',cell(t.adv||''),t.chk?'Ja':''];
 async function append(tab,cols,rows){const g=S.club.gid,last=cols.split(':')[1].replace(/\d/g,'');
  /* Zelf de volgende lege rij zoeken in plaats van Google te laten raden: values.append schoof rijen soms een kolom op (bv. bij verborgen kolommen). */
  for(let i=0;i<rows.length;i+=200){const chunk=rows.slice(i,i+200);let done=false;
@@ -227,13 +229,17 @@ async function append(tab,cols,rows){const g=S.club.gid,last=cols.split(':')[1].
   if(!done)throw new Error('Wegschrijven naar '+tab+' lukte niet. Probeer opnieuw.')}}
 /* Rijen herstellen die door de oude manier van toevoegen een kolom naar rechts waren geschoven. */
 let REPD='';
+async function fixShopRows(){const c=S.club;if(role!=='q'||c.shopFix===c.gid)return;const g=c.gid,by=new Map(S.tx.map(t=>[t.id,t]));
+ const d=await api(`/${g}/values/${enc(rng(TAB_B,'A2:D'))}?valueRenderOption=UNFORMATTED_VALUE`),data=[];
+ (d.values||[]).forEach((r,i)=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,''),t=by.get(id);if(!t||!isShop(t)||!t.name)return;if(String(r[2]||'').trim()===t.name)data.push({range:rng(TAB_B,'C'+(i+2)+':D'+(i+2)),values:[['',shopDesc(t)]]})});
+ if(data.length)await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data})});c.shopFix=g;save()}
 async function repairShift(){const g=S.club.gid;if(REPD===g)return false;let fixed=0;
  const T=[[TAB_B,'P',r=>typeof r[1]==='string'&&/^'?[0-9a-z-]{12,}$/i.test(r[1])&&/\d/.test(r[1])],[TAB_BN,'L',r=>typeof r[1]==='string'&&/^'?[0-9a-z-]{12,}$/i.test(r[1])&&/\d/.test(r[1])],[TAB_L,'E',r=>String(r[1]==null?'':r[1]).trim()!=='']];
  const m=await api(`/${g}?fields=sheets.properties.title`),have=new Set((m.sheets||[]).map(x=>x.properties.title));
  for(const [t,lc,isShift] of T){if(!have.has(t))continue;const d=await api(`/${g}/values/${enc(rng(t,'A2:'+lc))}?valueRenderOption=UNFORMATTED_VALUE`),data=[];
   (d.values||[]).forEach((r,i)=>{if(String(r[0]==null?'':r[0]).trim()!==''||!isShift(r))return;const nr=r.slice(1).map(v=>v==null?'':v);while(nr.length<lc.charCodeAt(0)-64)nr.push('');data.push({range:rng(t,'A'+(i+2)+':'+lc+(i+2)),values:[nr]})});
   if(data.length){await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data})});fixed+=data.length}}
- REPD=g;return fixed>0}
+ REPD=g;if(fixed)S.club.fmtK='';return fixed>0}
 async function head(tab,hd){const d=await api(`/${S.club.gid}/values/${enc(rng(tab,'A1:Z1'))}`);const v=(d.values||[])[0];
  if(!v||!v.some(x=>String(x||'').trim())){await api(`/${S.club.gid}/values/${enc(rng(tab,'A1'))}?valueInputOption=RAW`,{method:'PUT',body:JSON.stringify({values:[hd]})});return}
  if(String(v[0]).trim()!==hd[0])throw new Error(`Het tabblad ‘${tab}’ bestaat al en hoort niet bij de app. Geef het een andere naam of verwijder het.`)}
@@ -394,8 +400,9 @@ async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(T
  (d.values||[]).forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(id)inSheet.add(id);if(!id)return;if(have.has(id)){const x=byId.get(id);if(x&&!x.chkD){const k=/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim());if(!!x.chk!==k){x.chk=k;chg=true}}return}
   const v=pnum(r[7]);if(v==null)return;const date=toDate(r[1]),ts=toTs(String(r[11]||'').replace(/^'/,'')||r[11],date);
   if(c.wipeTs&&ts<c.wipeTs)return;const meth=REV[String(r[6]||'').trim().toLowerCase()];if(!meth)return;
-  const k=String(r[10]||'').trim(),typ=String(r[8]||'').trim().toLowerCase(),ref=String(r[9]==null?'':r[9]).trim().replace(/^'/,''),name=String(r[2]||'').trim();
-  const t={id,ts,date,mid:mem.get(name.toLowerCase())||null,name,v,method:meth,h:String(r[4]||'').trim(),s:String(r[5]||'').trim(),desc:String(r[3]||'').trim(),by:/quaestor/i.test(String(r[12]||'').trim()||k)?'q':'h',who:/^(quaestor|helper)$/i.test(k)?'':k,void:false,synced:true};
+  const k=String(r[10]||'').trim(),typ=String(r[8]||'').trim().toLowerCase(),ref=String(r[9]==null?'':r[9]).trim().replace(/^'/,'');let name=String(r[2]||'').trim(),desc=String(r[3]||'').trim();
+  if(!name&&(typ==='uitgave'||typ==='storno')&&desc){const i=desc.indexOf(' – ');if(i>=0){name=desc.slice(0,i).trim();desc=desc.slice(i+3).trim()}else if(typ==='uitgave'){name=desc;desc=''}}
+  const t={id,ts,date,mid:mem.get(name.toLowerCase())||null,name,v,method:meth,h:String(r[4]||'').trim(),s:String(r[5]||'').trim(),desc,by:/quaestor/i.test(String(r[12]||'').trim()||k)?'q':'h',who:/^(quaestor|helper)$/i.test(k)?'':k,void:false,synced:true};
   if(/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim()))t.chk=true;
   if(typ==='storno')t.storno=true;if(ref&&(typ==='storno'||typ==='afbetaling'||typ==='terugbetaling'))t.ref=ref;
   if(typ==='uitgave'||typ==='terugbetaling'){t.exp=true;if(typ==='uitgave'&&ref)t.bon=ref}const ad=String(r[13]||'').trim();if(ad)t.adv=ad;
@@ -431,7 +438,7 @@ async function sync(manual,force){
   if(S.club.closed&&!ISDEV){try{await pushTx()}catch(e){}LASTPULL=Date.now();setTimeout(closedGo,0);return}
   if(accCheck()){try{await pushTx()}catch(e){}LASTPULL=Date.now();S.sync.last=Date.now();S.sync.err='';save();setTimeout(blockAfter,0);return}
   try{if(await repairShift())changed=true}catch(e){if(e.auth)throw e}changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;changed=await syncBons(true)||changed;LASTPULL=Date.now()}
-  await pushTx();await pushChk();if(role==='q'){try{await pushOverview()}catch(e){if(e.auth)throw e}try{await fmtSheets()}catch(e){if(e.auth)throw e;console.warn('Opmaak',e)}}
+  await pushTx();await pushChk();if(role==='q'){try{await fixShopRows()}catch(e){if(e.auth)throw e}try{await pushOverview()}catch(e){if(e.auth)throw e}try{await fmtSheets()}catch(e){if(e.auth)throw e;console.warn('Opmaak',e)}}
   if(S.bons.some(b=>!b.synced||b.dirty))changed=await syncBons(false)||changed;
   try{await accPing()}catch(e){if(e.auth)throw e}
   S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;S.sync.pick=false;save();
@@ -1067,7 +1074,7 @@ function limCard(){const c=S.club,L=c.lim||{};return `<div class="card"><h2>Schu
 function setLim(s,v){if(role!=='q')return;const c=S.club;c.lim=Object.assign({},c.lim);const n=String(v).trim()===''?'':pamt(v);c.lim[s]=n==null?'':n;c.setDirty=true;save();queueSync();toast('Opgeslagen')}
 let OVH='';
 /* ---------- opmaak van de tabbladen ---------- */
-const FMT_V='2';
+const FMT_V='3';
 async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)return;const key=c.gid+'|'+FMT_V+'|'+c.color;if(!force&&(c.fmtK===key||(c.fmtFailK===key&&Date.now()-c.fmtFail<36e5)))return;
  const m=await api(`/${c.gid}?fields=sheets(properties(sheetId,title),bandedRanges(bandedRangeId),conditionalFormats(ranges))`),SH={};(m.sheets||[]).forEach(x=>SH[x.properties.title]=x);
  const rgb=h=>{h=String(h||'#8B1E3F').replace('#','');return{red:parseInt(h.slice(0,2),16)/255,green:parseInt(h.slice(2,4),16)/255,blue:parseInt(h.slice(4,6),16)/255}};
@@ -1082,7 +1089,7 @@ async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)ret
   R.push({updateSheetProperties:{properties:{sheetId:id,tabColor:AC,gridProperties:{frozenRowCount:o.frz||1}},fields:'tabColor,gridProperties.frozenRowCount'}});
   o.w.forEach((w,i)=>R.push({updateDimensionProperties:{range:{sheetId:id,dimension:'COLUMNS',startIndex:i,endIndex:i+1},properties:{pixelSize:w,hiddenByUser:(o.hide||[]).includes(i)},fields:'pixelSize,hiddenByUser'}}));
   R.push({updateDimensionProperties:{range:{sheetId:id,dimension:'ROWS',startIndex:0,endIndex:o.frz||1},properties:{pixelSize:32},fields:'pixelSize'}});
-  fmt(G(id,1,null,0,o.w.length),{verticalAlignment:'MIDDLE',textFormat:{fontSize:10}},'verticalAlignment,textFormat.fontSize');
+  fmt(G(id,o.frz||1,null,0,o.w.length),{verticalAlignment:'MIDDLE',textFormat:{fontSize:10}},'verticalAlignment,horizontalAlignment,textFormat.fontSize');
   if(!o.ov){fmt(G(id,0,1,0,o.w.length),{backgroundColor:AC,textFormat:{bold:true,foregroundColor:WH,fontSize:10},verticalAlignment:'MIDDLE',wrapStrategy:'CLIP'},'backgroundColor,textFormat,verticalAlignment,wrapStrategy');
    R.push({addBanding:{bandedRange:{range:G(id,0,null,0,o.w.length),rowProperties:{headerColor:AC,firstBandColor:WH,secondBandColor:ZG}}}})}
   Object.entries(o.num||{}).forEach(([j,f])=>fmt(G(id,1,null,+j,+j+1),{numberFormat:f},'numberFormat'));return id};
