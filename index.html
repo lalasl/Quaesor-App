@@ -108,7 +108,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='36';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='37';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -1044,8 +1044,8 @@ function limCard(){const c=S.club,L=c.lim||{};return `<div class="card"><h2>Schu
 function setLim(s,v){if(role!=='q')return;const c=S.club;c.lim=Object.assign({},c.lim);const n=String(v).trim()===''?'':pamt(v);c.lim[s]=n==null?'':n;c.setDirty=true;save();queueSync();toast('Opgeslagen')}
 let OVH='';
 /* ---------- opmaak van de tabbladen ---------- */
-const FMT_V='1';
-async function fmtSheets(){const c=S.club;if(role!=='q'||!c.gid||!c.gok)return;const key=c.gid+'|'+FMT_V+'|'+c.color;if(c.fmtK===key||(c.fmtFail&&Date.now()-c.fmtFail<36e5))return;
+const FMT_V='2';
+async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)return;const key=c.gid+'|'+FMT_V+'|'+c.color;if(!force&&(c.fmtK===key||(c.fmtFailK===key&&Date.now()-c.fmtFail<36e5)))return;
  const m=await api(`/${c.gid}?fields=sheets(properties(sheetId,title),bandedRanges(bandedRangeId),conditionalFormats(ranges))`),SH={};(m.sheets||[]).forEach(x=>SH[x.properties.title]=x);
  const rgb=h=>{h=String(h||'#8B1E3F').replace('#','');return{red:parseInt(h.slice(0,2),16)/255,green:parseInt(h.slice(2,4),16)/255,blue:parseInt(h.slice(4,6),16)/255}};
  const AC=rgb(c.color),TI={red:AC.red+(1-AC.red)*.86,green:AC.green+(1-AC.green)*.86,blue:AC.blue+(1-AC.blue)*.86},WH={red:1,green:1,blue:1},ZG=rgb('#F6F7F9'),GR=rgb('#8A8F99'),RD=rgb('#9B1C1C'),RB=rgb('#FBE3E3'),GN=rgb('#1E6B3A'),GB=rgb('#E2F3E8'),AM=rgb('#FDF0E1'),AT=rgb('#6B4A12');
@@ -1054,7 +1054,7 @@ async function fmtSheets(){const c=S.club;if(role!=='q'||!c.gid||!c.gok)return;c
  const fmt=(g,f,fields)=>R.push({repeatCell:{range:g,cell:{userEnteredFormat:f},fields:'userEnteredFormat('+fields+')'}});
  const cond=(g,b,f)=>R.push({addConditionalFormatRule:{rule:{ranges:[g],booleanRule:{condition:b,format:f}},index:0}});
  const formula=v=>({type:'CUSTOM_FORMULA',values:[{userEnteredValue:v}]});
- const base=(t,o)=>{const x=SH[t];if(!x)return null;const id=x.properties.sheetId;
+ const B=[];const base=(t,o)=>{const x=SH[t];if(!x)return null;const id=x.properties.sheetId;B.push([t,R.length]);
   (x.bandedRanges||[]).forEach(b=>R.push({deleteBanding:{bandedRangeId:b.bandedRangeId}}));for(let i=(x.conditionalFormats||[]).length-1;i>=0;i--)R.push({deleteConditionalFormatRule:{sheetId:id,index:i}});
   R.push({updateSheetProperties:{properties:{sheetId:id,tabColor:AC,gridProperties:{frozenRowCount:o.frz||1}},fields:'tabColor,gridProperties.frozenRowCount'}});
   o.w.forEach((w,i)=>R.push({updateDimensionProperties:{range:{sheetId:id,dimension:'COLUMNS',startIndex:i,endIndex:i+1},properties:{pixelSize:w,hiddenByUser:(o.hide||[]).includes(i)},fields:'pixelSize,hiddenByUser'}}));
@@ -1081,9 +1081,14 @@ async function fmtSheets(){const c=S.club;if(role!=='q'||!c.gid||!c.gok)return;c
   fmt(G(id,0,null,10,11),{backgroundColor:WH},'backgroundColor');
   cond(G(id,2,null,8,9),{type:'NUMBER_GREATER',values:[{userEnteredValue:'0'}]},{textFormat:{foregroundColor:RD,bold:true}});
   cond(G(id,2,null,15,16),{type:'NUMBER_GREATER',values:[{userEnteredValue:'0'}]},{backgroundColor:RB,textFormat:{foregroundColor:RD,bold:true}});
-  cond(G(id,2,null,15,16),formula('=AND(P3<>"",P3=0)'),{backgroundColor:GB,textFormat:{foregroundColor:GN,bold:true}});
+  cond(G(id,2,null,15,16),formula('=(P3="")+P3=0'),{backgroundColor:GB,textFormat:{foregroundColor:GN,bold:true}});
   cond(G(id,2,null,9,10),{type:'TEXT_EQ',values:[{userEnteredValue:'Ja'}]},{textFormat:{foregroundColor:GN,bold:true}})}
- try{if(R.length)await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:R})})}catch(e){if(!e.auth){c.fmtFail=Date.now();save()}throw e}c.fmtK=key;c.fmtFail=0;save()}
+ const err=[];for(let i=0;i<B.length;i++){const part=R.slice(B[i][1],i+1<B.length?B[i+1][1]:R.length);if(!part.length)continue;
+  try{await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:part})})}catch(e){if(e.auth)throw e;
+   const core=part.filter(r=>!r.addConditionalFormatRule&&!r.deleteConditionalFormatRule);let ok2=false;try{if(core.length<part.length){await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:core})});ok2=true}}catch(e2){if(e2.auth)throw e2}
+   err.push(B[i][0]+(ok2?' (kleuren)':'')+': '+(e.message||'onbekende fout'))}}
+ c.fmtErr=err.join(' · ');if(err.length){c.fmtFail=Date.now();c.fmtFailK=key}else{c.fmtK=key;c.fmtFail=0;c.fmtFailK=''}save();return !err.length}
+async function fmtNow(){if(SYNCING)return toast('Even geduld, de app is aan het bijwerken');SI=true;try{const ok=await fmtSheets(true);toast(ok?'Opmaak toegepast':'Opmaak lukte niet helemaal: '+S.club.fmtErr)}catch(e){toast(e.message||'Opmaak lukte niet')}finally{SI=false}render()}
 async function pushOverview(){const c=S.club;if(!c.gid||!c.gok||!c.bkImp&&!S.tx.some(t=>t.method==='schuld'))return;
  const fd=d=>d?d.split('-').reverse().join('/'):'';const D=Object.values(debts()).sort((a,b)=>a.name.localeCompare(b.name));
  const all={};S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno).forEach(t=>{const k=uk(t.name);(all[k]=all[k]||{name:t.name,due:0,paid:0}).due+=t.v;all[k].paid+=(t.paid||0)});
@@ -1143,6 +1148,7 @@ function wipeAllOk(){if(($('#wc').value||'').trim().toUpperCase()!=='WISSEN')ret
 function gCard(){const c=S.club,on=!!c.gid&&c.gok,ex=c.gmode==='existing',tg="document.getElementById('pk').style.display=this.value==='existing'?'block':'none'";
  if(on)return `<div class="card"><h2>Google Sheets</h2><p class="mu" id="gst">${esc(gStatus())}</p>${c.gname?`<p style="margin:0 0 10px">Spreadsheet: <b>${esc(c.gname)}</b></p>`:''}
  <div class="btns"><a class="btn" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}">Openen</a><button class="btn ghost" onclick="sync(true)">Nu bijwerken</button></div>
+ ${c.fmtErr?`<p class="err" style="margin-top:10px">Opmaak lukte niet: ${esc(c.fmtErr)}</p>`:''}<button class="btn ghost" style="margin-top:8px" onclick="fmtNow()">Opmaak van de tabbladen opnieuw toepassen</button>
  <details style="margin-top:12px"><summary>Andere spreadsheet of ontkoppelen</summary>${gForm(c,ex,tg)}<button class="btn" onclick="connect()">Opslaan en opnieuw verbinden</button><button class="btn ghost" style="margin-top:8px" onclick="unlink()">Ontkoppelen</button></details>
  <p class="mu" style="margin-top:12px"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`;
  return `<div class="card"><h2>Google Sheets</h2><p class="mu" id="gst">${esc(gStatus())}</p>${gForm(c,ex,tg)}${gCardEnd(c,on)}`}
