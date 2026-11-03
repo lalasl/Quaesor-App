@@ -108,7 +108,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='37';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='38';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -213,7 +213,27 @@ const enc=encodeURIComponent;
 const cell=v=>typeof v==='string'&&/^[=+\-@]/.test(v)?"'"+v:v;
 const typ=t=>t.storno?'Storno':t.exp&&t.ref?'Terugbetaling':t.exp?'Uitgave':t.ref?'Afbetaling':'Boeking';
 const rowOf=t=>[ "'"+t.id,t.date,cell(t.name||''),cell(t.desc||''),cell(t.h||''),cell(t.s||''),M[t.method],t.v,typ(t),t.ref?"'"+t.ref:t.bon?"'"+t.bon:'',cell(t.who||(t.by==='q'?'Quaestor':'Helper')),"'"+new Date(t.ts).toISOString(),t.by==='q'?'Quaestor':'Helper',cell(t.adv||''),t.chk?'Ja':''];
-async function append(tab,cols,rows){for(let i=0;i<rows.length;i+=200)await api(`/${S.club.gid}/values/${enc(rng(tab,cols))}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,{method:'POST',body:JSON.stringify({values:rows.slice(i,i+200)})})}
+async function append(tab,cols,rows){const g=S.club.gid,last=cols.split(':')[1].replace(/\d/g,'');
+ /* Zelf de volgende lege rij zoeken in plaats van Google te laten raden: values.append schoof rijen soms een kolom op (bv. bij verborgen kolommen). */
+ for(let i=0;i<rows.length;i+=200){const chunk=rows.slice(i,i+200);let done=false;
+  for(let tries=0;tries<4&&!done;tries++){
+   const d=await api(`/${g}/values/${enc(rng(tab,'A:C'))}`),n=(d.values||[]).length;
+   try{const m=await api(`/${g}?fields=sheets(properties(sheetId,title,gridProperties(rowCount)))`),x=(m.sheets||[]).find(z=>z.properties.title===tab),rc=x&&x.properties.gridProperties&&x.properties.gridProperties.rowCount;
+    if(x&&rc&&n+chunk.length>rc)await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{appendDimension:{sheetId:x.properties.sheetId,dimension:'ROWS',length:chunk.length+200}}]})})}catch(e){if(e.auth)throw e}
+   const r0=n+1,r1=n+chunk.length;
+   await api(`/${g}/values/${enc(rng(tab,'A'+r0+':'+last+r1))}?valueInputOption=USER_ENTERED`,{method:'PUT',body:JSON.stringify({values:chunk})});
+   const k=v=>String(v==null?'':v).replace(/^'/,'').trim(),chk=await api(`/${g}/values/${enc(rng(tab,'A'+r0+':A'+r1))}`),got=(chk.values||[]).map(r=>k(r[0]));
+   done=chunk.every((r,j)=>got[j]===k(r[0]))}
+  if(!done)throw new Error('Wegschrijven naar '+tab+' lukte niet. Probeer opnieuw.')}}
+/* Rijen herstellen die door de oude manier van toevoegen een kolom naar rechts waren geschoven. */
+let REPD='';
+async function repairShift(){const g=S.club.gid;if(REPD===g)return false;let fixed=0;
+ const T=[[TAB_B,'P',r=>typeof r[1]==='string'&&/^'?[0-9a-z-]{12,}$/i.test(r[1])&&/\d/.test(r[1])],[TAB_BN,'L',r=>typeof r[1]==='string'&&/^'?[0-9a-z-]{12,}$/i.test(r[1])&&/\d/.test(r[1])],[TAB_L,'E',r=>String(r[1]==null?'':r[1]).trim()!=='']];
+ const m=await api(`/${g}?fields=sheets.properties.title`),have=new Set((m.sheets||[]).map(x=>x.properties.title));
+ for(const [t,lc,isShift] of T){if(!have.has(t))continue;const d=await api(`/${g}/values/${enc(rng(t,'A2:'+lc))}?valueRenderOption=UNFORMATTED_VALUE`),data=[];
+  (d.values||[]).forEach((r,i)=>{if(String(r[0]==null?'':r[0]).trim()!==''||!isShift(r))return;const nr=r.slice(1).map(v=>v==null?'':v);while(nr.length<lc.charCodeAt(0)-64)nr.push('');data.push({range:rng(t,'A'+(i+2)+':'+lc+(i+2)),values:[nr]})});
+  if(data.length){await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data})});fixed+=data.length}}
+ REPD=g;return fixed>0}
 async function head(tab,hd){const d=await api(`/${S.club.gid}/values/${enc(rng(tab,'A1:Z1'))}`);const v=(d.values||[])[0];
  if(!v||!v.some(x=>String(x||'').trim())){await api(`/${S.club.gid}/values/${enc(rng(tab,'A1'))}?valueInputOption=RAW`,{method:'PUT',body:JSON.stringify({values:[hd]})});return}
  if(String(v[0]).trim()!==hd[0])throw new Error(`Het tabblad ‘${tab}’ bestaat al en hoort niet bij de app. Geef het een andere naam of verwijder het.`)}
@@ -410,7 +430,7 @@ async function sync(manual,force){
   if(userCheck())changed=true;
   if(S.club.closed&&!ISDEV){try{await pushTx()}catch(e){}LASTPULL=Date.now();setTimeout(closedGo,0);return}
   if(accCheck()){try{await pushTx()}catch(e){}LASTPULL=Date.now();S.sync.last=Date.now();S.sync.err='';save();setTimeout(blockAfter,0);return}
-  changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;changed=await syncBons(true)||changed;LASTPULL=Date.now()}
+  try{if(await repairShift())changed=true}catch(e){if(e.auth)throw e}changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;changed=await syncBons(true)||changed;LASTPULL=Date.now()}
   await pushTx();await pushChk();if(role==='q'){try{await pushOverview()}catch(e){if(e.auth)throw e}try{await fmtSheets()}catch(e){if(e.auth)throw e;console.warn('Opmaak',e)}}
   if(S.bons.some(b=>!b.synced||b.dirty))changed=await syncBons(false)||changed;
   try{await accPing()}catch(e){if(e.auth)throw e}
@@ -810,6 +830,7 @@ async function bonTabs(){const g=S.club.gid,m=await api(`/${g}?fields=sheets.pro
  if(rq.length)await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:rq})});
  await head(TAB_BN,HEAD_BN);await head(TAB_BF,['ID','Foto (gebruikt door de app, niet aanpassen)']);S.club.bonTab=true;S.club.fmtK='';save()}
 const bonRow=b=>["'"+b.id,b.date,cell(b.shop),b.total,cell(b.items),cell(b.desc),cell(b.who),"'"+new Date(b.ts).toISOString(),b.status,b.txid?"'"+b.txid:'',cell(b.adv||'')];
+const HEAL=new Set();
 async function syncBons(pull){const c=S.club,g=c.gid;let ch=false;
  const nw=S.bons.filter(b=>!b.synced);
  if(!c.bonTab){if(!nw.length&&!(pull&&await hasTab(TAB_BN)))return false;await bonTabs()}
@@ -826,8 +847,10 @@ async function syncBons(pull){const c=S.club,g=c.gid;let ch=false;
  const by=new Map(S.bons.map(b=>[b.id,b])),seen=new Set();
  rows.forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(!id)return;seen.add(id);const tot=pnum(r[3]);
   const o={date:toDate(r[1]),shop:String(r[2]||'').trim(),total:tot==null?0:tot,items:String(r[4]||''),desc:String(r[5]||''),who:String(r[6]||'').trim(),status:String(r[8]||'Nieuw').trim()||'Nieuw',txid:String(r[9]==null?'':r[9]).trim().replace(/^'/,''),adv:String(r[10]||'').trim()};
+  if(o.status==='Nieuw'&&role==='q'){const x=S.tx.find(t=>t.bon===id&&t.exp&&!t.void&&!t.storno);if(x){o.status='Ingeboekt';o.txid=x.id;HEAL.add(id)}}
   const b=by.get(id);if(!b){S.bons.push(Object.assign({id,ts:toTs(String(r[7]||'').replace(/^'/,''),o.date),h:'',synced:true,dirty:false,mine:false},o));ch=true;return}
   if(b.dirty)return;for(const k in o)if(String(b[k])!==String(o[k])){b[k]=o[k];ch=true}});
+ if(HEAL.size){S.bons.forEach(b=>{if(HEAL.has(b.id)&&b.synced)b.dirty=true});HEAL.clear();queueSync()}
  const before=S.bons.length;S.bons=S.bons.filter(b=>!b.synced||seen.has(b.id));if(S.bons.length!==before)ch=true;
  if(ch)save();return ch}
 const MX={cash:'Cash uit de kas',overschrijving:'Overschrijving van de clubrekening',payconiq:'Payconiq',voorschot:'Voorgeschoten door iemand (nog terug te betalen)'};
