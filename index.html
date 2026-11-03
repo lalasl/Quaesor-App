@@ -110,7 +110,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='43',APP_LABEL='1.0.2';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='44',APP_LABEL='1.1';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -1028,14 +1028,19 @@ function vSchuldDet(){const o=memDebt(SDN),Q=role==='q';const back=`<button clas
  return back+`<div class="card"><div class="row" style="border:0;padding:0"><div><h2 style="margin:0">${esc(o.name)}</h2><div class="drt">${stTag(o.st)}${o.warn?`<span class="tag warn" style="font-weight:600">${esc(o.warn)}</span>`:''}</div></div><div style="text-align:right"><span class="mu">Openstaand</span><div style="font-size:1.5rem;font-weight:700">${eur(o.tot)}</div></div></div>
  <div class="grid" style="margin-top:10px"><div class="stat">Totaal schuld<b>${eur(o.due)}</b></div><div class="stat">Al betaald<b>${eur(o.paid)}</b></div></div>
  ${RO()?'':`<button class="btn" style="margin-top:10px" data-n="${esc(o.name)}" onclick="payAll(this.dataset.n)">Betaling ontvangen</button>`}</div>${rmdCard(o)}
- <div class="card"><h2>Openstaande schulden</h2>${Q?'<p class="mu" style="margin-top:-6px">Vink aan wat je gecontroleerd hebt.</p>':''}${o.debts.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(d=>`<div class="row"><div>${esc(d.desc||d.h||'Schuld')}<div class="mu">${esc([fd(d.date),d.h,d.s,d.paid?'al '+eur(d.paid)+' betaald':''].filter(Boolean).join(' · '))}</div></div><div class="amt" style="display:flex;align-items:center;gap:8px">${eur(rem(d))}${Q?`<label style="margin:0" title="Gecontroleerd"><input type="checkbox" style="width:20px;height:20px" ${d.chk?'checked':''} onchange="chkSet('${d.id}',this.checked)" aria-label="Gecontroleerd"></label>`:(d.chk?'<span class="mu" title="Gecontroleerd">✓</span>':'')}${RO()?'':`<button class="sm" onclick="pay('${d.id}')">Betaald</button>`}</div></div>`).join('')}</div>
+ <div class="card"><h2>Openstaande schulden</h2>${Q?'<p class="mu" style="margin-top:-6px">Vink aan wat je gecontroleerd hebt.</p>':''}${o.debts.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(d=>`<div class="row"><div>${esc(d.desc||d.h||'Schuld')}${d.paid>.005?' <span class="tag" style="border-color:#C98A2B;color:#8A5A12">Deels betaald</span>':''}<div class="mu">${esc([fd(d.date),d.h,d.s].filter(Boolean).join(' · '))}</div>${d.paid>.005?`<div class="mu">${eur(d.paid)} van ${eur(d.v)} betaald</div>`:''}</div><div class="amt" style="display:flex;align-items:center;gap:8px"><span style="text-align:right">${eur(rem(d))}${d.paid>.005?'<div class="mu" style="font-weight:400;font-size:.75rem">nog te betalen</div>':''}</span>${Q?`<label style="margin:0" title="Gecontroleerd"><input type="checkbox" style="width:20px;height:20px" ${d.chk?'checked':''} onchange="chkSet('${d.id}',this.checked)" aria-label="Gecontroleerd"></label>`:(d.chk?'<span class="mu" title="Gecontroleerd">✓</span>':'')}${RO()?'':`<button class="sm" onclick="pay('${d.id}')">Betaald</button>`}</div></div>`).join('')}</div>
  ${(()=>{const pd=S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno&&uk(t.name)===uk(o.name)&&rem(t)<=.005).sort((a,b)=>(a.date||'').localeCompare(b.date||''));return pd.length?`<div class="card"><details><summary><b>Betaalde schulden (${pd.length})</b></summary>${pd.map(d=>`<div class="row"><div>${esc(d.desc||d.h||'Schuld')}<div class="mu">${esc([fd(d.date),d.h,d.s].filter(Boolean).join(' · '))}</div></div><div class="amt">${eur(d.v)}</div></div>`).join('')}</details></div>`:''})()}
  <div class="card"><h2>Ontvangen betalingen</h2>${o.pays.length?o.pays.slice().sort((a,b)=>b.ts-a.ts).map(t=>`<div class="row"><div>${esc(t.desc)}<div class="mu">${fd(t.date)} · ${ML[t.method]||t.method}${t.who?' · '+esc(t.who):''}</div></div><div class="amt">${eur(t.v)}</div></div>`).join(''):empty('Nog niets betaald.')}</div>`}
 function pay(id){if(RO())return;const d=S.tx.find(x=>x.id===id);if(!d)return;modal(`<h3>Betaling ontvangen</h3><p>${esc(d.name)} · ${esc(d.desc||d.h)} · nog ${eur(rem(d))}</p><label>Bedrag<input id="pa" inputmode="decimal" value="${fmt2(rem(d))}"></label><label>Betaalwijze<select id="pm"><option value="cash">Cash</option><option value="payconiq">Payconiq</option><option value="overschrijving">Overschrijving</option></select></label><label>Datum<input type="date" id="pd" value="${today()}"></label><button class="btn" onclick="payOk('${id}')">Betaling opslaan</button>`)}
 function payTx(d,a,m,date){const n={who:WHO,id:uid(),ts:Date.now(),date,mid:d.mid,name:d.name,v:a,method:m,h:d.h,s:d.s,desc:'Afbetaling: '+(d.desc||d.h||'schuld'),by:role,ref:d.id,void:false,synced:false};S.tx.push(n);return n}
 function payOk(id){if(RO())return;const d=S.tx.find(x=>x.id===id);if(!d)return;const a=Math.min(pamt($('#pa').value)||0,rem(d));if(!(a>0))return toast('Vul een bedrag in');
  payTx(d,a,$('#pm').value,$('#pd').value||today());relink();save();closeM();toast('Betaling opgeslagen');render();queueSync()}
-function payAll(name){if(RO())return;const o=memDebt(name);if(!o)return;modal(`<h3>Betaling van ${esc(o.name)}</h3><p class="mu">Openstaand ${eur(o.tot)}. Het bedrag wordt verdeeld over de oudste schulden eerst.</p><label>Bedrag<input id="pa" inputmode="decimal" value="${fmt2(o.tot)}"></label><label>Betaalwijze<select id="pm"><option value="cash">Cash</option><option value="payconiq">Payconiq</option><option value="overschrijving">Overschrijving</option></select></label><label>Datum<input type="date" id="pd" value="${today()}"></label><button class="btn" data-n="${esc(o.name)}" onclick="payAllOk(this.dataset.n)">Betaling opslaan</button>`)}
+function payAll(name){if(RO())return;const o=memDebt(name);if(!o)return;modal(`<h3>Betaling van ${esc(o.name)}</h3><p class="mu">Openstaand ${eur(o.tot)}. Het bedrag wordt verdeeld over de oudste schulden eerst.</p><label>Bedrag<input id="pa" inputmode="decimal" value="${fmt2(o.tot)}" data-n="${esc(o.name)}" oninput="payPrev(this.dataset.n)"></label><div id="pp" style="margin:-4px 0 10px"></div><label>Betaalwijze<select id="pm"><option value="cash">Cash</option><option value="payconiq">Payconiq</option><option value="overschrijving">Overschrijving</option></select></label><label>Datum<input type="date" id="pd" value="${today()}"></label><button class="btn" data-n="${esc(o.name)}" onclick="payAllOk(this.dataset.n)">Betaling opslaan</button>`);payPrev(o.name);setTimeout(()=>{const e=$('#pa');if(e){e.focus();e.select()}},50)}
+function payPrev(name){const o=memDebt(name),e=$('#pp');if(!o||!e)return;let a=pamt($('#pa').value)||0;if(!(a>0)){e.innerHTML='';return}
+ if(a>o.tot+.005){e.innerHTML=`<p class="err" style="margin:0">Dat is meer dan het openstaande bedrag (${eur(o.tot)}).</p>`;return}
+ const fd=d=>d?d.split('-').reverse().join('/'):'',L=[];o.debts.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||'')||x.ts-y.ts).forEach(d=>{if(a<=.005)return;const r=rem(d),p=Math.round(Math.min(a,r)*100)/100;a=Math.round((a-p)*100)/100;L.push([d,p,Math.round((r-p)*100)/100])});
+ const left=Math.round((o.tot-L.reduce((s,x)=>s+x[1],0))*100)/100;
+ e.innerHTML=`<div class="mu" style="font-size:.85rem;margin-bottom:4px">Zo wordt het verdeeld, de oudste eerst:</div>${L.map(([d,p,r])=>`<div class="row" style="padding:5px 0"><div style="font-size:.9rem">${esc(d.desc||d.h||'Schuld')}<div class="mu" style="font-size:.8rem">${fd(d.date)}</div></div><div style="text-align:right;font-size:.9rem"><b>${eur(p)}</b><div class="mu" style="font-size:.78rem">${r>.005?'nog '+eur(r)+' open':'volledig betaald'}</div></div></div>`).join('')}<div class="mu" style="font-size:.85rem;margin-top:4px">Daarna nog open: <b>${eur(left)}</b></div>`}
 function payAllOk(name){if(RO())return;const o=memDebt(name);if(!o)return;let a=pamt($('#pa').value)||0;if(!(a>0))return toast('Vul een bedrag in');if(a>o.tot+.005)return toast('Dat is meer dan het openstaande bedrag');
  const m=$('#pm').value,dt0=$('#pd').value||today();o.debts.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||'')||x.ts-y.ts).forEach(d=>{if(a<=.005)return;const p=Math.min(a,rem(d));payTx(d,Math.round(p*100)/100,m,dt0);a=Math.round((a-p)*100)/100});
  relink();save();closeM();toast('Betaling opgeslagen');render();queueSync()}
@@ -1104,7 +1109,7 @@ function limCard(){const c=S.club,L=c.lim||{};return `<div class="card"><h2>Schu
 function setLim(s,v){if(role!=='q')return;const c=S.club;c.lim=Object.assign({},c.lim);const n=String(v).trim()===''?'':pamt(v);c.lim[s]=n==null?'':n;c.setDirty=true;save();queueSync();toast('Opgeslagen')}
 let OVH='';
 /* ---------- opmaak van de tabbladen ---------- */
-const FMT_V='5';
+const FMT_V='6';
 async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)return;const key=c.gid+'|'+FMT_V+'|'+c.color;if(!force&&(c.fmtK===key||(c.fmtFailK===key&&Date.now()-c.fmtFail<36e5)))return;
  const m=await api(`/${c.gid}?fields=sheets(properties(sheetId,title),bandedRanges(bandedRangeId),conditionalFormats(ranges))`),SH={};(m.sheets||[]).forEach(x=>SH[x.properties.title]=x);
  const rgb=h=>{h=String(h||'#8B1E3F').replace('#','');return{red:parseInt(h.slice(0,2),16)/255,green:parseInt(h.slice(2,4),16)/255,blue:parseInt(h.slice(4,6),16)/255}};
@@ -1134,16 +1139,18 @@ async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)ret
  if(id!=null){cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Nieuw'}]},{backgroundColor:AM,textFormat:{foregroundColor:AT,bold:true}});
   cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Ingeboekt'}]},{textFormat:{foregroundColor:GN,bold:true}});
   cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Afgewezen'}]},{textFormat:{foregroundColor:GR,italic:true}})}
- id=base(TAB_OV,{ov:1,frz:2,w:[90,110,110,200,120,120,85,85,95,105,24,110,110,105,95,105],num:{6:EUR,7:EUR,8:EUR,13:EUR,14:EUR,15:EUR}});
- if(id!=null){R.push({unmergeCells:{range:G(id,0,1,0,16)}},{mergeCells:{range:G(id,0,1,0,10),mergeType:'MERGE_ALL'}},{mergeCells:{range:G(id,0,1,11,16),mergeType:'MERGE_ALL'}});
-  [[0,10],[11,16]].forEach(([a,b])=>{fmt(G(id,0,1,a,b),{backgroundColor:AC,textFormat:{bold:true,foregroundColor:WH,fontSize:11},verticalAlignment:'MIDDLE'},'backgroundColor,textFormat,verticalAlignment');
+ id=base(TAB_OV,{ov:1,frz:2,w:[90,110,110,200,120,120,85,85,85,85,105,24,110,110,105,95,105],num:{6:EUR,7:EUR,8:EUR,9:EUR,14:EUR,15:EUR,16:EUR}});
+ if(id!=null){R.push({unmergeCells:{range:G(id,0,1,0,17)}},{mergeCells:{range:G(id,0,1,0,11),mergeType:'MERGE_ALL'}},{mergeCells:{range:G(id,0,1,12,17),mergeType:'MERGE_ALL'}});
+  [[0,11],[12,17]].forEach(([a,b])=>{fmt(G(id,0,1,a,b),{backgroundColor:AC,textFormat:{bold:true,foregroundColor:WH,fontSize:11},verticalAlignment:'MIDDLE'},'backgroundColor,textFormat,verticalAlignment');
    fmt(G(id,1,2,a,b),{backgroundColor:TI,textFormat:{bold:true,fontSize:10},verticalAlignment:'MIDDLE'},'backgroundColor,textFormat,verticalAlignment');
    R.push({addBanding:{bandedRange:{range:G(id,1,null,a,b),rowProperties:{headerColor:TI,firstBandColor:WH,secondBandColor:ZG}}}})});
-  fmt(G(id,0,null,10,11),{backgroundColor:WH},'backgroundColor');
+  fmt(G(id,0,null,11,12),{backgroundColor:WH},'backgroundColor');
   cond(G(id,2,null,8,9),{type:'NUMBER_LESS',values:[{userEnteredValue:'0'}]},{textFormat:{foregroundColor:GN}});
-  cond(G(id,2,null,15,16),{type:'NUMBER_GREATER',values:[{userEnteredValue:'0'}]},{backgroundColor:RB,textFormat:{foregroundColor:RD,bold:true}});
-  cond(G(id,2,null,15,16),formula('=(P3="")+P3=0'),{backgroundColor:GB,textFormat:{foregroundColor:GN,bold:true}});
-  cond(G(id,2,null,9,10),{type:'TEXT_EQ',values:[{userEnteredValue:'Ja'}]},{textFormat:{foregroundColor:GN,bold:true}})}
+  cond(G(id,2,null,9,10),{type:'NUMBER_GREATER',values:[{userEnteredValue:'0'}]},{textFormat:{foregroundColor:RD,bold:true}});
+  cond(G(id,2,null,9,10),formula('=(J3="")+J3=0'),{textFormat:{foregroundColor:GN}});
+  cond(G(id,2,null,16,17),{type:'NUMBER_GREATER',values:[{userEnteredValue:'0'}]},{backgroundColor:RB,textFormat:{foregroundColor:RD,bold:true}});
+  cond(G(id,2,null,16,17),formula('=(Q3="")+Q3=0'),{backgroundColor:GB,textFormat:{foregroundColor:GN,bold:true}});
+  cond(G(id,2,null,10,11),{type:'TEXT_EQ',values:[{userEnteredValue:'Ja'}]},{textFormat:{foregroundColor:GN,bold:true}})}
  const err=[];for(let i=0;i<B.length;i++){const part=R.slice(B[i][1],i+1<B.length?B[i+1][1]:R.length);if(!part.length)continue;
   try{await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:part})})}catch(e){if(e.auth)throw e;
    const core=part.filter(r=>!r.addConditionalFormatRule&&!r.deleteConditionalFormatRule);let ok2=false;try{if(core.length<part.length){await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:core})});ok2=true}}catch(e2){if(e2.auth)throw e2}
@@ -1156,16 +1163,16 @@ async function pushOverview(){const c=S.club;if(!c.gid||!c.gok||!c.bkImp&&!S.tx.
  const sumRows=Object.values(all).sort((a,b)=>(b.due-b.paid)-(a.due-a.paid)||a.name.localeCompare(b.name)).map(o=>[o.name,stOf(o.name),Math.round(o.due*100)/100,Math.round(o.paid*100)/100,Math.round((o.due-o.paid)*100)/100]);
  /* Rekening courant: elke schuld (ook betaalde) en elke betaling als aparte regel, zoals in een klassieke schuldenlijst. Een betaling die over meerdere schulden verdeeld werd, staat als één regel. */
  const DS=S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno),DI=new Set(DS.map(t=>t.id)),LR=[];
- DS.forEach(d=>LR.push({date:d.date,name:d.name,ts:d.ts,desc:d.desc||d.h||'Schuld',h:d.h||'',s:d.s||'',due:d.v,paid:0,chk:!!d.chk}));
+ DS.forEach(d=>LR.push({date:d.date,name:d.name,ts:d.ts,desc:d.desc||d.h||'Schuld',h:d.h||'',s:d.s||'',due:d.v,paid:0,open:rem(d),chk:!!d.chk}));
  const PS=S.tx.filter(t=>t.ref&&DI.has(t.ref)&&!t.void&&!t.storno&&!t.exp).sort((a,b)=>a.ts-b.ts),G=[];
  PS.forEach(t=>{const dsc=String(t.desc||'').replace(/^Afbetaling:\s*/,''),g=G.find(x=>uk(x.name)===uk(t.name)&&x.date===t.date&&x.method===t.method&&Math.abs(t.ts-x.ts1)<12e4);
   if(g){g.paid+=t.v;g.ts1=t.ts;g.chk=g.chk&&!!t.chk;if(g.desc!==dsc)g.multi=true;if(g.h!==t.h)g.h='';if(g.s!==t.s)g.s=''}else G.push({date:t.date,name:t.name,ts:t.ts,ts1:t.ts,method:t.method,desc:dsc,h:t.h||'',s:t.s||'',due:0,paid:t.v,chk:!!t.chk})});
  G.forEach(g=>LR.push(Object.assign(g,{desc:g.multi?'Afbetaling':(/^afbetaling/i.test(g.desc)?g.desc:'Afbetaling: '+g.desc)})));
  LR.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.name.localeCompare(b.name)||a.ts-b.ts);
- const r2=v=>Math.round(v*100)/100,lineRows=LR.map(x=>[fd(x.date),x.name,stOf(x.name),x.desc,x.h,x.s,x.due?r2(x.due):'',x.paid?r2(x.paid):'',r2(x.due-x.paid),x.chk?'Ja':'']);
- const H1=['Datum','Clubnaam','Status','Omschrijving','Categorie','Subcategorie','Te betalen','Betaald','Saldo','Gecontroleerd'],H2=['Clubnaam','Status','Totaal schuld','Al betaald','Openstaand'];
- const n=Math.max(lineRows.length,sumRows.length),vals=[['Alle schulden en betalingen (bijgehouden door de app, niet aanpassen)'].concat(Array(10).fill('')).concat(['Overzicht per lid','','','','']),H1.concat(['']).concat(H2)];
- for(let i=0;i<n;i++)vals.push((lineRows[i]||Array(10).fill('')).concat(['']).concat(sumRows[i]||Array(5).fill('')));
+ const r2=v=>Math.round(v*100)/100,lineRows=LR.map(x=>[fd(x.date),x.name,stOf(x.name),x.desc,x.h,x.s,x.due?r2(x.due):'',x.paid?r2(x.paid):'',r2(x.due-x.paid),x.open==null?'':r2(x.open),x.chk?'Ja':'']);
+ const H1=['Datum','Clubnaam','Status','Omschrijving','Categorie','Subcategorie','Te betalen','Betaald','Saldo','Nog open','Gecontroleerd'],H2=['Clubnaam','Status','Totaal schuld','Al betaald','Openstaand'];
+ const n=Math.max(lineRows.length,sumRows.length),vals=[['Alle schulden en betalingen (bijgehouden door de app, niet aanpassen)'].concat(Array(11).fill('')).concat(['Overzicht per lid','','','','']),H1.concat(['']).concat(H2)];
+ for(let i=0;i<n;i++)vals.push((lineRows[i]||Array(11).fill('')).concat(['']).concat(sumRows[i]||Array(5).fill('')));
  const h=JSON.stringify(vals);if(h===OVH)return;
  const m=await api(`/${c.gid}?fields=sheets.properties.title`);if(!(m.sheets||[]).some(s=>s.properties.title===TAB_OV)){await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:TAB_OV}}}]})});c.fmtK=''}
  await api(`/${c.gid}/values/${enc(rng(TAB_OV,'A1:Z'))}:clear`,{method:'POST',body:'{}'});
