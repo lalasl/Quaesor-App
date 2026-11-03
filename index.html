@@ -108,7 +108,9 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='40';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+/* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
+   Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
+const APP_VERSION='41',APP_LABEL='1.0';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -333,7 +335,7 @@ async function oldTab(gid){
 async function readSettings(gid){const o=await metaGet(gid);if(o)return{m:o,src:'meta'};const t=await oldTab(gid);return t?{m:t.o,src:'tab',id:t.id}:{m:{},src:null}}
 function mergeAcc(a,b){const r={};const add=o=>{if(!o||typeof o!=='object')return;for(const k in o){const v=o[k];if(!/^[\w-]{6,64}$/.test(k)||!v||typeof v!=='object')continue;if(!r[k]||(+v.t||0)>(+r[k].t||0))r[k]={s:['uit','h','weg','q'].includes(v.s)?v.s:'',t:+v.t||0}}};add(a);add(b);return r}
 function adoptTabs(m){const c=S.club;if(Array.isArray(m['Verwijderd'])){c.rmIds=[...new Set((c.rmIds||[]).concat(m['Verwijderd']))].slice(-3000);const R=new Set(c.rmIds),n0=S.tx.length;S.tx=S.tx.filter(t=>!R.has(t.id));if(S.tx.length!==n0)relink()}if(m['Herinnering']&&typeof m['Herinnering']==='object'&&!c.rmdDirty)c.rmd=m['Herinnering'];if(m['Schuldlimieten']&&typeof m['Schuldlimieten']==='object')c.lim=m['Schuldlimieten'];if(+m['Schuldimport']>(c.bkImp||0))c.bkImp=+m['Schuldimport'];if(m['Categorietabblad']&&String(m['Categorietabblad'])!==c.catTab){c.catTab=String(m['Categorietabblad']);ENS=''}}
-function takeAcc(m){const c=S.club,cl=+m['Afgesloten']||0;if(cl>0&&!c.closedAt&&!ISDEV&&!c.closed&&!c.reopen){c.closed=cl;save()}
+function takeAcc(m){const c=S.club,cl=+m['Afgesloten']||0;if(cl>0&&!c.closedAt&&!c.closed&&!c.reopen){c.closed=cl;save()}
  const n=mergeAcc(c.acc,m['Toegang']);if(JSON.stringify(n)!==JSON.stringify(c.acc)){c.acc=n;save()}}
 async function syncSettings(){const c=S.club;
  if(c.helperOnly){const {m}=await readSettings(c.gid),ts=+m['Gewijzigd']||0;takeAcc(m);if(!(ts>(c.setTs||0)))return false;
@@ -341,7 +343,7 @@ async function syncSettings(){const c=S.club;
   if(m['Salt']&&m['Helper-code']){c.salt=String(m['Salt']);c.pinHh=String(m['Helper-code']);try{if(c.hOk&&c.pinH&&await hashPin(c.pinH,c.salt)!==c.pinHh)c.pinH=''}catch(e){}}
   c.setTs=ts;save();return true}
  const {m,src,id}=await readSettings(c.gid);let ch=false,wrote=false;takeAcc(m);
- if(((c.setDirty&&role==='q')||!m['Naam'])&&!(c.closed&&!ISDEV)){if(!c.salt)c.salt=rnd();let qh=c.pinQh,hh=c.pinHh;
+ if(((c.setDirty&&role==='q')||!m['Naam'])&&!c.closed){if(!c.salt)c.salt=rnd();let qh=c.pinQh,hh=c.pinHh;
   try{if(c.pinQ)qh=await hashPin(c.pinQ,c.salt);if(c.pinH)hh=await hashPin(c.pinH,c.salt)}catch(e){}
   c.pinQh=qh||'';c.pinHh=hh||'';c.setTs=Date.now();
   await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Toegang':c.acc,'Schuldlimieten':c.lim||{},'Herinnering':c.rmd||{},'Verwijderd':[...new Set((Array.isArray(m['Verwijderd'])?m['Verwijderd']:[]).concat(c.rmIds||[]))].slice(-3000),'Schuldimport':c.bkImp||0,'Afgesloten':c.reopen?0:Math.max(+m['Afgesloten']||0,c.closedAt||0),'Gewijzigd':c.setTs},src==='meta');c.reopen=false;
@@ -444,7 +446,7 @@ async function sync(manual,force){
   try{changed=await pullUsers()||changed;await pushUsers()}catch(e){if(e.auth||e.pick)throw e;S.sync.warn='Accounts bijwerken lukte niet: '+(e.message||'onbekende fout')}
   try{if(await bindMe())changed=true}catch(e){if(e.auth)throw e}
   if(userCheck())changed=true;
-  if(S.club.closed&&!ISDEV){try{await pushTx()}catch(e){}LASTPULL=Date.now();setTimeout(closedGo,0);return}
+  if(S.club.closed){try{await pushTx()}catch(e){}LASTPULL=Date.now();setTimeout(closedGo,0);return}
   if(accCheck()){try{await pushTx()}catch(e){}LASTPULL=Date.now();S.sync.last=Date.now();S.sync.err='';save();setTimeout(blockAfter,0);return}
   try{if(await repairShift())changed=true}catch(e){if(e.auth)throw e}changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;changed=await syncBons(true)||changed;LASTPULL=Date.now()}
   if(role==='q')try{await purgeRm()}catch(e){if(e.auth)throw e}await pushTx();await pushChk();if(role==='q'){try{await fixShopRows()}catch(e){if(e.auth)throw e}try{await sortTabs()}catch(e){if(e.auth)throw e}try{await pushOverview()}catch(e){if(e.auth)throw e}try{await fmtSheets()}catch(e){if(e.auth)throw e;console.warn('Opmaak',e)}}
@@ -483,6 +485,10 @@ async function choose(){readG();const c=S.club;
  try{const tok=await getToken();await loadPicker();r=await pickFile(tok)}catch(e){S.sync.err=e.message;S.sync.auth=!!e.auth;save();refreshSt();return toast(e.message)}
  if(!r)return;
  if((c.helperOnly||role!=='q')&&c.inviteGid&&r.id!==c.inviteGid)return toast('Dit is niet de spreadsheet uit de uitnodiging. Kies de spreadsheet die de Quaestor met je deelde.');
+ if(role==='q'&&!c.helperOnly&&r.id!==c.gid){let m={};try{SI=true;m=(await readSettings(r.id)).m||{}}catch(e){}finally{SI=false}
+  if(+m['Afgesloten']>0){if(!ISDEV)return toast('Deze spreadsheet hoort bij een club die de developer heeft afgesloten. Kies een andere spreadsheet.');
+   const go=await new Promise(res=>ask(`Deze spreadsheet hoort bij een club die je eerder voor iedereen hebt afgesloten. Wil je ze heropenen en gebruiken? Toestellen die al gewist werden, moeten de club opnieuw ophalen.`,'Heropenen',()=>res(true)));if(!go)return;
+   Object.assign(c,{reopen:true,closed:0,closedAt:0,setDirty:true})}}
  c.gmode='existing';
  if(r.id!==c.gid){c.gid=r.id;c.gcreated=false;S.tx.forEach(t=>t.synced=false);S.members.forEach(m=>m.on=false);S.delM=[]}
  c.gname=r.name;c.gpicked=true;c.gok=true;S.sync.pick=false;ENS='';save();
@@ -499,7 +505,7 @@ function parseJoin(s){const m=String(s==null?location.hash:s).trim().match(/#joi
 let JOIN=parseJoin();
 function start(){theme();
  if(JOIN){if(emptyClub(S))return joinScreen();return joinAsk()}
- if(S.club.closed&&!ISDEV)return closedGo();
+ if(S.club.closed)return closedGo();
  if(S.club.blocked){role=null;return S.club.blocked==='weg'?goneGo():blockedScreen()}
  if(emptyClub(S))return setup();
  if(!role&&S.club.sess){const u=S.users.find(x=>x.id===S.club.sess);if(u&&!u.st)return logIn(u);S.club.sess='';save()}
@@ -1223,7 +1229,7 @@ let SUBM='';
 const MSEC=[['club','Club en uiterlijk','Naam, kleur, logo en weergave'],['mensen','Accounts en helpers','Wie toegang heeft, helpers uitnodigen, rollen'],['leden','Leden, prijzen en schuldbeleid','Statussen, prijzen per status en schuldlimieten'],['rmd','Herinneringen','Rekeningnummer en berichten voor schulden'],['sheet','Spreadsheet en tabbladen','Google Sheets, categorieën en schulden overnemen'],['data','Back-up en wissen','Back-up maken, terugzetten en gegevens wissen']];
 function mSum(k){const c=S.club;if(k==='sheet'&&!(c.gid&&c.gok))return '<span class="neg">Niet verbonden</span>';if(k==='mensen'){const n=actU().length;return n?n+'&nbsp;'+(n===1?'account':'accounts'):''}return ''}
 function vInst(){const c=S.club;
- if(!SUBM)return `<div class="card">${MSEC.map(x=>`<button class="drow" onclick="SUBM='${x[0]}';render();scrollTo(0,0)"><span><b>${x[1]}</b><span class="mu" style="font-size:13px">${x[2]}</span></span><span class="dra"><span class="mu" style="font-size:12px;text-align:right;white-space:nowrap">${mSum(x[0])}</span><span aria-hidden="true">›</span></span></button>`).join('')}</div><p class="mu" style="text-align:center">Versie ${APP_VERSION}</p>`;
+ if(!SUBM)return `<div class="card">${MSEC.map(x=>`<button class="drow" onclick="SUBM='${x[0]}';render();scrollTo(0,0)"><span><b>${x[1]}</b><span class="mu" style="font-size:13px">${x[2]}</span></span><span class="dra"><span class="mu" style="font-size:12px;text-align:right;white-space:nowrap">${mSum(x[0])}</span><span aria-hidden="true">›</span></span></button>`).join('')}</div><p class="mu" style="text-align:center">Versie ${APP_LABEL}</p>`;
  const t=(MSEC.find(x=>x[0]===SUBM)||[])[1]||'';
  const body={
   club:()=>`<div class="card"><label>Naam van de club<input id="in" value="${esc(c.name)}"></label><label>Clubkleur<input type="color" id="ic" value="${c.color}" oninput="prevColor(this.value)"></label>
@@ -1254,7 +1260,7 @@ function vAcc(){const c=S.club,A=c.acc||{},dst=o=>(A[o.id]||{}).s||'';
  const U=actU(),names=new Set(U.map(u=>uk(u.u))),devs=ACCL.filter(o=>dst(o)!=='uit');
  const dev=(o,nb)=>{const mine=o.id===c.dev||nb===true,tg=[];if(mine)tg.push('<span class="tag">Dit toestel</span>');
   if(Date.now()-(+o.l||0)>60*864e5)tg.push('<span class="tag warn">Meer dan 2 maanden niet gebruikt</span>');
-  if((+o.v||0)<+APP_VERSION)tg.push(`<span class="tag">Oude versie ${esc(o.v||'?')}</span>`);
+  if((+o.v||0)<+APP_VERSION)tg.push('<span class="tag">Oude versie: app opnieuw openen</span>');
   return `<div class="accd"><div>${esc(o.d||'Onbekend toestel')} ${tg.join('')}</div><div class="mu">Laatst actief ${dt(o.l)}</div>${mine?'':`<div class="accb"><button class="btn ghost" onclick="accRm('${esc(o.id)}')">Toestel verwijderen</button></div>`}</div>`};
  const usr=u=>{const mine=u.id===USER,ds=devs.filter(o=>uk(o.n)===uk(u.u)).sort((a,b)=>(+b.l||0)-(+a.l||0)),tg=[],b=[];
   if(mine)tg.push('<span class="tag">Jij</span>');if(ds.length>1)tg.push(`<span class="tag">${ds.length} toestellen</span>`);if(u.dirty)tg.push('<span class="tag">Nog niet verstuurd</span>');
