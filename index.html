@@ -108,7 +108,7 @@ const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingedi
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
-const APP_VERSION='39';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
+const APP_VERSION='40';document.documentElement.style.setProperty('--ver',`"Versie ${APP_VERSION}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -229,6 +229,10 @@ async function append(tab,cols,rows){const g=S.club.gid,last=cols.split(':')[1].
   if(!done)throw new Error('Wegschrijven naar '+tab+' lukte niet. Probeer opnieuw.')}}
 /* Rijen herstellen die door de oude manier van toevoegen een kolom naar rechts waren geschoven. */
 let REPD='';
+async function purgeRm(){const c=S.club;if(role!=='q'||!(c.rmIds||[]).length)return;const R=new Set(c.rmIds),g=c.gid,d=await api(`/${g}/values/${enc(rng(TAB_B,'A2:A'))}`),del=[];
+ (d.values||[]).forEach((r,i)=>{if(R.has(String(r[0]==null?'':r[0]).trim().replace(/^'/,'')))del.push(i+1)});if(!del.length)return;
+ const m=await api(`/${g}?fields=sheets.properties(sheetId,title)`),sh=(m.sheets||[]).find(x=>x.properties.title===TAB_B);if(!sh)return;
+ await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:del.sort((a,b)=>b-a).map(i=>({deleteDimension:{range:{sheetId:sh.properties.sheetId,dimension:'ROWS',startIndex:i,endIndex:i+1}}}))})})}
 async function fixShopRows(){const c=S.club;if(role!=='q'||c.shopFix===c.gid)return;const g=c.gid,by=new Map(S.tx.map(t=>[t.id,t]));
  const d=await api(`/${g}/values/${enc(rng(TAB_B,'A2:D'))}?valueRenderOption=UNFORMATTED_VALUE`),data=[];
  (d.values||[]).forEach((r,i)=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,''),t=by.get(id);if(!t||!isShop(t)||!t.name)return;if(String(r[2]||'').trim()===t.name)data.push({range:rng(TAB_B,'C'+(i+2)+':D'+(i+2)),values:[['',shopDesc(t)]]})});
@@ -239,7 +243,7 @@ async function repairShift(){const g=S.club.gid;if(REPD===g)return false;let fix
  for(const [t,lc,isShift] of T){if(!have.has(t))continue;const d=await api(`/${g}/values/${enc(rng(t,'A2:'+lc))}?valueRenderOption=UNFORMATTED_VALUE`),data=[];
   (d.values||[]).forEach((r,i)=>{if(String(r[0]==null?'':r[0]).trim()!==''||!isShift(r))return;const nr=r.slice(1).map(v=>v==null?'':v);while(nr.length<lc.charCodeAt(0)-64)nr.push('');data.push({range:rng(t,'A'+(i+2)+':'+lc+(i+2)),values:[nr]})});
   if(data.length){await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data})});fixed+=data.length}}
- REPD=g;if(fixed)S.club.fmtK='';return fixed>0}
+ REPD=g;NSORT.add(TAB_B);NSORT.add(TAB_BN);if(fixed)S.club.fmtK='';return fixed>0}
 async function head(tab,hd){const d=await api(`/${S.club.gid}/values/${enc(rng(tab,'A1:Z1'))}`);const v=(d.values||[])[0];
  if(!v||!v.some(x=>String(x||'').trim())){await api(`/${S.club.gid}/values/${enc(rng(tab,'A1'))}?valueInputOption=RAW`,{method:'PUT',body:JSON.stringify({values:[hd]})});return}
  if(String(v[0]).trim()!==hd[0])throw new Error(`Het tabblad ‘${tab}’ bestaat al en hoort niet bij de app. Geef het een andere naam of verwijder het.`)}
@@ -328,7 +332,7 @@ async function oldTab(gid){
  catch(e){if(e.auth)throw e;return null}}
 async function readSettings(gid){const o=await metaGet(gid);if(o)return{m:o,src:'meta'};const t=await oldTab(gid);return t?{m:t.o,src:'tab',id:t.id}:{m:{},src:null}}
 function mergeAcc(a,b){const r={};const add=o=>{if(!o||typeof o!=='object')return;for(const k in o){const v=o[k];if(!/^[\w-]{6,64}$/.test(k)||!v||typeof v!=='object')continue;if(!r[k]||(+v.t||0)>(+r[k].t||0))r[k]={s:['uit','h','weg','q'].includes(v.s)?v.s:'',t:+v.t||0}}};add(a);add(b);return r}
-function adoptTabs(m){const c=S.club;if(m['Herinnering']&&typeof m['Herinnering']==='object'&&!c.rmdDirty)c.rmd=m['Herinnering'];if(m['Schuldlimieten']&&typeof m['Schuldlimieten']==='object')c.lim=m['Schuldlimieten'];if(+m['Schuldimport']>(c.bkImp||0))c.bkImp=+m['Schuldimport'];if(m['Categorietabblad']&&String(m['Categorietabblad'])!==c.catTab){c.catTab=String(m['Categorietabblad']);ENS=''}}
+function adoptTabs(m){const c=S.club;if(Array.isArray(m['Verwijderd'])){c.rmIds=[...new Set((c.rmIds||[]).concat(m['Verwijderd']))].slice(-3000);const R=new Set(c.rmIds),n0=S.tx.length;S.tx=S.tx.filter(t=>!R.has(t.id));if(S.tx.length!==n0)relink()}if(m['Herinnering']&&typeof m['Herinnering']==='object'&&!c.rmdDirty)c.rmd=m['Herinnering'];if(m['Schuldlimieten']&&typeof m['Schuldlimieten']==='object')c.lim=m['Schuldlimieten'];if(+m['Schuldimport']>(c.bkImp||0))c.bkImp=+m['Schuldimport'];if(m['Categorietabblad']&&String(m['Categorietabblad'])!==c.catTab){c.catTab=String(m['Categorietabblad']);ENS=''}}
 function takeAcc(m){const c=S.club,cl=+m['Afgesloten']||0;if(cl>0&&!c.closedAt&&!ISDEV&&!c.closed&&!c.reopen){c.closed=cl;save()}
  const n=mergeAcc(c.acc,m['Toegang']);if(JSON.stringify(n)!==JSON.stringify(c.acc)){c.acc=n;save()}}
 async function syncSettings(){const c=S.club;
@@ -340,7 +344,7 @@ async function syncSettings(){const c=S.club;
  if(((c.setDirty&&role==='q')||!m['Naam'])&&!(c.closed&&!ISDEV)){if(!c.salt)c.salt=rnd();let qh=c.pinQh,hh=c.pinHh;
   try{if(c.pinQ)qh=await hashPin(c.pinQ,c.salt);if(c.pinH)hh=await hashPin(c.pinH,c.salt)}catch(e){}
   c.pinQh=qh||'';c.pinHh=hh||'';c.setTs=Date.now();
-  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Toegang':c.acc,'Schuldlimieten':c.lim||{},'Herinnering':c.rmd||{},'Schuldimport':c.bkImp||0,'Afgesloten':c.reopen?0:Math.max(+m['Afgesloten']||0,c.closedAt||0),'Gewijzigd':c.setTs},src==='meta');c.reopen=false;
+  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Toegang':c.acc,'Schuldlimieten':c.lim||{},'Herinnering':c.rmd||{},'Verwijderd':[...new Set((Array.isArray(m['Verwijderd'])?m['Verwijderd']:[]).concat(c.rmIds||[]))].slice(-3000),'Schuldimport':c.bkImp||0,'Afgesloten':c.reopen?0:Math.max(+m['Afgesloten']||0,c.closedAt||0),'Gewijzigd':c.setTs},src==='meta');c.reopen=false;
   wrote=true;c.setDirty=false;save()}
  else{const ts=+m['Gewijzigd']||0;if(role!=='q')c.setDirty=false;
   if(ts>(c.setTs||0)){adoptTabs(m);c.name=String(m['Naam']||c.name);if(/^#[0-9a-f]{6}$/i.test(String(m['Kleur'])))c.color=String(m['Kleur']);
@@ -397,7 +401,8 @@ function relink(){const by=new Map(S.tx.map(t=>[t.id,t]));
 async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(TAB_B,'A2:O'))}?valueRenderOption=UNFORMATTED_VALUE`),have=new Set(S.tx.map(t=>t.id)),byId=new Map(S.tx.map(t=>[t.id,t]));let add=0,chg=false;
  const mem=new Map(S.members.map(m=>[m.name.toLowerCase(),m.id]));
  const inSheet=new Set();
- (d.values||[]).forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(id)inSheet.add(id);if(!id)return;if(have.has(id)){const x=byId.get(id);if(x&&!x.chkD){const k=/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim());if(!!x.chk!==k){x.chk=k;chg=true}}return}
+ const RM=new Set(c.rmIds||[]);if(RM.size){const n0=S.tx.length;S.tx=S.tx.filter(t=>!RM.has(t.id));if(S.tx.length!==n0){chg=true;have.clear();S.tx.forEach(t=>have.add(t.id))}}
+ (d.values||[]).forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(RM.has(id))return;if(id)inSheet.add(id);if(!id)return;if(have.has(id)){const x=byId.get(id);if(x&&!x.chkD){const k=/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim());if(!!x.chk!==k){x.chk=k;chg=true}}return}
   const v=pnum(r[7]);if(v==null)return;const date=toDate(r[1]),ts=toTs(String(r[11]||'').replace(/^'/,'')||r[11],date);
   if(c.wipeTs&&ts<c.wipeTs)return;const meth=REV[String(r[6]||'').trim().toLowerCase()];if(!meth)return;
   const k=String(r[10]||'').trim(),typ=String(r[8]||'').trim().toLowerCase(),ref=String(r[9]==null?'':r[9]).trim().replace(/^'/,'');let name=String(r[2]||'').trim(),desc=String(r[3]||'').trim();
@@ -419,10 +424,14 @@ function pendDo(del){const ids=new Set(S.pendDel);S.pendDel=[];
  save();render();if(!del)queueSync();toast(del?'Verwijderd op dit toestel':'Boekingen worden teruggezet')}
 async function pushChk(){const l=S.tx.filter(t=>t.chkD&&t.synced);if(!l.length)return;const g=S.club.gid,d=await api(`/${g}/values/${enc(rng(TAB_B,'A2:A'))}`),idx=new Map();(d.values||[]).forEach((r,i)=>idx.set(String(r[0]||'').replace(/^'/,''),i+2));
  const data=l.filter(t=>idx.has(t.id)).map(t=>({range:rng(TAB_B,'O'+idx.get(t.id)),values:[[t.chk?'Ja':'']]}));if(data.length)await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data})});l.forEach(t=>delete t.chkD);save()}
+const NSORT=new Set();
+async function sortTabs(){const c=S.club;if(role!=='q'||!NSORT.size)return;const m=await api(`/${c.gid}?fields=sheets.properties(sheetId,title)`),R=[];
+ (m.sheets||[]).forEach(x=>{const t=x.properties.title,id=x.properties.sheetId;if(!NSORT.has(t))return;if(t===TAB_B)R.push({sortRange:{range:{sheetId:id,startRowIndex:1,startColumnIndex:0,endColumnIndex:15},sortSpecs:[{dimensionIndex:1,sortOrder:'ASCENDING'},{dimensionIndex:11,sortOrder:'ASCENDING'}]}});if(t===TAB_BN)R.push({sortRange:{range:{sheetId:id,startRowIndex:1,startColumnIndex:0,endColumnIndex:11},sortSpecs:[{dimensionIndex:1,sortOrder:'ASCENDING'},{dimensionIndex:7,sortOrder:'ASCENDING'}]}})});
+ if(R.length)await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:R})});NSORT.clear()}
 async function pushTx(){const p=S.tx.filter(t=>!t.synced);if(!p.length)return;
  const d=await api(`/${S.club.gid}/values/${enc(rng(TAB_B,'A2:A'))}`),ex=new Set((d.values||[]).map(r=>String(r[0]||'').trim().replace(/^'/,'')));
  const nw=p.filter(t=>!ex.has(t.id)).sort((a,b)=>a.ts-b.ts);
- if(nw.length)await append(TAB_B,'A:O',nw.map(rowOf));
+ if(nw.length){await append(TAB_B,'A:O',nw.map(rowOf));NSORT.add(TAB_B)}
  p.forEach(t=>t.synced=true);save()}
 async function sync(manual,force){
  if(SYNCING){AGAIN=true;return}AGAIN=false;const c=S.club;if(!force&&!autoOk())return;
@@ -438,7 +447,7 @@ async function sync(manual,force){
   if(S.club.closed&&!ISDEV){try{await pushTx()}catch(e){}LASTPULL=Date.now();setTimeout(closedGo,0);return}
   if(accCheck()){try{await pushTx()}catch(e){}LASTPULL=Date.now();S.sync.last=Date.now();S.sync.err='';save();setTimeout(blockAfter,0);return}
   try{if(await repairShift())changed=true}catch(e){if(e.auth)throw e}changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;changed=await syncBons(true)||changed;LASTPULL=Date.now()}
-  await pushTx();await pushChk();if(role==='q'){try{await fixShopRows()}catch(e){if(e.auth)throw e}try{await pushOverview()}catch(e){if(e.auth)throw e}try{await fmtSheets()}catch(e){if(e.auth)throw e;console.warn('Opmaak',e)}}
+  if(role==='q')try{await purgeRm()}catch(e){if(e.auth)throw e}await pushTx();await pushChk();if(role==='q'){try{await fixShopRows()}catch(e){if(e.auth)throw e}try{await sortTabs()}catch(e){if(e.auth)throw e}try{await pushOverview()}catch(e){if(e.auth)throw e}try{await fmtSheets()}catch(e){if(e.auth)throw e;console.warn('Opmaak',e)}}
   if(S.bons.some(b=>!b.synced||b.dirty))changed=await syncBons(false)||changed;
   try{await accPing()}catch(e){if(e.auth)throw e}
   S.sync.last=Date.now();S.sync.err='';S.sync.auth=false;S.sync.pick=false;save();
@@ -844,7 +853,7 @@ async function syncBons(pull){const c=S.club,g=c.gid;let ch=false;
  for(const b of nw){const ph=phGet(b.id);
   if(ph){const v=["'"+b.id];for(let i=0;i<ph.length;i+=40000)v.push(ph.slice(i,i+40000));
    await api(`/${g}/values/${enc(rng(TAB_BF,'A:A'))}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{method:'POST',body:JSON.stringify({values:[v.map((x,i)=>i?x:b.id)]})})}
-  await append(TAB_BN,'A:K',[bonRow(b)]);b.synced=true;b.dirty=false;if(ph){PH.set(b.id,ph);phDel(b.id)}save();ch=true}
+  await append(TAB_BN,'A:K',[bonRow(b)]);NSORT.add(TAB_BN);b.synced=true;b.dirty=false;if(ph){PH.set(b.id,ph);phDel(b.id)}save();ch=true}
  const dir=S.bons.filter(b=>b.dirty&&b.synced);
  if(!pull&&!dir.length)return ch;
  const d=await api(`/${g}/values/${enc(rng(TAB_BN,'A2:K'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[],idx=new Map();
@@ -1060,21 +1069,35 @@ function bkPlan(bk){const by={};bk.lines.filter(l=>!l.ok).forEach(l=>{const k=uk
   const ls=o.lines.filter(l=>l.bal>0).sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(l=>({l,v:l.bal}));let red=Math.round((ls.reduce((a,x)=>a+x.v,0)-Math.max(0,target))*100)/100;
   for(const x of ls){if(red<=.005)break;const r=Math.min(red,x.v);x.v=Math.round((x.v-r)*100)/100;red=Math.round((red-r)*100)/100}
   ls.filter(x=>x.v>.005).forEach(x=>plan.push({name:o.name,st:o.st||(bk.sst||{})[o.name]||'',l:x.l,v:x.v}))});return plan}
-function bkPrev(bk){const pl=bkPlan(bk),n=new Set(pl.map(x=>uk(x.name))).size,tot=pl.reduce((a,x)=>a+x.v,0);
- return `<p class="mu">Gevonden: ${esc(bk.info)}.</p><div class="stat" style="margin:8px 0"><span class="mu">Over te nemen</span><b>${eur(tot)}</b><span class="mu">${pl.length} openstaande ${pl.length===1?'schuld':'schulden'} bij ${n} ${n===1?'lid':'leden'}${bk.sum?', afgestemd op je overzicht per lid':''}</span></div><button class="btn" onclick="bkImport()">Overnemen in de app</button>`}
-function bkImport(){if(role!=='q'||!S.bk||S.bk.err)return;const pl=bkPlan(S.bk);if(!pl.length)return toast('Er zijn geen openstaande schulden om over te nemen');
- const go=()=>{let n=0,sk0=0,nm=0;const now=Date.now(),ex={},key=(nm,d,v)=>uk(nm)+'|'+d+'|'+(+v).toFixed(2);S.tx.filter(t=>t.method==='schuld'&&!t.void&&!t.storno&&t.v>0).forEach(t=>{const k=key(t.name,t.date,t.v);ex[k]=(ex[k]||0)+1});
-  pl.forEach((x,i)=>{const date=x.l.date||today(),k=key(x.name,date,x.v);if(ex[k]>0){ex[k]--;sk0++;return}
-   let m=S.members.find(y=>uk(y.name)===uk(x.name));if(!m){m={id:uid(),name:x.name,status:addSt(x.st)||S.statuses[0],dirty:true};S.members.push(m);nm++}
-   S.tx.push({who:WHO,id:uid(),ts:now+i,date,mid:m.id,name:m.name,v:x.v,method:'schuld',h:x.l.h||'',s:x.l.s||'',desc:x.l.desc||'Schuld uit vorige schuldenlijst',by:'q',chk:true,void:false,synced:false});n++});
+function bkFull(bk){const by={};bk.lines.forEach(l=>{if(!(l.due>0)&&!(l.paid>0))return;const k=uk(l.name);(by[k]=by[k]||{name:l.name,st:l.st||(bk.sst||{})[l.name]||'',debts:[],pays:[]});
+  if(l.due>0)by[k].debts.push({l,v:Math.round(l.due*100)/100});if(l.paid>0)by[k].pays.push({l,v:Math.round(l.paid*100)/100})});
+ const L=Object.values(by);L.forEach(o=>{o.due=o.debts.reduce((a,x)=>a+x.v,0);o.paid=o.pays.reduce((a,x)=>a+x.v,0);o.open=Math.round((o.due-o.paid)*100)/100;
+  if(bk.sum){const k=Object.keys(bk.sum).find(x=>uk(x)===uk(o.name));o.sum=k!=null?bk.sum[k]:null}});return L}
+function bkPrev(bk){const L=bkFull(bk),nd=L.reduce((a,o)=>a+o.debts.length,0),np=L.reduce((a,o)=>a+o.pays.length,0),due=L.reduce((a,o)=>a+o.due,0),paid=L.reduce((a,o)=>a+o.paid,0),open=L.reduce((a,o)=>a+Math.max(0,o.open),0),no=L.filter(o=>o.open>.005).length;
+ const diff=L.filter(o=>o.sum!=null&&Math.abs(o.sum-o.open)>.01);
+ return `<p class="mu">Gevonden: ${esc(bk.info)}.</p><div class="stat" style="margin:8px 0"><span class="mu">Volledige geschiedenis overnemen</span><b>${eur(open)} openstaand</b><span class="mu">${nd} schulden (${eur(due)}) en ${np} betalingen (${eur(paid)}) van ${L.length} leden. Nog ${no} ${no===1?'lid heeft':'leden hebben'} een openstaande schuld.</span></div>${diff.length?`<p class="err">Let op: bij ${esc(diff.map(o=>o.name).join(', '))} verschilt het openstaande bedrag met je overzicht per lid.</p>`:bk.sum?'<p class="mu">Per lid klopt dit met je overzicht per lid.</p>':''}<button class="btn" onclick="bkImport()">${S.club.bkImp?'Vervangen door de volledige geschiedenis':'Overnemen in de app'}</button>`}
+function bkOld(){const c=S.club;if(!c.bkImp)return [];const imp=S.tx.filter(t=>t.imp||(t.method==='schuld'&&!t.ref&&!t.storno&&t.chk&&t.by==='q'&&Math.abs(t.ts-c.bkImp)<6e5));
+ const pi=S.tx.filter(t=>t.imp&&t.ref);return imp.concat(pi.filter(t=>!imp.includes(t)))}
+function bkImport(){if(role!=='q'||!S.bk||S.bk.err)return;const L=bkFull(S.bk);if(!L.length)return toast('Er werden geen schulden gevonden');
+ const old=bkOld(),oldIds=new Set(old.map(t=>t.id)),blk=S.tx.filter(t=>t.ref&&oldIds.has(t.ref)&&!oldIds.has(t.id)&&!t.void&&!t.storno);
+ if(blk.length)return toast(`Er zijn al ${blk.length} betalingen geboekt op eerder overgenomen schulden. Annuleer die eerst, of boek ze daarna opnieuw.`);
+ const go=()=>{const now=Date.now(),key=(n,d,v)=>uk(n)+'|'+d+'|'+(+v).toFixed(2),ex={};let n=0,np=0,nm=0,sk0=0,i=0;
+  if(old.length){S.tx=S.tx.filter(t=>!oldIds.has(t.id));const c=S.club;c.rmIds=[...new Set((c.rmIds||[]).concat([...oldIds]))].slice(-3000)}
+  S.tx.filter(t=>t.method==='schuld'&&!t.void&&!t.storno&&t.v>0).forEach(t=>{const k=key(t.name,t.date,t.v);ex[k]=(ex[k]||0)+1});
+  L.forEach(o=>{let m=S.members.find(y=>uk(y.name)===uk(o.name));if(!m){m={id:uid(),name:o.name,status:addSt(o.st)||S.statuses[0],dirty:true};S.members.push(m);nm++}
+   const D=[];o.debts.slice().sort((a,b)=>(a.l.date||'').localeCompare(b.l.date||'')).forEach(x=>{const date=x.l.date||today(),k=key(m.name,date,x.v);if(ex[k]>0){ex[k]--;sk0++;return}
+    const t={who:WHO,id:uid(),ts:now+(i++),date,mid:m.id,name:m.name,v:x.v,method:'schuld',h:x.l.h||'',s:x.l.s||'',desc:x.l.desc||'Schuld uit vorige schuldenlijst',by:'q',chk:true,imp:true,void:false,synced:false};S.tx.push(t);D.push({t,left:x.v});n++});
+   o.pays.slice().sort((a,b)=>(a.l.date||'').localeCompare(b.l.date||'')).forEach(x=>{let a=x.v;for(const d of D){if(a<=.005)break;if(d.left<=.005)continue;const p=Math.round(Math.min(a,d.left)*100)/100;
+     S.tx.push({who:WHO,id:uid(),ts:now+(i++),date:x.l.date||today(),mid:m.id,name:m.name,v:p,method:'overschrijving',h:d.t.h,s:d.t.s,desc:'Afbetaling: '+(x.l.desc||d.t.desc),by:'q',ref:d.t.id,chk:true,imp:true,void:false,synced:false});d.left=Math.round((d.left-p)*100)/100;a=Math.round((a-p)*100)/100;np++}})});
   Object.assign(S.club,{bkImp:Date.now(),debtTab:'',setDirty:true});S.bk=null;relink();save();render();queueSync();
-  toast(`${n} schulden overgenomen`+(nm?`, ${nm} nieuwe leden`:'')+(sk0?`, ${sk0} stonden er al`:''))};
- ask(`${pl.length} openstaande schulden (${eur(pl.reduce((a,x)=>a+x.v,0))}) overnemen in de app? Daarna houd je schulden alleen nog in de app bij. Je oude tabblad verandert niet.`+(S.club.bkImp?' Let op: je deed dit al eens. Schulden die al in de app staan, worden overgeslagen.':''),'Overnemen',go)}
+  toast(`${n} schulden en ${np} betalingen overgenomen`+(nm?`, ${nm} nieuwe leden`:'')+(sk0?`, ${sk0} stonden er al`:'')+(old.length?`. ${old.length} oude regels vervangen`:''))};
+ const nd=L.reduce((a,o)=>a+o.debts.length,0),np=L.reduce((a,o)=>a+o.pays.length,0);
+ ask(old.length?`De ${old.length} schulden die je eerder overnam, worden vervangen door de volledige geschiedenis: ${nd} schulden en ${np} betalingen. De oude regels verdwijnen ook uit het tabblad Boekingen. Je eigen schuldenlijst verandert niet.`:`${nd} schulden en ${np} betalingen overnemen in de app? Daarna houd je schulden alleen nog in de app bij. Je oude tabblad verandert niet.`,old.length?'Vervangen':'Overnemen',go)}
 function limCard(){const c=S.club,L=c.lim||{};return `<div class="card"><h2>Schuldbeleid per status</h2><p class="mu">Hoeveel schuld mag een lid hebben? Leeg = geen limiet. 0 = moet afbetalen. Boven de limiet krijgt het lid een waarschuwing bij Schulden.</p>${S.statuses.map((s,i)=>{const k=Object.keys(L).find(x=>sk(x)===sk(s)),v=k!=null?L[k]:(/oud/i.test(s)?0:'');return `<label>${esc(s)}<input inputmode="decimal" data-s="${esc(s)}" value="${v===''||v==null?'':fmt2(v)}" placeholder="geen limiet" onchange="setLim(this.dataset.s,this.value)"></label>`}).join('')}</div>`}
 function setLim(s,v){if(role!=='q')return;const c=S.club;c.lim=Object.assign({},c.lim);const n=String(v).trim()===''?'':pamt(v);c.lim[s]=n==null?'':n;c.setDirty=true;save();queueSync();toast('Opgeslagen')}
 let OVH='';
 /* ---------- opmaak van de tabbladen ---------- */
-const FMT_V='3';
+const FMT_V='4';
 async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)return;const key=c.gid+'|'+FMT_V+'|'+c.color;if(!force&&(c.fmtK===key||(c.fmtFailK===key&&Date.now()-c.fmtFail<36e5)))return;
  const m=await api(`/${c.gid}?fields=sheets(properties(sheetId,title),bandedRanges(bandedRangeId),conditionalFormats(ranges))`),SH={};(m.sheets||[]).forEach(x=>SH[x.properties.title]=x);
  const rgb=h=>{h=String(h||'#8B1E3F').replace('#','');return{red:parseInt(h.slice(0,2),16)/255,green:parseInt(h.slice(2,4),16)/255,blue:parseInt(h.slice(4,6),16)/255}};
@@ -1094,6 +1117,7 @@ async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)ret
    R.push({addBanding:{bandedRange:{range:G(id,0,null,0,o.w.length),rowProperties:{headerColor:AC,firstBandColor:WH,secondBandColor:ZG}}}})}
   Object.entries(o.num||{}).forEach(([j,f])=>fmt(G(id,1,null,+j,+j+1),{numberFormat:f},'numberFormat'));return id};
  let id=base(TAB_B,{w:[80,90,120,190,120,120,110,90,95,90,120,150,70,130,105],hide:[0,9,11,12],num:{1:DAT,7:EUR}});
+ if(id!=null)R.push({setBasicFilter:{filter:{range:G(id,0,null,0,15)}}});
  if(id!=null){cond(G(id,1,null,0,15),formula('=$I2="Storno"'),{textFormat:{foregroundColor:GR,italic:true}});
   cond(G(id,1,null,6,7),{type:'TEXT_EQ',values:[{userEnteredValue:M.schuld}]},{textFormat:{foregroundColor:AT,bold:true},backgroundColor:AM});
   cond(G(id,1,null,14,15),{type:'TEXT_EQ',values:[{userEnteredValue:'Ja'}]},{textFormat:{foregroundColor:GN,bold:true}})}
@@ -1123,7 +1147,7 @@ async function pushOverview(){const c=S.club;if(!c.gid||!c.gok||!c.bkImp&&!S.tx.
  const fd=d=>d?d.split('-').reverse().join('/'):'';const D=Object.values(debts()).sort((a,b)=>a.name.localeCompare(b.name));
  const all={};S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno).forEach(t=>{const k=uk(t.name);(all[k]=all[k]||{name:t.name,due:0,paid:0}).due+=t.v;all[k].paid+=(t.paid||0)});
  const sumRows=Object.values(all).sort((a,b)=>(b.due-b.paid)-(a.due-a.paid)||a.name.localeCompare(b.name)).map(o=>[o.name,stOf(o.name),Math.round(o.due*100)/100,Math.round(o.paid*100)/100,Math.round((o.due-o.paid)*100)/100]);
- const lineRows=[];D.forEach(o=>o.debts.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(d=>lineRows.push([fd(d.date),o.name,o.st,d.desc||'',d.h||'',d.s||'',d.v,d.paid||0,rem(d),d.chk?'Ja':''])));
+ const LR=[];D.forEach(o=>o.debts.forEach(d=>LR.push({d,o})));LR.sort((a,b)=>(a.d.date||'').localeCompare(b.d.date||'')||a.o.name.localeCompare(b.o.name)||a.d.ts-b.d.ts);const lineRows=LR.map(({d,o})=>[fd(d.date),o.name,o.st,d.desc||'',d.h||'',d.s||'',d.v,d.paid||0,rem(d),d.chk?'Ja':'']);
  const H1=['Datum','Clubnaam','Status','Omschrijving','Categorie','Subcategorie','Bedrag','Betaald','Openstaand','Gecontroleerd'],H2=['Clubnaam','Status','Totaal schuld','Al betaald','Openstaand'];
  const n=Math.max(lineRows.length,sumRows.length),vals=[['Openstaande schulden per lijn (bijgehouden door de app, niet aanpassen)'].concat(Array(10).fill('')).concat(['Overzicht per lid','','','','']),H1.concat(['']).concat(H2)];
  for(let i=0;i<n;i++)vals.push((lineRows[i]||Array(10).fill('')).concat(['']).concat(sumRows[i]||Array(5).fill('')));
