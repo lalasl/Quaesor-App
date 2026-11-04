@@ -114,7 +114,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='49',APP_LABEL='1.4.1';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='50',APP_LABEL='1.5';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -134,8 +134,8 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const eur=n=>new Intl.NumberFormat('nl-BE',{style:'currency',currency:'EUR'}).format(n);
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,9);
 const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
-const M={cash:'Cash',payconiq:'Payconiq',overschrijving:'Overschrijving',schuld:'Schuldenlijst',voorschot:'Voorgeschoten'};
-const ML={cash:'Cash',payconiq:'Payconiq',overschrijving:'Overschrijving',schuld:'Later betalen',voorschot:'Voorgeschoten'};
+const M={cash:'Cash',payconiq:'Payconiq',overschrijving:'Overschrijving',schuld:'Schuldenlijst',voorschot:'Voorgeschoten',verrekening:'Verrekening'};
+const ML={cash:'Cash',payconiq:'Payconiq',overschrijving:'Overschrijving',schuld:'Later betalen',voorschot:'Voorgeschoten',verrekening:'Verrekend met voorschot'};
 let S=null,role=null,tab='boek',DAY=today(),LQ='',ASK=null;
 const newB=()=>({mid:null,name:'',amt:'',desc:'',method:'cash',h:'',s:'',man:false});
 let B=newB();
@@ -684,7 +684,7 @@ function vBoek(){const c=S.cats;
  return delBanner()+hb+`<div class="card">
  <label>Lid<input id="q" autocomplete="off" placeholder="Typ een naam…" value="${esc(B.name)}" oninput="onQ(this.value)"></label><div id="sug"></div><div id="mi">${miHtml()}</div>
  <label>Bedrag in euro<input id="amt" type="number" inputmode="decimal" step="0.01" min="0" value="${esc(B.amt)}" oninput="onAmt(this.value)"></label>
- <div class="seg" style="grid-auto-flow:row;grid-template-columns:1fr 1fr">${Object.keys(M).filter(m=>m!=='voorschot').map(m=>`<button class="${B.method===m?'on':''}" onclick="B.method='${m}';render()">${ML[m]}</button>`).join('')}</div>
+ <div class="seg" style="grid-auto-flow:row;grid-template-columns:1fr 1fr">${Object.keys(M).filter(m=>m!=='voorschot'&&m!=='verrekening').map(m=>`<button class="${B.method===m?'on':''}" onclick="B.method='${m}';render()">${ML[m]}</button>`).join('')}</div>
  <label>Categorie<select onchange="setCat('h',this.value)">${opts(c.h,B.h)}</select></label>
  <label>Subcategorie<select onchange="setCat('s',this.value)">${opts(c.s,B.s,true)}</select></label>
  <label>Opmerking (niet verplicht)<input value="${esc(B.desc)}" oninput="B.desc=this.value"></label>
@@ -719,13 +719,18 @@ function book(){if(role!=='q'&&role!=='h')return toast('Je hebt geen rechten om 
 function commit(a){const m=S.members.find(x=>x.id===B.mid);
  S.tx.push({who:WHO,id:uid(),ts:Date.now(),date:today(),mid:B.mid,name:m?m.name:B.name.trim(),v:a,method:B.method,h:B.h,s:B.s,desc:B.desc.trim(),by:role,void:false,synced:false});
  save();Object.assign(B,{mid:null,name:'',amt:'',desc:'',man:false});toast('Geboekt');render();queueSync()}
+function vGroup(t){let R=null;if(t.exp&&t.ref)R=t.ref;else if(t.method==='verrekening'){const r=S.tx.find(x=>x.method==='verrekening'&&x.exp&&x.ref&&!x.void&&!x.storno&&uk(x.name)===uk(t.name)&&x.date===t.date&&t.ts>=x.ts&&t.ts-x.ts<500);if(r)R=r.ref}
+ if(!R)return [t];const refs=S.tx.filter(x=>x.exp&&x.ref===R&&!x.void&&!x.storno),v=refs.find(x=>x.method==='verrekening');if(!v)return [t];
+ return refs.concat(S.tx.filter(x=>x.method==='verrekening'&&!x.exp&&x.ref&&!x.void&&!x.storno&&uk(x.name)===uk(v.name)&&x.date===v.date&&x.ts>v.ts&&x.ts-v.ts<500))}
 function storno(id){if(RO())return;const t=S.tx.find(x=>x.id===id);if(!t)return;
+ const vg=vGroup(t);if(vg.length>1){const v=vg.find(x=>x.exp&&x.method==='verrekening'),rest=vg.filter(x=>x.exp&&x.method!=='verrekening').reduce((a,x)=>a-x.v,0);
+  return ask(`Deze terugbetaling hoort bij een verrekening met de schuld van ${esc(v.name)}: ${eur(-v.v)} verrekend${rest>.005?' en '+eur(rest)+' terugbetaald':''}. Alles wordt samen geannuleerd: de schuld staat dan weer open en het voorschot wacht opnieuw op terugbetaling.`,'Alles annuleren',()=>{vg.forEach(x=>doStorno(x.id,1));relink();save();toast('Verrekening geannuleerd');render();queueSync()})}
  if(t.method==='schuld'&&(t.paid||0)>0)return toast('Annuleer eerst de betalingen van deze schuld');
  if(t.method==='voorschot'&&t.paidBy)return toast('Annuleer eerst de terugbetaling');
  ask('Deze boeking annuleren? Ze blijft doorstreept staan en in de spreadsheet komt een tegenboeking. Er wordt niets gewist.','Boeking annuleren',()=>doStorno(id))}
-function doStorno(id){const t=S.tx.find(x=>x.id===id);if(!t||t.void)return;
+function doStorno(id,q){const t=S.tx.find(x=>x.id===id);if(!t||t.void)return;
  t.void=true;S.tx.push({...t,who:WHO,id:uid(),ts:Date.now(),date:today(),v:-t.v,storno:true,void:false,ref:t.id,by:role,synced:false});
- relink();
+ if(q)return;relink();
  save();toast('Boeking geannuleerd');render();queueSync()}
 function vMe(){return accCard()+nCard()+`<div class="card"><h2>Dit toestel</h2><p class="mu">Gebruik je dit toestel niet meer voor ${esc(S.club.name)}? Koppel het dan los. De gegevens op dit toestel worden gewist, de spreadsheet blijft.</p><button class="btn ghost" onclick="devOff()">Dit toestel loskoppelen</button></div>`}
 function vVandaag(){const l=S.tx.filter(t=>t.date===today()&&!t.storno).reverse();return delBanner()+`<div class="card"><h2>Vandaag: ${l.filter(t=>!t.void).length} boekingen</h2>${l.length?l.map(t=>row(t,false)).join(''):empty('Nog niets geboekt vandaag.')}</div>${accCard()}${S.club.helperOnly||(USER&&role!=='q')?`<div class="card"><h2>Dit toestel</h2><p class="mu">Gebruik je dit toestel niet meer voor ${esc(S.club.name)}? Koppel het dan los. De gegevens op dit toestel worden gewist, de spreadsheet blijft.</p>${USER?'':`<label>Je naam<input id="wn2" value="${esc(S.club.names.h)}"></label><button class="btn ghost" style="margin-bottom:8px" onclick="chName()">Naam opslaan</button>`}<button class="btn ghost" onclick="devOff()">Dit toestel loskoppelen</button></div>`:''}`}
@@ -740,7 +745,7 @@ function vDag(){const l=S.tx.filter(t=>t.date===DAY),sum=m=>l.filter(t=>t.method
  ${perPerson(l)}<div class="card"><h2>Alle boekingen van deze dag</h2>${l.length?l.slice().reverse().map(t=>row(t,!RO())).join(''):empty('Geen boekingen op deze dag.')}</div>
  <div class="card"><h2>Nog niet geboekt op deze dag (${todo.length})</h2>${todo.length?todo.slice(0,40).map(m=>`<div class="row"><div>${esc(m.name)} <span class="mu">${esc(m.status)}</span></div>${role==='p'?'':`<button class="sm" onclick="goBook('${m.id}')">Boeken</button>`}</div>`).join('')+(todo.length>40?empty('… en '+(todo.length-40)+' anderen'):''):empty('Iedereen uit de ledenlijst is geboekt.')}</div>`}
 function perPerson(l){const pp={};
- l.forEach(t=>{if(t.exp)return;const k=t.who||(t.by==='q'?'Quaestor':'Helper');const o=pp[k]=pp[k]||{n:0,v:0};if(!t.storno&&!t.void)o.n++;if(t.method!=='schuld')o.v+=t.v});
+ l.forEach(t=>{if(t.exp)return;const k=t.who||(t.by==='q'?'Quaestor':'Helper');const o=pp[k]=pp[k]||{n:0,v:0};if(!t.storno&&!t.void)o.n++;if(t.method!=='schuld'&&t.method!=='verrekening')o.v+=t.v});
  const ks=Object.keys(pp).sort();if(!ks.length)return '';
  return `<div class="card"><h2>Per medewerker</h2>${ks.map(k=>`<div class="row"><div>${esc(k)} <span class="mu">${pp[k].n} boeking${pp[k].n===1?'':'en'}</span></div><div class="amt">${eur(pp[k].v)}</div></div>`).join('')}<p class="mu">Wat elke medewerker ontving. Later te betalen en geannuleerde boekingen tellen niet mee.</p></div>`}
 function goBook(id){if(role==='p')return;tab='boek';pick(id)}
@@ -896,7 +901,8 @@ function bonBook(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q')return;
 function bonBookOk(id){const b=S.bons.find(x=>x.id===id);if(!b)return;const a=pamt($('#xb').value),m=$('#xm').value,adv=m==='voorschot'?($('#xv').value||'').trim():'';
  if(!(a>0))return toast('Vul een bedrag in');if(m==='voorschot'&&!adv)return toast('Vul in wie het voorschoot');
  const tx={who:WHO,id:uid(),ts:Date.now(),date:$('#xd').value||today(),mid:null,name:b.shop,v:-a,method:m,h:$('#xh').value,s:$('#xs').value,desc:($('#xo').value||'').trim(),by:role,exp:true,bon:b.id,adv,void:false,synced:false};
- S.tx.push(tx);b.status='Ingeboekt';b.txid=tx.id;b.dirty=!!b.synced;closeM();save();render();queueSync();toast('Ingeboekt als uitgave')}
+ S.tx.push(tx);b.status='Ingeboekt';b.txid=tx.id;b.dirty=!!b.synced;closeM();save();render();queueSync();
+ const od=adv?memDebt(adv):null;if(od&&od.tot>.005){toast(`Ingeboekt. ${adv} heeft nog ${eur(od.tot)} schuld: je kan meteen verrekenen.`);return refund(tx.id)}toast('Ingeboekt als uitgave')}
 function bonTx(b){const x=b&&b.txid&&S.tx.find(t=>t.id===b.txid);return x&&!x.void?x:null}
 function bonEdit(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q')return;const x=bonTx(b);
  modal(`<h3>Bonnetje aanpassen</h3>${x?'<p class="mu">Dit bonnetje is al ingeboekt. Pas je winkel, datum of bedrag aan, dan wordt de boeking geannuleerd en opnieuw ingeboekt met de nieuwe gegevens.</p>':''}
@@ -915,9 +921,33 @@ function bonEditOk(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q')retur
  closeM();save();render();queueSync();toast(money?'Aangepast en opnieuw ingeboekt':'Bonnetje aangepast')}
 function bonReject(id){const b=S.bons.find(x=>x.id===id);if(!b)return;ask(`Bonnetje van ${esc(b.shop)} (${eur(b.total)}) afwijzen? Het blijft bewaard in de spreadsheet met status Afgewezen.`,'Afwijzen',()=>{b.status='Afgewezen';b.dirty=!!b.synced;save();render();queueSync()})}
 const advOpen=()=>S.tx.filter(t=>t.method==='voorschot'&&t.exp&&!t.void&&!t.storno&&!t.paidBy);
-function refund(id){const d=S.tx.find(x=>x.id===id);if(!d)return;modal(`<h3>Terugbetalen</h3><p>${esc(d.adv)} · ${esc(d.name)} · ${eur(-d.v)}</p><label>Betaalwijze<select id="rm"><option value="overschrijving">Overschrijving</option><option value="cash">Cash uit de kas</option><option value="payconiq">Payconiq</option></select></label><label>Datum<input type="date" id="rd" value="${today()}"></label><button class="btn" onclick="refundOk('${id}')">Terugbetaald</button>`)}
-function refundOk(id){const d=S.tx.find(x=>x.id===id);if(!d)return;S.tx.push({who:WHO,id:uid(),ts:Date.now(),date:$('#rd').value||today(),mid:null,name:d.adv,v:d.v,method:$('#rm').value,h:d.h,s:d.s,desc:'Terugbetaling '+d.name,by:role,exp:true,ref:d.id,void:false,synced:false});
- relink();save();closeM();render();queueSync();toast('Terugbetaling geboekt')}
+function refund(id){const d=S.tx.find(x=>x.id===id);if(!d)return;const X=-d.v,o=d.adv?memDebt(d.adv):null,D=o?o.tot:0,Y0=Math.round(Math.min(D,X)*100)/100;
+ modal(`<h3>Terugbetalen</h3><p>${esc(d.adv)} schoot ${eur(X)} voor: ${esc(d.desc||d.name)}</p>
+ ${D>.005?`<div class="stat" style="margin:4px 0 10px"><span class="mu">${esc(o.name)} heeft nog een openstaande schuld</span><b>${eur(D)}</b></div>
+ <label class="tg" style="border:0"><span>Verrekenen met de schuld<small>Een deel van het voorschot betaalt de schuld af. Je maakt alleen het verschil over.</small></span><input type="checkbox" id="vk" checked onchange="refPrev('${id}')"></label>
+ <div id="vkw"><label>Bedrag verrekenen<input id="va" inputmode="decimal" value="${fmt2(Y0)}" oninput="refPrev('${id}')"></label><div id="pp" style="margin:-4px 0 10px"></div></div>`:''}
+ <div id="rmw"><label>Betaalwijze<select id="rm" onchange="refPrev('${id}')"><option value="overschrijving">Overschrijving</option><option value="cash">Cash uit de kas</option><option value="payconiq">Payconiq</option></select></label></div><label>Datum<input type="date" id="rd" value="${today()}"></label>
+ <div id="rsum"></div><button class="btn" onclick="refundOk('${id}')">Bevestigen</button>`);refPrev(id)}
+function refCalc(id){const d=S.tx.find(x=>x.id===id);if(!d)return null;const X=Math.round(-d.v*100)/100,o=d.adv?memDebt(d.adv):null,D=o?Math.round(o.tot*100)/100:0,on=!!($('#vk')&&$('#vk').checked);
+ let Y=on?(pamt(($('#va')||{}).value)||0):0,err='';if(Y>Math.min(D,X)+.005)err=`Je kan maximaal ${eur(Math.min(D,X))} verrekenen (${Y>X?'het voorschot':'de openstaande schuld'}).`;if(Y<0)Y=0;
+ Y=Math.round(Y*100)/100;return {d,o,X,D,Y,Z:Math.round((X-Y)*100)/100,on,err,m:($('#rm')||{}).value||'overschrijving'}}
+function refPrev(id){const r=refCalc(id),e=$('#rsum');if(!r||!e)return;const {d,o,X,Y,Z,on,err,m}=r,fd=x=>x?x.split('-').reverse().join('/'):'';
+ const w=$('#vkw');if(w)w.style.display=on?'block':'none';const rw=$('#rmw');if(rw)rw.style.display=Z>.005?'block':'none';
+ const pp=$('#pp');if(pp){if(!on||!(Y>0)||err)pp.innerHTML='';else{let a=Y;const L=[];o.debts.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||'')||x.ts-y.ts).forEach(t=>{if(a<=.005)return;const q=rem(t),p=Math.round(Math.min(a,q)*100)/100;a=Math.round((a-p)*100)/100;L.push([t,p,Math.round((q-p)*100)/100])});
+  pp.innerHTML=`<div class="mu" style="font-size:.85rem;margin-bottom:4px">Deze schulden worden afbetaald, de oudste eerst:</div>${L.map(([t,p,q])=>`<div class="row" style="padding:5px 0"><div style="font-size:.9rem">${esc(t.desc||t.h||'Schuld')}<div class="mu" style="font-size:.8rem">${fd(t.date)}</div></div><div style="text-align:right;font-size:.9rem"><b>${eur(p)}</b><div class="mu" style="font-size:.78rem">${q>.005?'nog '+eur(q)+' open':'volledig betaald'}</div></div></div>`).join('')}<div class="mu" style="font-size:.85rem;margin-top:4px">Daarna nog open: <b>${eur(Math.max(0,r.D-Y))}</b></div>`}}
+ if(err){e.innerHTML=`<p class="err">${err}</p>`;return}
+ const boek=Z<=.005?'bankboek (of kasboek)':m==='cash'?'kasboek':'bankboek',nm=esc(d.adv);
+ e.innerHTML=`<div class="stat" style="margin:6px 0 12px;text-align:left"><span class="mu">Samenvatting</span>
+  <div class="row" style="padding:4px 0"><div>Voorgeschoten door ${nm}</div><div class="amt">${eur(X)}</div></div>
+  ${Y>0?`<div class="row" style="padding:4px 0"><div>Verrekend met de schuld</div><div class="amt">− ${eur(Y)}</div></div>`:''}
+  <div class="row" style="padding:4px 0;border:0"><div><b>${Z>.005?'Over te maken aan '+nm:'Niets over te maken'}</b></div><div class="amt"><b>${eur(Z)}</b></div></div>
+  ${Y>0?`<div class="mu" style="font-size:.85rem;margin-top:8px;line-height:1.45">Zo noteer je het in je ${boek}:<br>• UIT ${eur(X)}: ${esc(d.desc||d.name)} (voorgeschoten door ${nm})<br>• IN ${eur(Y)}: afbetaling schuld ${nm} (verrekend met voorschot)<br>Samen ${Z>.005?eur(Z)+' minder op de rekening: precies wat je overmaakt.':'€ 0,00: er gaat geen geld van de rekening, maar zo kloppen uitgave en schuld allebei.'}</div>`:''}</div>`}
+function refundOk(id){const r=refCalc(id);if(!r)return;if(r.err)return toast(r.err);const {d,o,X,Y,Z,m}=r,date=$('#rd').value||today(),now=Date.now();let i=0;
+ if(Y>.005){S.tx.push({who:WHO,id:uid(),ts:now+(i++),date,mid:null,name:d.adv,v:-Y,method:'verrekening',h:d.h,s:d.s,desc:'Terugbetaling '+d.name+' (verrekend met schuld)',by:role,exp:true,ref:d.id,void:false,synced:false});
+  let a=Y;o.debts.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||'')||x.ts-y.ts).forEach(t=>{if(a<=.005)return;const p=Math.round(Math.min(a,rem(t))*100)/100;if(!(p>0))return;
+   S.tx.push({who:WHO,id:uid(),ts:now+(i++),date,mid:t.mid,name:t.name,v:p,method:'verrekening',h:t.h,s:t.s,desc:'Afbetaling: '+(t.desc||t.h||'schuld')+' (verrekend met voorschot)',by:role,ref:t.id,void:false,synced:false});a=Math.round((a-p)*100)/100})}
+ if(Z>.005)S.tx.push({who:WHO,id:uid(),ts:now+(i++),date,mid:null,name:d.adv,v:-Z,method:m,h:d.h,s:d.s,desc:'Terugbetaling '+d.name+(Y>.005?' (rest na verrekening)':''),by:role,exp:true,ref:d.id,void:false,synced:false});
+ relink();save();closeM();render();queueSync();toast(Y>.005?`${eur(Y)} verrekend met de schuld`+(Z>.005?`, ${eur(Z)} terugbetaald`:''):'Terugbetaling geboekt')}
 function vBon(){const Q=role==='q';if(BON)return bonForm();
  const st=b=>{const x=b.txid&&S.tx.find(t=>t.id===b.txid);if(b.status==='Ingeboekt'&&x&&x.void)return 'Boeking geannuleerd';return b.status+(b.synced?'':' · nog niet verstuurd')};
  const it=(b,act)=>`<div class="row"><div><b>${esc(b.shop)}</b> <span class="tag">${esc(st(b))}</span><div class="mu">${esc(b.date)}${b.who?' · '+esc(b.who):''}${b.adv?' · voorgeschoten door '+esc(b.adv):''}${b.desc?' · '+esc(b.desc):''}</div>
@@ -993,10 +1023,10 @@ async function notifyRun(){const c=S.club,Q=role==='q',now=Date.now();if(!S.nSin
   advOpen().filter(t=>t.date&&Date.parse(t.date)<now-14*864e5).forEach(t=>once('adv:'+t.id,()=>note('adv',`${t.adv} wacht al 2 weken op ${eur(-t.v)} terugbetaling voor ${t.name}.`,{tab:'bon'})));
   if(nOn('dev')&&c.gid&&c.gok&&now-(S.nDevTs||0)>36e5){S.nDevTs=now;try{const l=await accList(c.gid);l.filter(o=>o.id!==c.dev&&+o.u>0&&+o.uo>0&&now-+o.uo>2*864e5).forEach(o=>once('dev:'+o.id+':'+o.uo,()=>note('dev',`Het toestel van ${o.n||'?'} (${o.d||'onbekend toestel'}) heeft al ${Math.floor((now-o.uo)/864e5)} dagen ${o.u} ${+o.u===1?'boeking':'boekingen'} die niet in de spreadsheet staan. Vraag om de app te openen met internet.`,{tab:'acc'})))}catch(e){if(e.auth)throw e}}
   if(nOn('week')){const d=new Date(),wk=d.getFullYear()+'-'+Math.floor((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(2024,0,1))/(7*864e5));
-   if(S.nWeek!==wk&&(d.getDay()!==1||d.getHours()>=8)){S.nWeek=wk;const from=new Date(now-7*864e5).toISOString().slice(0,10),L=S.tx.filter(t=>t.date>=from&&!t.void&&!t.storno),rec=L.filter(t=>!t.exp&&t.method!=='schuld').reduce((a,t)=>a+t.v,0),nd=L.filter(t=>t.method==='schuld'&&t.v>0).reduce((a,t)=>a+t.v,0),tot=Object.values(D).reduce((a,o)=>a+o.tot,0),nb=bonTodo().length;
+   if(S.nWeek!==wk&&(d.getDay()!==1||d.getHours()>=8)){S.nWeek=wk;const from=new Date(now-7*864e5).toISOString().slice(0,10),L=S.tx.filter(t=>t.date>=from&&!t.void&&!t.storno),rec=L.filter(t=>!t.exp&&t.method!=='schuld'&&t.method!=='verrekening').reduce((a,t)=>a+t.v,0),nd=L.filter(t=>t.method==='schuld'&&t.v>0).reduce((a,t)=>a+t.v,0),tot=Object.values(D).reduce((a,o)=>a+o.tot,0),nb=bonTodo().length;
     note('week',`Afgelopen week: ${eur(rec)} ontvangen en ${eur(nd)} nieuwe schulden. In totaal staat er ${eur(tot)} open${nb?', en '+nb+' '+(nb===1?'bonnetje wacht':'bonnetjes wachten')+' op verwerking':''}.`,{tab:'schuld'})}}}
  bst.filter(x=>x.b&&(x.b.mine||uk(x.b.who||'')===me)).forEach(x=>{if(x.to==='Ingeboekt')note('mybon',`Je bonnetje van ${x.b.shop} (${eur(x.b.total)}) is ingeboekt.`,{tab:'bon'});else if(x.to==='Afgewezen')note('mybon',`Je bonnetje van ${x.b.shop} (${eur(x.b.total)}) werd afgewezen.`,{tab:'bon'})});
- tx.filter(t=>t.exp&&t.ref&&!t.storno&&uk(t.name)===me&&uk(t.who||'')!==me).forEach(t=>note('refund',`Je kreeg ${eur(-t.v)} terugbetaald${t.desc?': '+t.desc.replace(/^Terugbetaling\s*/,''):''}.`,{tab:'bon'}));
+ tx.filter(t=>t.exp&&t.ref&&!t.storno&&uk(t.name)===me&&uk(t.who||'')!==me).forEach(t=>note('refund',t.method==='verrekening'?`${eur(-t.v)} van je voorschot werd verrekend met je openstaande schuld.`:`Je kreeg ${eur(-t.v)} terugbetaald${t.desc?': '+t.desc.replace(/^Terugbetaling\s*/,'').replace(/\s*\(rest na verrekening\)$/,''):''}.`,{tab:'bon'}));
  if(!Q)tx.filter(t=>t.storno&&uk(t.who||'')!==me).forEach(t=>{const o=S.tx.find(x=>x.id===t.ref);if(o&&uk(o.who||'')===me)note('mystorno',`Je boeking van ${o.name||'?'} (${eur(o.v)}) werd geannuleerd door ${t.who||'de Quaestor'}.`,{tab:'dag',day:o.date})});
  Object.keys(done).forEach(k=>{if(now-done[k]>90*864e5)delete done[k]});save();const b=document.querySelector('header .bell');if(b)b.outerHTML=bellHtml()}
 function nGo(id){const n=(S.notes||[]).find(x=>x.id===id);if(!n)return;n.read=true;save();const g=n.go||{};
