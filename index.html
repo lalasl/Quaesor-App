@@ -114,7 +114,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='48',APP_LABEL='1.4';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='49',APP_LABEL='1.4.1';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -1186,7 +1186,7 @@ function limCard(){const c=S.club,L=c.lim||{};return `<div class="card"><h2>Schu
 function setLim(s,v){if(role!=='q')return;const c=S.club;c.lim=Object.assign({},c.lim);const n=String(v).trim()===''?'':pamt(v);c.lim[s]=n==null?'':n;c.setDirty=true;save();queueSync();toast('Opgeslagen')}
 let OVH='';
 /* ---------- opmaak van de tabbladen ---------- */
-const FMT_V='7';
+const FMT_V='8';
 async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)return;const key=c.gid+'|'+FMT_V+'|'+c.color;if(!force&&(c.fmtK===key||(c.fmtFailK===key&&Date.now()-c.fmtFail<36e5)))return;
  const m=await api(`/${c.gid}?fields=sheets(properties(sheetId,title),bandedRanges(bandedRangeId),conditionalFormats(ranges))`),SH={};(m.sheets||[]).forEach(x=>SH[x.properties.title]=x);
  const rgb=h=>{h=String(h||'#8B1E3F').replace('#','');return{red:parseInt(h.slice(0,2),16)/255,green:parseInt(h.slice(2,4),16)/255,blue:parseInt(h.slice(4,6),16)/255}};
@@ -1227,7 +1227,8 @@ async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)ret
   cond(G(id,2,null,9,10),formula('=(J3="")+J3=0'),{textFormat:{foregroundColor:GN}});
   cond(G(id,2,null,16,17),{type:'NUMBER_GREATER',values:[{userEnteredValue:'0'}]},{backgroundColor:RB,textFormat:{foregroundColor:RD,bold:true}});
   cond(G(id,2,null,16,17),formula('=(Q3="")+Q3=0'),{backgroundColor:GB,textFormat:{foregroundColor:GN,bold:true}});
-  cond(G(id,2,null,10,11),{type:'TEXT_EQ',values:[{userEnteredValue:'Ja'}]},{textFormat:{foregroundColor:GN,bold:true}})}
+  cond(G(id,2,null,10,11),{type:'TEXT_EQ',values:[{userEnteredValue:'Ja'}]},{textFormat:{foregroundColor:GN,bold:true}});
+  R.push({setBasicFilter:{filter:{range:G(id,1,null,0,11)}}})}
  const err=[];for(let i=0;i<B.length;i++){const part=R.slice(B[i][1],i+1<B.length?B[i+1][1]:R.length);if(!part.length)continue;
   try{await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:part})})}catch(e){if(e.auth)throw e;
    const core=part.filter(r=>!r.addConditionalFormatRule&&!r.deleteConditionalFormatRule);let ok2=false;try{if(core.length<part.length){await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:core})});ok2=true}}catch(e2){if(e2.auth)throw e2}
