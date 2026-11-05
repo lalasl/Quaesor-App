@@ -114,7 +114,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='51',APP_LABEL='1.5.1';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='52',APP_LABEL='1.5.2';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -145,7 +145,7 @@ function norm(){
  if(Array.isArray(S.cats)){const o=S.cats;S.cats={h:o.map(c=>c.h),s:[...new Set(o.flatMap(c=>c.s))]}}
  S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0,askName:false,debtTab:'',lim:{},bkImp:0,pinMe:'',hOk:false,uTab:false,lastUser:'',sess:'',closedAt:0,closed:0,bonTab:false,dev:'',acc:{},accMid:0,accGid:'',accSig:'',accTs:0,accF:0,blocked:''},S.club);
  if(!S.club.dev)S.club.dev=uid().replace(/-/g,'');if(!S.club.acc||typeof S.club.acc!=='object'||Array.isArray(S.club.acc))S.club.acc={};
- if(S.club.gscope!==SCOPE){if(String(S.club.gscope||'').indexOf('drive.file')<0&&(S.club.gid||S.club.gok)){S.club.gok=false;if(S.club.gmode==='existing')S.club.gpicked=false;try{sessionStorage.removeItem('qg')}catch(e){}}S.club.gscope=SCOPE}
+ if(S.club.gscope!==SCOPE){if(String(S.club.gscope||'').indexOf('drive.file')<0&&(S.club.gid||S.club.gok)){S.club.gok=false;if(S.club.gmode==='existing')S.club.gpicked=false;try{localStorage.removeItem('qg')}catch(e){}}S.club.gscope=SCOPE}
  S.sync=Object.assign({last:0,err:'',auth:false,pick:false,warn:''},S.sync||{});
  S.club.names=Object.assign({q:'',h:''},S.club.names||{});
  S.delM=Array.isArray(S.delM)?S.delM:[];S.users=Array.isArray(S.users)?S.users:[];S.bons=Array.isArray(S.bons)?S.bons:[];S.pendDel=Array.isArray(S.pendDel)?S.pendDel:[];
@@ -173,7 +173,8 @@ function theme(){const c=S.club,r=document.documentElement;r.style.setProperty('
 /* ================= GOOGLE SHEETS ================= */
 let WHO='',LOGVIA='',USER='',LPULL=false,ISDEV=false;
 let AGAIN=false,TOKEN=null,TEXP=0,SYNCING=false,SI=false,ENS='',LASTPULL=0,QT=null;
-try{const q=JSON.parse(sessionStorage.getItem('qg')||'null');if(q&&q.exp>Date.now()&&q.s===SCOPE){TOKEN=q.t;TEXP=q.exp}}catch(e){}
+try{sessionStorage.removeItem('qg');const q=JSON.parse(localStorage.getItem('qg')||'null');if(q&&q.exp>Date.now()&&q.s===SCOPE){TOKEN=q.t;TEXP=q.exp}}catch(e){}
+const gHint=()=>{try{return localStorage.getItem('qgh')||''}catch(e){return ''}};let GPEND=null,GREN=false;
 const cid=()=>(S.club.cid||GOOGLE_CLIENT_ID||'').trim();
 const apiKey=()=>(S.club.akey||GOOGLE_API_KEY||'').trim();
 const appId=()=>(S.club.appid||GOOGLE_APP_ID||'').trim();
@@ -181,25 +182,30 @@ const haveTok=()=>TOKEN&&Date.now()<TEXP-60000;
 const autoOk=()=>S.club.gok&&S.club.gid;
 const authErr=m=>{const e=new Error(m);e.auth=true;return e};
 function loadGsi(){return new Promise((res,rej)=>{if(window.google&&google.accounts&&google.accounts.oauth2)return res();const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=()=>res();s.onerror=()=>rej(new Error('Google kon niet geladen worden. Controleer je internetverbinding.'));document.head.appendChild(s)})}
-function getToken(pr){return new Promise((res,rej)=>{
- if(haveTok()&&pr==null)return res(TOKEN);
+function getToken(pr,force){if(pr==null&&!force&&haveTok())return Promise.resolve(TOKEN);if(pr==null&&GPEND)return GPEND;const P=getToken0(pr,force);if(pr==null){GPEND=P;P.then(()=>{GPEND=null},()=>{GPEND=null})}return P}
+function getToken0(pr,force){return new Promise((res,rej)=>{
+ if(haveTok()&&pr==null&&!force)return res(TOKEN);
  if(!cid())return rej(authErr('Geen Google Client ID ingesteld. Zie de handleiding.'));
  loadGsi().then(()=>{
-  const tc=google.accounts.oauth2.initTokenClient({client_id:cid(),scope:SCOPE,
+  const h=pr==null||pr===''?gHint():'',tc=google.accounts.oauth2.initTokenClient(Object.assign({client_id:cid(),scope:SCOPE},h?{login_hint:h}:{},{
    callback:r=>{if(r.error)return rej(authErr(r.error==='access_denied'?'Toegang geweigerd in Google.':'Google-fout: '+r.error));
-    TOKEN=r.access_token;TEXP=Date.now()+(+r.expires_in||3600)*1000;TEMAIL='';try{sessionStorage.setItem('qg',JSON.stringify({t:TOKEN,exp:TEXP,s:SCOPE}))}catch(e){}
+    TOKEN=r.access_token;TEXP=Date.now()+(+r.expires_in||3600)*1000;TEMAIL='';try{localStorage.setItem('qg',JSON.stringify({t:TOKEN,exp:TEXP,s:SCOPE}))}catch(e){}
     if(!S.club.gok){S.club.gok=true;save()}res(TOKEN)},
-   error_callback:()=>rej(authErr('Aanmelden bij Google is niet gelukt of werd geannuleerd.'))});
+   error_callback:()=>rej(authErr('Aanmelden bij Google is niet gelukt of werd geannuleerd.'))}));
   tc.requestAccessToken({prompt:pr!=null?pr:(S.club.gok?'':'consent')})}).catch(rej)})}
 let TEMAIL='';
 async function uinfo(tok){const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+tok}});
- if(r.status===401||r.status===403){TOKEN=null;try{sessionStorage.removeItem('qg')}catch(e){}throw authErr('Meld je opnieuw aan bij Google.')}
- if(!r.ok)throw new Error('Je e-mailadres ophalen bij Google lukte niet.');const j=await r.json();if(!j.email)throw new Error('Google gaf geen e-mailadres door.');TEMAIL=String(j.email).trim().toLowerCase();return TEMAIL}
+ if(r.status===401||r.status===403){TOKEN=null;TEXP=0;try{localStorage.removeItem('qg')}catch(e){}throw authErr('Meld je opnieuw aan bij Google.')}
+ if(!r.ok)throw new Error('Je e-mailadres ophalen bij Google lukte niet.');const j=await r.json();if(!j.email)throw new Error('Google gaf geen e-mailadres door.');TEMAIL=String(j.email).trim().toLowerCase();try{localStorage.setItem('qgh',TEMAIL)}catch(e){}return TEMAIL}
+/* Google geeft een browser-app een sleutel van 1 uur. Is die (bijna) verlopen, dan vernieuwt de app hem bij de eerstvolgende tik:
+   een venster dat zichzelf sluit, zonder account te kiezen (login_hint). Zonder tik mag een browser dat venster niet openen. */
+document.addEventListener('click',()=>{if(GREN||GPEND||!navigator.onLine||!S||!S.club||!autoOk()||!USER)return;if(TOKEN&&Date.now()<TEXP-10*60000)return;
+  GREN=true;getToken(null,true).then(()=>{if(S.sync.auth){S.sync.auth=false;S.sync.err='';save();refreshSt()}queueSync()},()=>{}).finally(()=>{GREN=false})},true);
 async function gEmail(pr){if(TEMAIL&&pr==null&&haveTok())return TEMAIL;return uinfo(await getToken(pr))}
 async function api(path,opt){opt=opt||{};
  if(!haveTok()){if(!SI)throw authErr('Opnieuw verbinden nodig.');await getToken()}
  const r=await fetch('https://sheets.googleapis.com/v4/spreadsheets'+path,{...opt,headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/json'}});
- if(r.status===401){TOKEN=null;try{sessionStorage.removeItem('qg')}catch(e){}throw authErr('Sessie verlopen. Tik op de status bovenaan om opnieuw te verbinden.')}
+ if(r.status===401){TOKEN=null;try{localStorage.removeItem('qg')}catch(e){}throw authErr('Sessie verlopen. Tik op de status bovenaan om opnieuw te verbinden.')}
  if(!r.ok){let m='';try{m=(await r.json()).error.message}catch(e){}
   if((r.status===403||r.status===404)&&path.indexOf('/'+S.club.gid)===0&&!/not been used|disabled|API has/i.test(m)){const e=new Error('Geen toegang tot deze spreadsheet. Kies ze opnieuw. Lukt het niet, vraag de Quaestor om je als bewerker toe te voegen.');e.pick=true;throw e}
   throw new Error(m||('Google-fout '+r.status))}
@@ -507,7 +513,7 @@ async function choose(){readG();const c=S.club;
  if(r.id!==c.gid){c.gid=r.id;c.gcreated=false;S.tx.forEach(t=>t.synced=false);S.members.forEach(m=>m.on=false);S.delM=[]}
  c.gname=r.name;c.gpicked=true;c.gok=true;S.sync.pick=false;ENS='';save();
  await sync(true,true);if(role)render()}
-function unlink(){ask('Spreadsheet ontkoppelen? Je boekingen blijven op dit toestel bewaard.','Ontkoppelen',()=>{Object.assign(S.club,{gid:'',gok:false,gcreated:false,gpicked:false,gname:''});S.delM=[];S.sync={last:0,err:'',auth:false,pick:false,warn:''};ENS='';TOKEN=null;try{sessionStorage.removeItem('qg')}catch(e){}save();render()})}
+function unlink(){ask('Spreadsheet ontkoppelen? Je boekingen blijven op dit toestel bewaard.','Ontkoppelen',()=>{Object.assign(S.club,{gid:'',gok:false,gcreated:false,gpicked:false,gname:''});S.delM=[];S.sync={last:0,err:'',auth:false,pick:false,warn:''};ENS='';TOKEN=null;try{localStorage.removeItem('qg')}catch(e){}save();render()})}
 window.addEventListener('online',()=>{refreshSt();queueSync()});
 window.addEventListener('offline',refreshSt);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)queueSync()});
@@ -626,7 +632,7 @@ function enter(){if(USER){WHO=(me()||{}).u||WHO;tab='boek';render();queueSync();
 function nameScreen(){$('#app').innerHTML=`<div class="auth"><h2>Wie ben je?</h2><label>Je naam<input id="wn" autocomplete="name" value="${esc(S.club.names[role]||'')}" onkeydown="if(event.key==='Enter')saveName()"></label><div class="err" id="wne"></div><button class="btn" onclick="saveName()">Verder</button></div>`}
 function saveName(){const n=($('#wn').value||'').trim().slice(0,40);if(n.length<2){$('#wne').textContent='Vul je naam in (minstens 2 letters).';return}S.club.names[role]=n;WHO=n;LASTPULL=0;save();tab='boek';render();queueSync()}
 function chName(){const n=($('#wn2').value||'').trim().slice(0,40);if(n.length<2)return toast('Vul je naam in (minstens 2 letters)');S.club.names[role]=n;WHO=n;save();toast('Naam opgeslagen')}
-function logout(){const u=me();if(u&&!u.e&&!u.code&&role)return toast('Verbind eerst met Google (Meer → Google Sheets), anders kan je niet meer aanmelden.');S.club.sess='';save();role=null;USER='';WHO='';ISDEV=false;login()}
+function logout(){const u=me();if(u&&!u.e&&!u.code&&role)return toast('Verbind eerst met Google (Meer → Google Sheets), anders kan je niet meer aanmelden.');S.club.sess='';save();role=null;USER='';WHO='';ISDEV=false;TOKEN=null;TEXP=0;TEMAIL='';try{localStorage.removeItem('qg');localStorage.removeItem('qgh')}catch(e){}login()}
 function accCard(){const u=me();if(!u)return '';return `<div class="card"><h2>Je account</h2><p class="mu">Aangemeld als <b>${esc(u.u)}</b> (${ISDEV?'Developer':(RN[u.r]||'Helper').toLowerCase()})${u.e?` met Google-account ${esc(u.e)}`:''}. Gebruik hetzelfde account op al je toestellen.</p>${u.e?'':(u.code?'<p class="mu">Je account is nog niet gekoppeld aan Google. Dat gebeurt vanzelf bij de volgende synchronisatie.</p><button class="btn ghost" onclick="pwMine()">Wachtwoord wijzigen</button>':'<p class="mu">Verbind met Google om je account te koppelen.</p>')}</div>`}
 function pwMine(){modal(`<h3>Wachtwoord wijzigen</h3><label>Huidig wachtwoord<input id="po" type="password" autocomplete="current-password"></label><label>Nieuw wachtwoord<input id="pn" type="password" autocomplete="new-password"></label><label>Nieuw wachtwoord herhalen<input id="pn2" type="password" autocomplete="new-password"></label><p class="mu">${PWH}</p><button class="btn" onclick="pwMineOk()">Opslaan</button>`)}
 async function pwMineOk(){const u=me();if(!u)return;const ok=await pwCheck($('#po').value,u);if(!ok)return toast('Je huidige wachtwoord klopt niet');
@@ -1326,7 +1332,7 @@ function invCard(){const c=S.club;
  <p class="mu" style="margin-top:12px">De link bevat geen pincodes en geeft zelf geen toegang tot je gegevens. Dat gebeurt pas als je de spreadsheet deelt.</p></div>`}
 function shareInv(){const l=inviteLink();if(navigator.share)navigator.share({title:S.club.name,text:'Uitnodiging als helper bij '+S.club.name,url:l}).catch(()=>{});else showT('Uitnodigingslink',l)}
 function resetAll(){USER='';WHO='';ISDEV=false;S=DEF();norm();ENS='';TOKEN=null;TEXP=0;LASTPULL=0;PE=[];B=newB();
- try{sessionStorage.removeItem('qg')}catch(e){}save();role=null;tab='boek';start()}
+ try{localStorage.removeItem('qg')}catch(e){}save();role=null;tab='boek';start()}
 function devOff(){const n=S.tx.filter(t=>!t.synced).length;ask('Dit toestel loskoppelen? Alle gegevens op dit toestel worden gewist.'+(n?` ${n} boeking(en) zijn nog niet verstuurd en gaan verloren.`:''),'Loskoppelen',()=>{resetAll();toast('Toestel losgekoppeld')})}
 function wipeTx(){const n=S.tx.length,u=S.tx.filter(t=>!t.synced).length,g=S.club.gid&&S.club.gok;
  modal(`<h3>Alle ${n} boekingen wissen?</h3>${u?`<p class="neg">${u} boeking(en) zijn nog niet verstuurd en gaan verloren.</p>`:''}<p class="mu">Wissen in de spreadsheet is niet te herstellen, tenzij je de versiegeschiedenis van Google Sheets gebruikt.</p>
