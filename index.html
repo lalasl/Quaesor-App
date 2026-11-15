@@ -121,7 +121,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='56',APP_LABEL='1.5.6';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='57',APP_LABEL='1.5.7';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -434,7 +434,7 @@ function relink(){const by=new Map(S.tx.map(t=>[t.id,t]));
  S.tx.forEach(t=>{if(t.storno){const o=by.get(t.ref);if(o){o.void=true;if(o.exp)t.exp=true}}});
  S.tx.forEach(t=>{if(t.ref&&!t.storno&&!t.void){const d=by.get(t.ref);if(d){d.paid=Math.round(((d.paid||0)+t.v)*100)/100;if(d.method!=='schuld'||d.paid>=d.v-.005){d.paidBy=t.id;d.paidDate=t.date}}}})}
 async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(TAB_B,'A2:O'))}?valueRenderOption=UNFORMATTED_VALUE`),have=new Set(S.tx.map(t=>t.id)),byId=new Map(S.tx.map(t=>[t.id,t]));let add=0,chg=false;
- const mem=new Map(S.members.map(m=>[m.name.toLowerCase(),m.id]));
+ const mem=new Map(S.members.map(m=>[uk(m.name),m.id]));
  const inSheet=new Set();
  const RM=new Set(c.rmIds||[]);if(RM.size){const n0=S.tx.length;S.tx=S.tx.filter(t=>!RM.has(t.id));if(S.tx.length!==n0){chg=true;have.clear();S.tx.forEach(t=>have.add(t.id))}}
  (d.values||[]).forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(RM.has(id))return;if(id)inSheet.add(id);if(!id)return;if(have.has(id)){const x=byId.get(id);{const nm=String(r[2]||'').trim();if(x&&nm&&!x.renD&&!x.exp&&nm!==x.name){x.name=nm;const mm=S.members.find(z=>uk(z.name)===uk(nm));if(mm)x.mid=mm.id;chg=true}}if(x&&!x.chkD){const k=/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim());if(!!x.chk!==k){x.chk=k;chg=true}}if(x&&x.synced&&!x.edD&&!x.exp&&!x.storno&&!isShop(x)&&edPull(x,r))chg=true;return}
@@ -442,7 +442,7 @@ async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(T
   if(c.wipeTs&&ts<c.wipeTs)return;const meth=REV[String(r[6]||'').trim().toLowerCase()];if(!meth)return;
   const k=String(r[10]||'').trim(),typ=String(r[8]||'').trim().toLowerCase(),ref=String(r[9]==null?'':r[9]).trim().replace(/^'/,'');let name=String(r[2]||'').trim(),desc=String(r[3]||'').trim();
   if(!name&&(typ==='uitgave'||typ==='storno')&&desc){const i=desc.indexOf(' – ');if(i>=0){name=desc.slice(0,i).trim();desc=desc.slice(i+3).trim()}else if(typ==='uitgave'){name=desc;desc=''}}
-  const t={id,ts,date,mid:mem.get(name.toLowerCase())||null,name,v,method:meth,h:String(r[4]||'').trim(),s:String(r[5]||'').trim(),desc,by:/quaestor/i.test(String(r[12]||'').trim()||k)?'q':'h',who:/^(quaestor|helper)$/i.test(k)?'':k,void:false,synced:true};
+  const t={id,ts,date,mid:mem.get(uk(name))||null,name,v,method:meth,h:String(r[4]||'').trim(),s:String(r[5]||'').trim(),desc,by:/quaestor/i.test(String(r[12]||'').trim()||k)?'q':'h',who:/^(quaestor|helper)$/i.test(k)?'':k,void:false,synced:true};
   if(/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim()))t.chk=true;
   if(typ==='storno')t.storno=true;if(ref&&(typ==='storno'||typ==='afbetaling'||typ==='terugbetaling'))t.ref=ref;
   if(typ==='uitgave'||typ==='terugbetaling'){t.exp=true;if(typ==='uitgave'&&ref)t.bon=ref}const ad=String(r[13]||'').trim();if(ad)t.adv=ad;
@@ -570,7 +570,8 @@ async function doSetup(){const n=$('#sn').value.trim(),u=$('#su').value.trim(),e
  const us=await mkUser(u,null,'q',em);Object.assign(S.club,{name:n,setDirty:true,lastUser:us.u,hq:{id:us.id,e:us.e||'',ts:Date.now()}});S.users=[us];save();logIn(us)}
 /* ---------- accounts ---------- */
 const TAB_U='Gebruikers',HEAD_U=['ID','Gebruikersnaam','Rol','Status','Salt','Code','Aangemaakt','Gewijzigd','E-mail'];
-const uk=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+/* Namen vergelijken zonder hoofdletters en zonder accenten: 'Trill' en 'Trïll' zijn hetzelfde lid. */
+const uk=s=>String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
 const actU=()=>S.users.filter(u=>u.st!=='weg');
 const findU=n=>actU().find(u=>uk(u.u)===uk(n));
 const findE=e=>e?actU().find(u=>u.e&&u.e===String(e).toLowerCase()):null;
@@ -737,8 +738,8 @@ function setSt(id,v,fromBook){const m=S.members.find(x=>x.id===id),n=canonSt(v)|
 function onQ(v){const had=!!B.mid;B.name=v;B.mid=null;if(had){if(!B.man)B.amt='';mi()}sug()}
 function sug(){const e=$('#sug');if(!e)return;const t=B.name.trim().toLowerCase();let h='';
  if(B.mid)h='<div class="chip">✓ Lid geselecteerd</div>';
- else if(t){h=S.members.filter(m=>m.name.toLowerCase().includes(t)).slice(0,6).map(m=>`<button class="opt" onclick="pick('${m.id}')"><span>${esc(m.name)}</span><span class="mu">${esc(m.status)}</span></button>`).join('');
-  if(!S.members.some(m=>m.name.toLowerCase()===t))h+=`<div class="mu" style="margin:8px 0 4px">Nieuw lid “${esc(B.name.trim())}” toevoegen. Kies de status:</div><div class="seg" style="grid-auto-flow:row;grid-template-columns:repeat(auto-fit,minmax(90px,1fr))">${S.statuses.map(x=>`<button data-s="${esc(x)}" onclick="newM(this.dataset.s)">${esc(x)}</button>`).join('')}</div>`}
+ else if(t){h=S.members.filter(m=>uk(m.name).includes(uk(t))).slice(0,6).map(m=>`<button class="opt" onclick="pick('${m.id}')"><span>${esc(m.name)}</span><span class="mu">${esc(m.status)}</span></button>`).join('');
+  if(!S.members.some(m=>uk(m.name)===uk(t)))h+=`<div class="mu" style="margin:8px 0 4px">Nieuw lid “${esc(B.name.trim())}” toevoegen. Kies de status:</div><div class="seg" style="grid-auto-flow:row;grid-template-columns:repeat(auto-fit,minmax(90px,1fr))">${S.statuses.map(x=>`<button data-s="${esc(x)}" onclick="newM(this.dataset.s)">${esc(x)}</button>`).join('')}</div>`}
  e.innerHTML=h}
 function pick(id){const m=S.members.find(x=>x.id===id);B.mid=id;B.name=m.name;autoPrice();render()}
 function newM(st){unDel(B.name.trim());const m={id:uid(),name:B.name.trim(),status:canonSt(st)||S.statuses[0],dirty:true};S.members.push(m);save();B.mid=m.id;autoPrice();queueSync();render()}
@@ -839,10 +840,10 @@ function actNewOk(){const date=$('#nad').value||today(),h=$('#nah').value,s=$('#
  const now=Date.now(),a={id:uid(),date,h,s,ts:now,nts:now,by:WHO,note:'',rm:false,p:[],dirty:true};S.att.push(a);ACT=a.id;AQ='';save();render();queueSync();setTimeout(()=>{const e=$('#aq');if(e)e.focus()},50)}
 function actSug(){const e=$('#asug');if(!e)return;const t=AQ.trim().toLowerCase();if(!t){e.innerHTML='';return}
  const a=curAct(),on=new Set(a?attPeople(a).map(p=>uk(p.n)):[]);
- let h=S.members.filter(m=>m.name.toLowerCase().includes(t)).slice(0,6).map(m=>`<button class="opt" data-n="${esc(m.name)}" onclick="actAdd(this.dataset.n)"><span>${esc(m.name)}</span><span class="mu">${on.has(uk(m.name))?'staat al op de lijst':esc(m.status)}</span></button>`).join('');
- if(!S.members.some(m=>m.name.toLowerCase()===t))h+=`<button class="opt new" data-n="${esc(AQ.trim())}" onclick="actAdd(this.dataset.n)"><span>“${esc(AQ.trim())}” toevoegen</span><span class="mu">niet in de ledenlijst</span></button>`;
+ let h=S.members.filter(m=>uk(m.name).includes(uk(t))).slice(0,6).map(m=>`<button class="opt" data-n="${esc(m.name)}" onclick="actAdd(this.dataset.n)"><span>${esc(m.name)}</span><span class="mu">${on.has(uk(m.name))?'staat al op de lijst':esc(m.status)}</span></button>`).join('');
+ if(!S.members.some(m=>uk(m.name)===uk(t)))h+=`<button class="opt new" data-n="${esc(AQ.trim())}" onclick="actAdd(this.dataset.n)"><span>“${esc(AQ.trim())}” toevoegen</span><span class="mu">niet in de ledenlijst</span></button>`;
  e.innerHTML=h}
-function actAddTyped(){const t=AQ.trim();if(!t)return;const m=S.members.find(x=>x.name.toLowerCase()===t.toLowerCase())||S.members.filter(x=>x.name.toLowerCase().includes(t.toLowerCase())).slice(0,1)[0];actAdd(m?m.name:t)}
+function actAddTyped(){const t=AQ.trim();if(!t)return;const m=S.members.find(x=>uk(x.name)===uk(t))||S.members.filter(x=>uk(x.name).includes(uk(t))).slice(0,1)[0];actAdd(m?m.name:t)}
 function actAdd(n){const a=curAct();n=String(n||'').trim();if(!a||!n||!AW())return;const p=a.p.find(x=>uk(x.n)===uk(n)),pp=attPeople(a).find(x=>uk(x.n)===uk(n));
  if(p&&!p.rm||pp){AQ='';render();setTimeout(()=>{const e=$('#aq');if(e)e.focus()},30);return toast(n+' staat al op de lijst'+(pp&&pp.st!=='open'?' en is geboekt':''))}
  if(p){p.rm=false;p.ts=Date.now();p.by=WHO}else a.p.push({n,ts:Date.now(),by:WHO,rm:false});a.dirty=true;AQ='';save();render();queueSync();toast(n+' staat op de lijst: nog niet geboekt');setTimeout(()=>{const e=$('#aq');if(e)e.focus()},30)}
@@ -1343,7 +1344,7 @@ function vLeden(){if(RO())return `<div class="card"><h2>${S.members.length} lede
  return `<div class="card"><h2>${S.members.length} leden</h2><div class="btns" style="margin-bottom:12px"><button class="btn" onclick="addMOpen()">+ Lid toevoegen</button><button class="btn ghost" onclick="telImp()">Lijst plakken</button></div>
  <label>Zoeken<input oninput="LQ=this.value;ml()" placeholder="Naam…"></label><p class="mu" style="margin-top:-6px">De status kan je hier aanpassen, of in het tabblad Leden van je spreadsheet.</p><div id="ml"></div></div>`}
 function addMOpen(){if(RO())return;modal(`<h3>Lid toevoegen</h3><label>Clubnaam<input id="mn" autocomplete="off" placeholder="bv. Spelt"></label><label>Status<select id="ms">${S.statuses.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select></label><label>Of een nieuwe status (niet verplicht)<input id="ms2" autocomplete="off" placeholder="bv. schacht"></label><button class="btn" onclick="addM()">Toevoegen</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`);setTimeout(()=>{const e=$('#mn');if(e)e.focus()},50)}
-function ml(){const e=$('#ml');if(!e)return;const q=LQ.toLowerCase(),o=open(),l=S.members.filter(m=>m.name.toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name));
+function ml(){const e=$('#ml');if(!e)return;const q=LQ.toLowerCase(),o=open(),l=S.members.filter(m=>uk(m.name).includes(uk(q))).sort((a,b)=>a.name.localeCompare(b.name));
  e.innerHTML=l.length?l.map(m=>{const d=Math.max(0,debtOf(m.name));return `<div class="row"><div>${esc(m.name)}${role==='q'&&m.tel?`<div class="mu">${esc(m.tel)}</div>`:''}${d?`<div class="neg" style="white-space:nowrap">Schuld ${eur(d)}</div>`:''}</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">${RO()?`<span class="mu">${esc(m.status)}</span>`:`<select class="ss" aria-label="Status van ${esc(m.name)}" onchange="stSel(this,'${m.id}',false)">${stOpts(m.status)}</select><span style="display:flex;gap:10px"><button class="lnk" onclick="editM('${m.id}')" aria-label="${esc(m.name)} aanpassen">Aanpassen</button><button class="lnk" onclick="delM('${m.id}')" aria-label="${esc(m.name)} verwijderen">Verwijderen</button></span>`}</div></div>`}).join(''):empty('Geen leden gevonden.')}
 function editM(id){if(RO())return;const m=S.members.find(x=>x.id===id);if(!m)return;const nc=/geen\s*contact/i.test(m.tel||'');
  modal(`<h3>Lid aanpassen</h3><label>Clubnaam<input id="en" autocomplete="off" value="${esc(m.name)}"></label><label>Status<select id="es">${S.statuses.map(x=>`<option value="${esc(x)}"${x===m.status?' selected':''}>${esc(x)}</option>`).join('')}</select></label><label>Of een nieuwe status (niet verplicht)<input id="es2" autocomplete="off" placeholder="bv. schacht"></label>
