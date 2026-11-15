@@ -121,7 +121,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='57',APP_LABEL='1.5.7';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='58',APP_LABEL='1.5.8';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -430,6 +430,8 @@ const toDate=x=>{if(typeof x==='number')return new Date(Math.round(serial(x))).t
 const toTs=(x,date)=>{if(typeof x==='number')return Math.round(serial(x));const p=Date.parse(String(x||'').trim());return isFinite(p)?p:Date.parse(date+'T12:00:00')||0};
 const REV=Object.fromEntries(Object.entries(M).map(([k,v])=>[v.toLowerCase(),k]));
 function relink(){const by=new Map(S.tx.map(t=>[t.id,t]));
+ /* Schrijf de naam zoals in de ledenlijst (bv. 'Trill' wordt 'Trïll'), zodat overal dezelfde naam staat. */
+ const mm=new Map(S.members.map(m=>[uk(m.name),m]));S.tx.forEach(t=>{if(!t.name||t.exp)return;const m=mm.get(uk(t.name));if(m&&t.name!==m.name){t.name=m.name;if(!t.mid)t.mid=m.id}});
  S.tx.forEach(t=>{if(!t.storno)t.void=false;delete t.paidBy;delete t.paidDate;delete t.paid});
  S.tx.forEach(t=>{if(t.storno){const o=by.get(t.ref);if(o){o.void=true;if(o.exp)t.exp=true}}});
  S.tx.forEach(t=>{if(t.ref&&!t.storno&&!t.void){const d=by.get(t.ref);if(d){d.paid=Math.round(((d.paid||0)+t.v)*100)/100;if(d.method!=='schuld'||d.paid>=d.v-.005){d.paidBy=t.id;d.paidDate=t.date}}}})}
