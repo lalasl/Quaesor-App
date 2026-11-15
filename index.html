@@ -121,7 +121,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='54',APP_LABEL='1.5.4';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='55',APP_LABEL='1.5.5';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -306,7 +306,8 @@ function fillS(sel,id){const e=document.getElementById(id);if(e)e.innerHTML=opts
 /* ---------- werkjaar en oude schulden ---------- */
 const OLD_H='Oude schulden',OLD_S='Vorige werkjaren';
 const isOldDebt=d=>!!d&&(d.h===OLD_H||(!!S.club.wj&&!!d.date&&d.date<S.club.wj));
-const payHS=d=>isOldDebt(d)?{h:OLD_H,s:OLD_S}:{h:d.h,s:d.s};
+const oldSub=()=>{const m=(S.cats&&S.cats.m)||{};return Object.keys(m).find(x=>m[x]===OLD_H)||''};
+const payHS=d=>isOldDebt(d)?{h:OLD_H,s:oldSub()}:{h:d.h,s:d.s};
 const rnd=()=>[...crypto.getRandomValues(new Uint8Array(12))].map(x=>x.toString(16).padStart(2,'0')).join('');
 async function hashPin(pin,salt,it){const te=new TextEncoder(),k=await crypto.subtle.importKey('raw',te.encode(pin),'PBKDF2',false,['deriveBits']);
  const b=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:te.encode(salt),iterations:it||100000},k,256);return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
@@ -928,7 +929,7 @@ function rapCsv(){const r=rapData(),q=v=>'"'+String(v==null?'':v).replace(/"/g,'
  try{const u=URL.createObjectURL(new Blob([txt],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=u;a.download='verslag-'+r.van+'-'+r.tot+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}catch(e){showT('Verslag (csv)',txt)}}
 function rapShare(){const r=rapData(),t=[`${S.club.name}: verslag ${fdt(r.van)} – ${fdt(r.tot)}`,`Inkomsten ${eur(r.inT)}, uitgaven ${eur(r.outT)}, resultaat ${eur(r.inT-r.outT)}`+(r.oldIn?` (zonder oude schulden ${eur(r.inT-r.outT-r.oldIn)})`:''),`Openstaande schulden ${eur(r.dTot)} (waarvan vorige werkjaren ${eur(r.dOld)})`].concat(r.H.map(g=>`${g.h}: ${eur(g.i)} in, ${eur(g.u)} uit`)).join('\n');
  navigator.share({title:S.club.name+' verslag',text:t}).catch(()=>{})}
-function wjCard(){const c=S.club;return `<div class="card"><h2>Werkjaar en oude schulden</h2><p class="mu">Schulden van vóór deze datum horen bij een vorig werkjaar. Betaalt iemand zo'n schuld af, dan boekt de app die betaling op <b>${OLD_H} · ${OLD_S}</b> en niet op een categorie van dit jaar. Zo blijft het resultaat van dit werkjaar juist.</p><label>Begin van dit werkjaar<input type="date" id="iwj" value="${esc(c.wj||'')}"></label></div>`}
+function wjCard(){const c=S.club;return `<div class="card"><h2>Werkjaar en oude schulden</h2><p class="mu">Schulden van vóór deze datum horen bij een vorig werkjaar. Betaalt iemand zo'n schuld af, dan boekt de app die betaling op <b>${OLD_H}</b> en niet op een categorie van dit jaar. Zo blijft het resultaat van dit werkjaar juist.</p><label>Begin van dit werkjaar<input type="date" id="iwj" value="${esc(c.wj||'')}"></label></div>`}
 
 /* ---------- bonnetjes ---------- */
 const SHOPS=['Colruyt','Delhaize','Aldi','Lidl','Carrefour','Albert Heijn','Jumbo','Spar','OKay','Action','Makro','Hanos','Bidfood','Kruidvat','Brico','Hubo','Gamma','Ikea','Hema','Zeeman','Intermarché','Cora','Match','Prik & Tik','Drinks & Food','Mediamarkt','Coolblue','Bol.com','Decathlon','Blokker','Trafic','Dreamland','Standaard Boekhandel','Club','Fnac','Vanden Borre','Krëfel','Total','Shell','Q8','Esso','Lukoil','Proxy','Panos','Exki','McDonald','Quick','Burger King','Domino','Pizza Hut','Brasserie','Frituur','Bakkerij'];
