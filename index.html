@@ -89,7 +89,7 @@ details summary{cursor:pointer;color:var(--mu);font-size:.85rem;margin:6px 0}
 @media print{:root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--bg:#fff;--card:#fff;--tx:#111;--mu:#555;--bd:#ccc;--in:#fff;--er:#9b1c1c;color-scheme:light}
  header,nav,.np,#toast,#modal{display:none!important}html,body{height:auto!important;display:block!important}main{overflow:visible!important;max-width:none!important;padding:0!important}
  .card{break-inside:avoid;page-break-inside:avoid}.rh{display:block!important}}
-.rh{display:none}.rt{width:100%;border-collapse:collapse;font-size:.9rem;font-variant-numeric:tabular-nums}.rt td,.rt th{padding:6px 4px;border-bottom:1px solid var(--bd);text-align:right}.rt td:first-child,.rt th:first-child{text-align:left}.rt th{color:var(--mu);font-weight:600;font-size:.8rem}.rt tr.rhead td{font-weight:700;background:var(--in)}.rt tr.rsub td:first-child{padding-left:16px}.rt tr.rtot td{font-weight:700;border-top:2px solid var(--ac)}
+.rh{display:none}.rtw{overflow-x:auto;margin:0 -4px;padding:0 4px}.rt{width:100%;min-width:560px;border-collapse:collapse;font-size:.9rem;font-variant-numeric:tabular-nums}.rt td,.rt th{padding:6px 4px;border-bottom:1px solid var(--bd);text-align:right}.rt td:first-child,.rt th:first-child{text-align:left}.rt th{color:var(--mu);font-weight:600;font-size:.8rem}.rt tr.rhead td{font-weight:700;background:var(--in)}.rt tr.rsub td:first-child{padding-left:16px}.rt tr.rtot td{font-weight:700;border-top:2px solid var(--ac)}
 .note{white-space:pre-wrap;font-size:.9rem;background:var(--in);border-radius:8px;padding:8px 10px;margin-top:6px}
 </style>
 </head>
@@ -121,7 +121,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='55',APP_LABEL='1.5.5';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='56',APP_LABEL='1.5.6';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -855,7 +855,7 @@ function actDel(){const a=curAct();if(!a||RO())return;ask('Deze aanwezigheidslij
 /* ---------- mini-verslag ---------- */
 /* Bron 1: het kas- en bankboek in de gekoppelde spreadsheet, als de app ze herkent (kolom Datum + kolommen IN en UIT, of Bedrag + Categorie).
    Bron 2 (als er geen boeken gevonden worden): alles wat via de app geboekt is. Schulden en aanwezigheid komen altijd uit de app. */
-const MONEY=['cash','payconiq','overschrijving'];
+const MONEY=['cash','payconiq','overschrijving'],ATT_SKIP=/^(werking|fondsenwerving|textiel)$/i;
 const BKRX={date:/^(datum|date|dag)$/,desc:/omschrijving|beschrijving|mededeling|description|detail/,h:/^(hoofdcategorie|hoofd|categorie|category|rubriek|post)$/,s:/^(subcategorie|sub|subcategory|activiteit)$/,inn:/^(in|inkomsten|ontvangen|ontvangst|ontvangsten|credit|bedrag in|in \(€\)|in €)$/,out:/^(uit|uitgaven|uitgegeven|betaald|debet|debit|bedrag uit|uit \(€\)|uit €)$/,amt:/^(bedrag|amount|bedrag \(€\)|bedrag €)$/,saldo:/^saldo$/};
 function bkHead(rows){for(let r=0;r<rows.length;r++){const c=(rows[r]||[]).map(x=>String(x==null?'':x).trim().toLowerCase()),f=k=>c.findIndex(x=>BKRX[k].test(x)),o={row:r};for(const k in BKRX)o[k]=f(k);
   if(o.date>=0&&((o.inn>=0&&o.out>=0)||(o.amt>=0&&o.h>=0)))return o}return null}
@@ -897,6 +897,11 @@ function rapData(){const c=S.club,first=S.tx.reduce((a,t)=>t.date&&t.date<a?t.da
  const hi=h=>{const i=S.cats.h.indexOf(h);return i<0?900:i},si=s=>{const i=S.cats.s.indexOf(s);return s?(i<0?900:i+1):0};
  const rows=Object.values(K).map(r=>({h:r.h,s:r.s,i:r2(r.i),u:r2(r.u),o:r2(r.o)})).filter(r=>Math.abs(r.i)+Math.abs(r.u)+Math.abs(r.o)>.004).sort((x,y)=>hi(x.h)-hi(y.h)||x.h.localeCompare(y.h)||si(x.s)-si(y.s)||x.s.localeCompare(y.s));
  const H=[];rows.forEach(r=>{let g=H.find(x=>x.h===r.h);if(!g){g={h:r.h,i:0,u:0,o:0,sub:[]};H.push(g)}g.i=r2(g.i+r.i);g.u=r2(g.u+r.u);g.o=r2(g.o+r.o);g.sub.push(r)});
+ /* Aanwezigen: verschillende namen die voor die activiteit geboekt zijn of op de aanwezigheidslijst staan, binnen de periode. */
+ const noAtt=h=>!h||h===OLD_H||isOv(h)||ATT_SKIP.test(h),tel=(h,s)=>{if(noAtt(h))return 0;const N=new Set();
+  S.tx.forEach(t=>{if(!t.void&&!t.storno&&!t.exp&&!t.ref&&t.v>0&&t.name&&t.h===h&&(t.s||'')===s&&t.date>=van&&t.date<=tot)N.add(uk(t.name))});
+  S.att.forEach(a=>{if(!a.rm&&a.h===h&&(a.s||'')===s&&a.date>=van&&a.date<=tot)a.p.forEach(p=>{if(!p.rm)N.add(uk(p.n))})});return N.size};
+ H.forEach(g=>{g.sub.forEach(x=>{x.n=tel(g.h,x.s);x.pp=x.n?r2(x.u/x.n):null});const ws=g.sub.filter(x=>x.s);g.n=ws.length?g.sub.reduce((a,x)=>a+x.n,0):tel(g.h,'');g.pp=g.n?r2(g.u/g.n):null});
  const D=Object.values(debts()).filter(o=>o.tot>.005).sort((a,b)=>b.tot-a.tot),dTot=r2(OD.reduce((a,d)=>a+rem(d),0)),dOld=r2(OD.filter(isOldDebt).reduce((a,d)=>a+rem(d),0));
  const A=S.att.filter(a=>!a.rm&&a.date>=van&&a.date<=tot).sort((x,y)=>x.date.localeCompare(y.date)).map(a=>{const P=attPeople(a);return{a,n:P.length,op:P.filter(p=>p.st==='open').length}});
  return{van,tot,src:BK?'sheet':'app',books,per,inT,outT,oldIn:r2(oldIn),H,D,dTot,dOld,A}}
@@ -913,7 +918,7 @@ function vRap(){const c=S.club,con=!!(c.gid&&c.gok);
  <p class="mu" style="margin:10px 0 0">${src}${con?' <button class="lnk" onclick="bkRefresh()">Vernieuwen</button>':''}${c.wj?'':' Tip: stel bij Meer › Werkjaar het begin van het werkjaar in.'}</p></div>
  <div id="rap"><div class="rh"><h2 style="font-size:1.4rem;margin:0">${esc(c.name)}: financieel verslag</h2><p class="mu">Periode ${fdt(r.van)} tot en met ${fdt(r.tot)} · gemaakt op ${fdt(today())}</p></div>
  ${geld}${res}
- <div class="card"><h2>Per activiteit en categorie</h2>${r.H.length?`<table class="rt"><tr><th>Categorie</th><th>Inkomsten</th><th>Uitgaven</th><th>Resultaat</th><th>Nog te ontvangen</th></tr>${r.H.map(g=>`<tr class="rhead"><td>${esc(g.h)}</td><td>${sp(g.i)}</td><td>${sp(g.u)}</td><td class="${g.i-g.u<0?'neg':''}">${sp(r2x(g.i-g.u))}</td><td>${sp(g.o)}</td></tr>`+(g.sub.length>1||g.sub[0].s?g.sub.map(x=>`<tr class="rsub"><td>${esc(x.s||'overige')}</td><td>${sp(x.i)}</td><td>${sp(x.u)}</td><td class="${x.i-x.u<0?'neg':''}">${sp(r2x(x.i-x.u))}</td><td>${sp(x.o)}</td></tr>`).join(''):'')).join('')}<tr class="rtot"><td>Totaal</td><td>${eur(r.inT)}</td><td>${eur(r.outT)}</td><td>${eur(net)}</td><td>${eur(r.dTot)}</td></tr></table>`:empty('Nog niets geboekt in deze periode.')}</div>
+ <div class="card"><h2>Per activiteit en categorie</h2>${r.H.length?`<div class="rtw"><table class="rt"><tr><th>Categorie</th><th>Inkomsten</th><th>Uitgaven</th><th>Resultaat</th><th>Nog te ontvangen</th><th>Aanwezig</th><th>Kost per persoon</th></tr>${r.H.map(g=>`<tr class="rhead"><td>${esc(g.h)}</td><td>${sp(g.i)}</td><td>${sp(g.u)}</td><td class="${g.i-g.u<0?'neg':''}">${sp(r2x(g.i-g.u))}</td><td>${sp(g.o)}</td><td>${g.n||'<span class="mu">–</span>'}</td><td>${g.pp!=null?eur(g.pp):'<span class="mu">–</span>'}</td></tr>`+(g.sub.length>1||g.sub[0].s?g.sub.map(x=>`<tr class="rsub"><td>${esc(x.s||'overige')}</td><td>${sp(x.i)}</td><td>${sp(x.u)}</td><td class="${x.i-x.u<0?'neg':''}">${sp(r2x(x.i-x.u))}</td><td>${sp(x.o)}</td><td>${x.n||'<span class="mu">–</span>'}</td><td>${x.pp!=null?eur(x.pp):'<span class="mu">–</span>'}</td></tr>`).join(''):'')).join('')}<tr class="rtot"><td>Totaal</td><td>${eur(r.inT)}</td><td>${eur(r.outT)}</td><td>${eur(net)}</td><td>${eur(r.dTot)}</td><td></td><td></td></tr></table></div>`:empty('Nog niets geboekt in deze periode.')}</div>
  <div class="card"><h2>Openstaande schulden (vandaag)</h2><div class="grid" style="margin:0 0 8px"><div class="stat">Totaal open<b>${eur(r.dTot)}</b></div><div class="stat">Uit vorige werkjaren<b>${eur(r.dOld)}</b></div></div><p class="mu" style="margin:0 0 6px">${r.D.length} ${r.D.length===1?'lid heeft':'leden hebben'} nog een schuld.</p>${r.D.slice(0,5).map(o=>`<div class="row" style="padding:6px 0"><div>${esc(o.name)} <span class="mu">${esc(o.st||'')}</span></div><div class="amt">${eur(o.tot)}</div></div>`).join('')}${r.D.length>5?`<p class="mu" style="margin:6px 0 0">… en ${r.D.length-5} anderen</p>`:''}</div>
  ${r.A.length?`<div class="card"><h2>Aanwezigheid</h2>${r.A.map(x=>`<div class="row" style="display:block;padding:8px 0"><div style="display:flex;justify-content:space-between;gap:10px"><div><b>${esc(actName(x.a))}</b> <span class="mu">${fdt(x.a.date)}</span></div><div class="amt" style="font-weight:400">${x.n} aanwezig${x.op?` · <span class="neg">${x.op} niet geboekt</span>`:''}</div></div>${x.a.note?`<div class="note">${esc(x.a.note)}</div>`:''}</div>`).join('')}</div>`:''}
  <p class="mu rh">${src}</p></div>`}
@@ -921,8 +926,8 @@ const r2x=v=>Math.round((v||0)*100)/100;
 function rapPrint(){const o=document.title;document.title=(S.club.name||'Club')+' verslag '+today();window.print();setTimeout(()=>document.title=o,1000)}
 function rapCsv(){const r=rapData(),q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"',n=v=>String(r2x(v)).replace('.',','),L=[['Verslag '+S.club.name,'van '+fdt(r.van),'tot '+fdt(r.tot),r.src==='sheet'?'bron: '+r.books.map(b=>b.t).join(' en '):'bron: boekingen via de app'],[]];
  if(r.src==='sheet'){L.push(['Kerncijfers'].concat(r.books.map(b=>b.t)));[['Saldo begin','begin'],['Inkomsten','inn'],['Uitgaven','out'],['Overboekingen','ovb'],['Saldo einde','end']].forEach(([l,k])=>L.push([l].concat(r.books.map(b=>n(b[k])))));L.push([])}
- L.push(['Resultaat (inkomsten min uitgaven)','',n(r.inT-r.outT)],['waarvan oude schulden','',n(r.oldIn)],['Resultaat zonder oude schulden','',n(r.inT-r.outT-r.oldIn)],[],['Hoofdcategorie','Subcategorie','Inkomsten','Uitgaven','Resultaat','Nog te ontvangen']);
- r.H.forEach(g=>{L.push([g.h,'',n(g.i),n(g.u),n(g.i-g.u),n(g.o)]);g.sub.forEach(x=>{if(g.sub.length>1||x.s)L.push([g.h,x.s||'overige',n(x.i),n(x.u),n(x.i-x.u),n(x.o)])})});
+ L.push(['Resultaat (inkomsten min uitgaven)','',n(r.inT-r.outT)],['waarvan oude schulden','',n(r.oldIn)],['Resultaat zonder oude schulden','',n(r.inT-r.outT-r.oldIn)],[],['Hoofdcategorie','Subcategorie','Inkomsten','Uitgaven','Resultaat','Nog te ontvangen','Aanwezig','Kost per persoon']);
+ r.H.forEach(g=>{L.push([g.h,'',n(g.i),n(g.u),n(g.i-g.u),n(g.o),g.n||'',g.pp!=null?n(g.pp):'']);g.sub.forEach(x=>{if(g.sub.length>1||x.s)L.push([g.h,x.s||'overige',n(x.i),n(x.u),n(x.i-x.u),n(x.o),x.n||'',x.pp!=null?n(x.pp):''])})});
  L.push(['Totaal','',n(r.inT),n(r.outT),n(r.inT-r.outT),n(r.dTot)],[],['Openstaande schulden','',n(r.dTot)],['waarvan vorige werkjaren','',n(r.dOld)],[],['Lid','Status','Openstaand']);r.D.forEach(o=>L.push([o.name,o.st||'',n(o.tot)]));
  if(r.A.length){L.push([],['Activiteit','Datum','Aanwezig','Niet geboekt','Notitie']);r.A.forEach(x=>L.push([actName(x.a),fdt(x.a.date),x.n,x.op,x.a.note||'']))}
  const txt='\ufeff'+L.map(l=>l.map(q).join(';')).join('\r\n');
