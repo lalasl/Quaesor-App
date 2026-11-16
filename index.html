@@ -55,7 +55,7 @@ summary{color:var(--mu);font-size:.85rem;padding:4px 0}
 .row.void{opacity:.5;text-decoration:line-through}
 .mu{color:var(--mu);font-size:.85rem}
 .amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
-.neg{color:var(--er)}.pos{color:#1E6B3A;font-weight:600}
+.neg{color:var(--er)}:root{--tm:#E8770E}.tmbar{background:var(--tm);color:#fff;padding:6px 14px;font-size:.82rem;text-align:center;line-height:1.35}html.tm::after{content:'';position:fixed;inset:0;border:5px solid var(--tm);pointer-events:none;z-index:9998}.tag.tmtag{border-color:var(--tm);color:var(--tm);font-weight:600}.pos{color:#1E6B3A;font-weight:600}
 .back{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:var(--tx);font:inherit;font-weight:600;font-size:.95rem;padding:4px 0;margin:0 0 10px;cursor:pointer}
 .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}.btns .btn{margin:0!important}
 .lnk{background:none;border:0;padding:2px 0;color:var(--mu);font:inherit;font-size:.8rem;text-decoration:underline;cursor:pointer}
@@ -112,17 +112,17 @@ const isHQ=u=>!!(u&&S&&S.club&&S.club.hq&&u.id===S.club.hq.id);const HQ=()=>!!US
 const effR=u=>isDev(u.e)?'q':u.r==='d'?'q':u.r;
 /* Enkel toegang tot spreadsheets die de app zelf aanmaakt of die de gebruiker zelf kiest. */
 const SCOPE='https://www.googleapis.com/auth/drive.file openid email';
-const TAB_PT='Potten',HEAD_PT=['Pot-ID','Datum','Pot','Hoofdcategorie','Subcategorie','Soort','Persoon','Bedrag','Betaalwijze of status','Boeking-ID','Tijdstip','Door','Info','Verwijderd'];
-const TAB_A='Aanwezigheid',HEAD_A=['Activiteit-ID','Datum','Hoofdcategorie','Subcategorie','Lid','Tijdstip','Door','Notitie','Verwijderd'];
+const TAB_PT='Potten',HEAD_PT=['Pot-ID','Datum','Pot','Hoofdcategorie','Subcategorie','Soort','Persoon','Bedrag','Betaalwijze of status','Boeking-ID','Tijdstip','Door','Info','Verwijderd','Testmodus'];
+const TAB_A='Aanwezigheid',HEAD_A=['Activiteit-ID','Datum','Hoofdcategorie','Subcategorie','Lid','Tijdstip','Door','Notitie','Verwijderd','Testmodus'];
 var POT='',PQ='',BKD=null,BKL=false,OVT='dag',ACT='',AQ='',NOTE='',ABACK='',RV='',RT='';
 const TAB_OV='Schulden (overzicht)',TAB_B='Boekingen',TAB_L='Leden',TAB_P='Prijzen',TAB_I='Instellingen',TAB_BN='Bonnetjes',TAB_BF='Bonnetjes-foto';
-const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingediend door','Ingediend op','Status','Boeking-ID','Voorgeschoten door'];
+const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingediend door','Ingediend op','Status','Boeking-ID','Voorgeschoten door','Testmodus'];
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='61',APP_LABEL='1.5.11';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='70',APP_LABEL='1.7.0';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -151,8 +151,8 @@ try{const r=localStorage.getItem(K);if(r)S=JSON.parse(r)}catch(e){}
 if(!S)S=DEF();
 function norm(){
  if(Array.isArray(S.cats)){const o=S.cats;S.cats={h:o.map(c=>c.h),s:[...new Set(o.flatMap(c=>c.s))]}}
- if(!S.cats.m||typeof S.cats.m!=='object')S.cats.m={};S.att=Array.isArray(S.att)?S.att:[];S.pots=Array.isArray(S.pots)?S.pots:[];S.pots.forEach(p=>{if(!Array.isArray(p.c))p.c=[]});
- S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0,askName:false,debtTab:'',lim:{},bkImp:0,pinMe:'',hOk:false,uTab:false,lastUser:'',sess:'',closedAt:0,closed:0,bonTab:false,attTab:false,potTab:false,feat:{},wj:'',dev:'',acc:{},accMid:0,accGid:'',accSig:'',accTs:0,accF:0,blocked:''},S.club);
+ if(!S.cats.m||typeof S.cats.m!=='object')S.cats.m={};S.att=Array.isArray(S.att)?S.att:[];S.pots=Array.isArray(S.pots)?S.pots:[];[S.tx,S.members,S.att,S.pots,S.bons].forEach(L=>(Array.isArray(L)?L:[]).forEach(o=>{if(o&&o.test===undefined)o.test=0}));S.pots.forEach(p=>{if(!Array.isArray(p.c))p.c=[]});
+ S.club=Object.assign({gid:'',gok:false,gcreated:false,gpicked:false,gname:'',catTab:'Categorieën',cid:'',akey:'',appid:'',gmode:'new',gurl:'',gscope:'',helperOnly:false,wipeTs:0,inviteGid:'',salt:'',pinQh:'',pinHh:'',setDirty:false,setTs:0,askName:false,debtTab:'',lim:{},bkImp:0,pinMe:'',hOk:false,uTab:false,lastUser:'',sess:'',closedAt:0,closed:0,bonTab:false,attTab:false,potTab:false,feat:{},test:{on:false,ts:0,by:''},tpDone:0,tpAt:0,wj:'',dev:'',acc:{},accMid:0,accGid:'',accSig:'',accTs:0,accF:0,blocked:''},S.club);
  if(!S.club.dev)S.club.dev=uid().replace(/-/g,'');if(!S.club.acc||typeof S.club.acc!=='object'||Array.isArray(S.club.acc))S.club.acc={};
  if(S.club.gscope!==SCOPE){if(String(S.club.gscope||'').indexOf('drive.file')<0&&(S.club.gid||S.club.gok)){S.club.gok=false;if(S.club.gmode==='existing')S.club.gpicked=false;try{localStorage.removeItem('qg')}catch(e){}}S.club.gscope=SCOPE}
  S.sync=Object.assign({last:0,err:'',auth:false,pick:false,warn:''},S.sync||{});
@@ -162,7 +162,7 @@ function norm(){
  S.statuses=(Array.isArray(S.statuses)?S.statuses.map(cleanSt).filter(Boolean):[]);if(!S.statuses.length)S.statuses=['lid','niet-lid','oud-lid'];
  S.members.forEach(m=>{m.status=addSt(m.status)||S.statuses[0]})}
 norm();save();
-function save(){try{localStorage.setItem(K,JSON.stringify(S));const e=REG.list.find(x=>x.id===REG.active);
+function save(){try{tagNew()}catch(e){}try{localStorage.setItem(K,JSON.stringify(S));const e=REG.list.find(x=>x.id===REG.active);
  if(e){e.name=S.club.name||'';e.color=S.club.color;e.helper=!!S.club.helperOnly;e.user=S.club.lastUser||''}localStorage.setItem(REGK,JSON.stringify(REG))}catch(e){toast('Opslaan op dit toestel lukt niet')}}
 const emptyClub=s=>!s.club.pinQ&&!s.club.pinQh&&!s.club.helperOnly&&!(s.users||[]).length&&!s.club.gid;
 function removeProfile(id){try{localStorage.removeItem(keyOf(id));const px=keyOf(id)+'-bon-';Object.keys(localStorage).filter(k=>k.indexOf(px)===0).forEach(k=>localStorage.removeItem(k))}catch(e){}REG.list=REG.list.filter(x=>x.id!==id);if(!REG.list.length)REG.list.push({id:'c'+Date.now().toString(36),name:'',color:'#8b1e3f',helper:false})}
@@ -235,7 +235,7 @@ const cell=v=>typeof v==='string'&&/^[=+\-@]/.test(v)?"'"+v:v;
 const typ=t=>t.storno?'Storno':t.exp&&t.ref?'Terugbetaling':t.exp?'Uitgave':t.ref?'Afbetaling':'Boeking';
 const isShop=t=>{if(t.storno){const o=S.tx.find(x=>x.id===t.ref);return !!o&&!o.storno&&isShop(o)}return !!t.exp&&!t.ref};
 const shopDesc=t=>t.name?(t.desc?t.name+' – '+t.desc:t.name):(t.desc||'');
-const rowOf=t=>[ "'"+t.id,t.date,isShop(t)?'':cell(t.name||''),cell(isShop(t)?shopDesc(t):(t.desc||'')),cell(t.h||''),cell(t.s||''),M[t.method],t.v,typ(t),t.ref?"'"+t.ref:t.bon?"'"+t.bon:'',cell(t.who||(t.by==='q'?'Quaestor':'Helper')),"'"+new Date(t.ts).toISOString(),t.by==='q'?'Quaestor':'Helper',cell(t.adv||''),t.chk?'Ja':''];
+const rowOf=t=>[ "'"+t.id,t.date,isShop(t)?'':cell(t.name||''),cell(isShop(t)?shopDesc(t):(t.desc||'')),cell(t.h||''),cell(t.s||''),M[t.method],t.v,typ(t),t.ref?"'"+t.ref:t.bon?"'"+t.bon:'',cell(t.who||(t.by==='q'?'Quaestor':'Helper')),"'"+new Date(t.ts).toISOString(),t.by==='q'?'Quaestor':'Helper',cell(t.adv||''),t.chk?'Ja':'',t.test?'Ja':''];
 async function append(tab,cols,rows){const g=S.club.gid,last=cols.split(':')[1].replace(/\d/g,'');
  /* Zelf de volgende lege rij zoeken in plaats van Google te laten raden: values.append schoof rijen soms een kolom op (bv. bij verborgen kolommen). */
  for(let i=0;i<rows.length;i+=200){const chunk=rows.slice(i,i+200);let done=false;
@@ -282,7 +282,7 @@ async function ensureSheet(){const c=S.club;let created=[];
   const need=[TAB_B,TAB_L,c.catTab].filter((t,i,a)=>!titles.includes(t)&&a.indexOf(t)===i);
   if(need.length)await api(`/${c.gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:need.map(t=>({addSheet:{properties:{title:t}}}))})});
   created=need.filter(t=>t===c.catTab)}
- await head(TAB_B,HEAD_B);await rolCol();await advCol();await chkCol();await head(TAB_L,['Naam','Status']);await lCol()}
+ await head(TAB_B,HEAD_B);await rolCol();await advCol();await chkCol();await head(TAB_L,['Naam','Status']);await lCol();await testCols()}
 async function lCol(){const u=`/${S.club.gid}/values/${enc(rng(TAB_L,'C1:E1'))}`,d=await api(u),v=(d.values||[])[0]||[];
  if(!String(v[0]||'').trim()||!String(v[1]||'').trim()||!String(v[2]||'').trim())await api(u+'?valueInputOption=RAW',{method:'PUT',body:JSON.stringify({values:[[String(v[0]||'').trim()||'Telefoon',String(v[1]||'').trim()||'Herinnerd',String(v[2]||'').trim()||'ID (niet aanpassen)']]})})}
 async function chkCol(){const u=`/${S.club.gid}/values/${enc(rng(TAB_B,'O1'))}`,d=await api(u);
@@ -365,7 +365,7 @@ async function oldTab(gid){
 async function readSettings(gid){const o=await metaGet(gid);if(o)return{m:o,src:'meta'};const t=await oldTab(gid);return t?{m:t.o,src:'tab',id:t.id}:{m:{},src:null}}
 function mergeAcc(a,b){const r={};const add=o=>{if(!o||typeof o!=='object')return;for(const k in o){const v=o[k];if(!/^[\w-]{6,64}$/.test(k)||!v||typeof v!=='object')continue;if(!r[k]||(+v.t||0)>(+r[k].t||0))r[k]={s:['uit','h','weg','q'].includes(v.s)?v.s:'',t:+v.t||0}}};add(a);add(b);return r}
 function adoptTabs(m){const c=S.club;if(m['Functies']&&typeof m['Functies']==='object'&&!Array.isArray(m['Functies'])&&!(c.setDirty&&role==='q'))c.feat=m['Functies'];if(typeof m['Werkjaar start']==='string'&&/^(\d{4}-\d{2}-\d{2})?$/.test(m['Werkjaar start']))c.wj=m['Werkjaar start'];if(Array.isArray(m['Verwijderd'])){c.rmIds=[...new Set((c.rmIds||[]).concat(m['Verwijderd']))].slice(-3000);const R=new Set(c.rmIds),n0=S.tx.length;S.tx=S.tx.filter(t=>!R.has(t.id));if(S.tx.length!==n0)relink()}if(m['Herinnering']&&typeof m['Herinnering']==='object'&&!c.rmdDirty)c.rmd=m['Herinnering'];if(m['Schuldlimieten']&&typeof m['Schuldlimieten']==='object')c.lim=m['Schuldlimieten'];if(+m['Schuldimport']>(c.bkImp||0))c.bkImp=+m['Schuldimport'];if(m['Categorietabblad']&&String(m['Categorietabblad'])!==c.catTab){c.catTab=String(m['Categorietabblad']);ENS=''}}
-function takeAcc(m){const c=S.club,cl=+m['Afgesloten']||0;{const h=m['Hoofdquaestor'];if(h&&typeof h==='object'&&(+h.ts||0)>((c.hq&&+c.hq.ts)||0))c.hq=h}if(+m['Schuldimport']>(c.bkImp||0))c.bkImp=+m['Schuldimport'];if(cl>0&&!c.closedAt&&!c.closed&&!c.reopen){c.closed=cl;save()}
+function takeAcc(m){const c=S.club,cl=+m['Afgesloten']||0;{const t=m['Testmodus'];if(t&&typeof t==='object'&&(+t.ts||0)>((c.test&&+c.test.ts)||0)){c.test={on:!!t.on,ts:+t.ts,by:String(t.by||'')};save()}}{const h=m['Hoofdquaestor'];if(h&&typeof h==='object'&&(+h.ts||0)>((c.hq&&+c.hq.ts)||0))c.hq=h}if(+m['Schuldimport']>(c.bkImp||0))c.bkImp=+m['Schuldimport'];if(cl>0&&!c.closedAt&&!c.closed&&!c.reopen){c.closed=cl;save()}
  const n=mergeAcc(c.acc,m['Toegang']);if(JSON.stringify(n)!==JSON.stringify(c.acc)){c.acc=n;save()}}
 async function syncSettings(){const c=S.club;
  if(c.helperOnly){const {m}=await readSettings(c.gid),ts=+m['Gewijzigd']||0;takeAcc(m);if(!(ts>(c.setTs||0)))return false;
@@ -376,7 +376,7 @@ async function syncSettings(){const c=S.club;
  if(((c.setDirty&&role==='q')||!m['Naam'])&&!c.closed){if(!c.salt)c.salt=rnd();let qh=c.pinQh,hh=c.pinHh;
   try{if(c.pinQ)qh=await hashPin(c.pinQ,c.salt);if(c.pinH)hh=await hashPin(c.pinH,c.salt)}catch(e){}
   c.pinQh=qh||'';c.pinHh=hh||'';c.setTs=Date.now();
-  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Toegang':c.acc,'Schuldlimieten':c.lim||{},'Herinnering':c.rmd||{},'Hoofdquaestor':c.hq||null,'Verwijderd':[...new Set((Array.isArray(m['Verwijderd'])?m['Verwijderd']:[]).concat(c.rmIds||[]))].slice(-3000),'Schuldimport':c.bkImp||0,'Werkjaar start':c.wj||'','Functies':c.feat||{},'Afgesloten':c.reopen?0:Math.max(+m['Afgesloten']||0,c.closedAt||0),'Gewijzigd':c.setTs},src==='meta');c.reopen=false;
+  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Toegang':c.acc,'Schuldlimieten':c.lim||{},'Herinnering':c.rmd||{},'Hoofdquaestor':c.hq||null,'Verwijderd':[...new Set((Array.isArray(m['Verwijderd'])?m['Verwijderd']:[]).concat(c.rmIds||[]))].slice(-3000),'Schuldimport':c.bkImp||0,'Werkjaar start':c.wj||'','Functies':c.feat||{},'Testmodus':c.test||{on:false,ts:0,by:''},'Afgesloten':c.reopen?0:Math.max(+m['Afgesloten']||0,c.closedAt||0),'Gewijzigd':c.setTs},src==='meta');c.reopen=false;
   wrote=true;c.setDirty=false;save()}
  else{const ts=+m['Gewijzigd']||0;if(role!=='q')c.setDirty=false;
   if(ts>(c.setTs||0)){adoptTabs(m);c.name=String(m['Naam']||c.name);if(/^#[0-9a-f]{6}$/i.test(String(m['Kleur'])))c.color=String(m['Kleur']);
@@ -391,12 +391,12 @@ async function syncMembers(){const gid=S.club.gid;
   if(del.length){const mt=await api(`/${gid}?fields=sheets.properties(sheetId,title)`),sh=(mt.sheets||[]).find(x=>x.properties.title===TAB_L);
    if(sh)await api(`/${gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:del.sort((x,y)=>y-x).map(i=>({deleteDimension:{range:{sheetId:sh.properties.sheetId,dimension:'ROWS',startIndex:i+1,endIndex:i+2}}}))})})}
   S.delM=[];save()}
- const d=await api(`/${gid}/values/${enc(rng(TAB_L,'A2:E'))}`),rows=d.values||[],idx=new Map();let changed=false;const upd=[],out=[],mine=new Set(),gone=new Set();
+ const d=await api(`/${gid}/values/${enc(rng(TAB_L,'A2:F'))}`),rows=d.values||[],idx=new Map();let changed=false;const upd=[],out=[],mine=new Set(),gone=new Set();
  /* Kolom E bevat het vaste ID van elk lid. Zo herkent de app een clubnaam die in de spreadsheet werd aangepast als hetzelfde lid. */
  const byId=new Map(S.members.map(m=>[m.id,m]));
  rows.forEach((r,i)=>{const n=String(r[0]||'').trim(),id=String(r[4]==null?'':r[4]).trim(),m=id&&byId.get(id);if(!n||!m||m.ren||uk(m.name)===uk(n))return;
   if(S.members.some(x=>x!==m&&uk(x.name)===uk(n)))return;renameM(m,n);changed=true});
- rows.forEach((r,i)=>{const n=String(r[0]||'').trim();if(n&&!idx.has(n.toLowerCase()))idx.set(n.toLowerCase(),{row:i+2,st:cleanSt(r[1]),tel:String(r[2]==null?'':r[2]).trim(),rem:remParse(r[3]),id:String(r[4]==null?'':r[4]).trim()})});
+ rows.forEach((r,i)=>{const n=String(r[0]||'').trim();if(n&&!idx.has(n.toLowerCase()))idx.set(n.toLowerCase(),{row:i+2,st:cleanSt(r[1]),tel:String(r[2]==null?'':r[2]).trim(),rem:remParse(r[3]),id:String(r[4]==null?'':r[4]).trim(),test:isJa(r[5])})});
  S.members.forEach(m=>{if(!m.ren)return;const e=idx.get(m.ren.toLowerCase());if(e&&!idx.has(m.name.toLowerCase())){upd.push({range:rng(TAB_L,'A'+e.row),values:[[m.name]]});idx.delete(m.ren.toLowerCase());idx.set(m.name.toLowerCase(),e);rows[e.row-2][0]=m.name}delete m.ren});
  S.members.forEach(m=>{const k=m.name.toLowerCase();mine.add(k);const e=idx.get(k);
   if(!e){if(m.on&&!m.dirty){gone.add(m.id);return}out.push(m);m.dirty=false;m.on=true;return}
@@ -406,9 +406,9 @@ async function syncMembers(){const gid=S.club.gid;
   if(m.dirty){if(sk(e.st)!==sk(m.status))upd.push({range:rng(TAB_L,'B'+e.row),values:[[m.status]]});m.dirty=false}
   else if(e.st&&sk(e.st)!==sk(m.status)){m.status=addSt(e.st);changed=true}});
  if(gone.size){S.members=S.members.filter(m=>!gone.has(m.id));changed=true}
- idx.forEach((e,k)=>{if(mine.has(k))return;const n=String(rows[e.row-2][0]).trim(),id=e.id&&!byId.has(e.id)?e.id:uid();if(id!==e.id)upd.push({range:rng(TAB_L,'E'+e.row),values:[[id]]});S.members.push({id,name:n,status:e.st?addSt(e.st):S.statuses[0],on:true,tel:e.tel,rem:e.rem});changed=true});
+ idx.forEach((e,k)=>{if(mine.has(k))return;if(e.test&&!TEST())return;const n=String(rows[e.row-2][0]).trim(),id=e.id&&!byId.has(e.id)?e.id:uid();if(id!==e.id)upd.push({range:rng(TAB_L,'E'+e.row),values:[[id]]});S.members.push({id,name:n,status:e.st?addSt(e.st):S.statuses[0],on:true,tel:e.tel,rem:e.rem,test:e.test?1:0});changed=true});
  if(upd.length)await api(`/${gid}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data:upd})});
- if(out.length){await append(TAB_L,'A:E',out.map(m=>[cell(m.name),cell(m.status),m.tel||'',remStr(m.rem),m.id]));out.forEach(m=>{m.telDirty=false;m.remDirty=false})}
+ if(out.length){await append(TAB_L,'A:F',out.map(m=>[cell(m.name),cell(m.status),m.tel||'',remStr(m.rem),m.id,m.test?'Ja':'']));out.forEach(m=>{m.telDirty=false;m.remDirty=false})}
  save();return changed}
 const pnum=v=>{if(v===''||v==null)return null;const n=typeof v==='number'?v:parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null};
 async function hasTab(t){const m=await api(`/${S.club.gid}?fields=sheets.properties.title`);return (m.sheets||[]).some(x=>x.properties.title===t)}
@@ -436,16 +436,16 @@ function relink(){const by=new Map(S.tx.map(t=>[t.id,t]));
  S.tx.forEach(t=>{if(!t.storno)t.void=false;delete t.paidBy;delete t.paidDate;delete t.paid});
  S.tx.forEach(t=>{if(t.storno){const o=by.get(t.ref);if(o){o.void=true;if(o.exp)t.exp=true}}});
  S.tx.forEach(t=>{if(t.ref&&!t.storno&&!t.void){const d=by.get(t.ref);if(d){d.paid=Math.round(((d.paid||0)+t.v)*100)/100;if(d.method!=='schuld'||d.paid>=d.v-.005){d.paidBy=t.id;d.paidDate=t.date}}}})}
-async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(TAB_B,'A2:O'))}?valueRenderOption=UNFORMATTED_VALUE`),have=new Set(S.tx.map(t=>t.id)),byId=new Map(S.tx.map(t=>[t.id,t]));let add=0,chg=false;
+async function pullTx(){const c=S.club,d=await api(`/${c.gid}/values/${enc(rng(TAB_B,'A2:P'))}?valueRenderOption=UNFORMATTED_VALUE`),have=new Set(S.tx.map(t=>t.id)),byId=new Map(S.tx.map(t=>[t.id,t]));let add=0,chg=false;
  const mem=new Map(S.members.map(m=>[uk(m.name),m.id]));
  const inSheet=new Set();
  const RM=new Set(c.rmIds||[]);if(RM.size){const n0=S.tx.length;S.tx=S.tx.filter(t=>!RM.has(t.id));if(S.tx.length!==n0){chg=true;have.clear();S.tx.forEach(t=>have.add(t.id))}}
  (d.values||[]).forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(RM.has(id))return;if(id)inSheet.add(id);if(!id)return;if(have.has(id)){const x=byId.get(id);{const nm=String(r[2]||'').trim();if(x&&nm&&!x.renD&&!x.exp&&nm!==x.name){x.name=nm;const mm=S.members.find(z=>uk(z.name)===uk(nm));if(mm)x.mid=mm.id;chg=true}}if(x&&!x.chkD){const k=/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim());if(!!x.chk!==k){x.chk=k;chg=true}}if(x&&x.synced&&!x.edD&&!x.exp&&!x.storno&&!isShop(x)&&edPull(x,r))chg=true;return}
-  const v=pnum(r[7]);if(v==null)return;const date=toDate(r[1]),ts=toTs(String(r[11]||'').replace(/^'/,'')||r[11],date);
+  if(isJa(r[15])&&!TEST())return;const v=pnum(r[7]);if(v==null)return;const date=toDate(r[1]),ts=toTs(String(r[11]||'').replace(/^'/,'')||r[11],date);
   if(c.wipeTs&&ts<c.wipeTs)return;const meth=REV[String(r[6]||'').trim().toLowerCase()];if(!meth)return;
   const k=String(r[10]||'').trim(),typ=String(r[8]||'').trim().toLowerCase(),ref=String(r[9]==null?'':r[9]).trim().replace(/^'/,'');let name=String(r[2]||'').trim(),desc=String(r[3]||'').trim();
   if(!name&&(typ==='uitgave'||typ==='storno')&&desc){const i=desc.indexOf(' – ');if(i>=0){name=desc.slice(0,i).trim();desc=desc.slice(i+3).trim()}else if(typ==='uitgave'){name=desc;desc=''}}
-  const t={id,ts,date,mid:mem.get(uk(name))||null,name,v,method:meth,h:String(r[4]||'').trim(),s:String(r[5]||'').trim(),desc,by:/quaestor/i.test(String(r[12]||'').trim()||k)?'q':'h',who:/^(quaestor|helper)$/i.test(k)?'':k,void:false,synced:true};
+  const t={id,ts,date,test:isJa(r[15])?1:0,mid:mem.get(uk(name))||null,name,v,method:meth,h:String(r[4]||'').trim(),s:String(r[5]||'').trim(),desc,by:/quaestor/i.test(String(r[12]||'').trim()||k)?'q':'h',who:/^(quaestor|helper)$/i.test(k)?'':k,void:false,synced:true};
   if(/^(ja|true|x|ok|✓)$/i.test(String(r[14]==null?'':r[14]).trim()))t.chk=true;
   if(typ==='storno')t.storno=true;if(ref&&(typ==='storno'||typ==='afbetaling'||typ==='terugbetaling'))t.ref=ref;
   if(typ==='uitgave'||typ==='terugbetaling'){t.exp=true;if(typ==='uitgave'&&ref)t.bon=ref}const ad=String(r[13]||'').trim();if(ad)t.adv=ad;
@@ -465,7 +465,7 @@ function edPull(x,r){let ch=false;const v=pnum(r[7]),date=r[1]===''||r[1]==null?
  if(desc!==String(x.desc||'').trim()){x.desc=desc;ch=true}if(h&&h!==(x.h||'')){x.h=h;ch=true}if(s!==(x.s||'')){x.s=s;ch=true}
  return ch}
 async function pushEd(){const l=S.tx.filter(t=>t.edD&&t.synced);if(!l.length)return;const g=S.club.gid,d=await api(`/${g}/values/${enc(rng(TAB_B,'A2:A'))}`),idx=new Map();(d.values||[]).forEach((r,i)=>idx.set(String(r[0]||'').replace(/^'/,''),i+2));
- const data=l.filter(t=>idx.has(t.id)).map(t=>({range:rng(TAB_B,'A'+idx.get(t.id)+':O'+idx.get(t.id)),values:[rowOf(t)]}));if(data.length){await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'USER_ENTERED',data})});NSORT.add(TAB_B)}l.forEach(t=>delete t.edD);save()}
+ const data=l.filter(t=>idx.has(t.id)).map(t=>({range:rng(TAB_B,'A'+idx.get(t.id)+':P'+idx.get(t.id)),values:[rowOf(t)]}));if(data.length){await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'USER_ENTERED',data})});NSORT.add(TAB_B)}l.forEach(t=>delete t.edD);save()}
 async function pushChk(){const l=S.tx.filter(t=>t.chkD&&t.synced);if(!l.length)return;const g=S.club.gid,d=await api(`/${g}/values/${enc(rng(TAB_B,'A2:A'))}`),idx=new Map();(d.values||[]).forEach((r,i)=>idx.set(String(r[0]||'').replace(/^'/,''),i+2));
  const data=l.filter(t=>idx.has(t.id)).map(t=>({range:rng(TAB_B,'O'+idx.get(t.id)),values:[[t.chk?'Ja':'']]}));if(data.length)await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data})});l.forEach(t=>delete t.chkD);save()}
 const NSORT=new Set();
@@ -475,7 +475,7 @@ async function sortTabs(){const c=S.club;if(role!=='q'||!NSORT.size)return;const
 async function pushTx(){const p=S.tx.filter(t=>!t.synced);if(!p.length)return;
  const d=await api(`/${S.club.gid}/values/${enc(rng(TAB_B,'A2:A'))}`),ex=new Set((d.values||[]).map(r=>String(r[0]||'').trim().replace(/^'/,'')));
  const nw=p.filter(t=>!ex.has(t.id)).sort((a,b)=>a.ts-b.ts);
- if(nw.length){await append(TAB_B,'A:O',nw.map(rowOf));NSORT.add(TAB_B)}
+ if(nw.length){await append(TAB_B,'A:P',nw.map(rowOf));NSORT.add(TAB_B)}
  p.forEach(t=>t.synced=true);save()}
 async function sync(manual,force){
  if(SYNCING){AGAIN=true;return}AGAIN=false;const c=S.club;if(!force&&!autoOk())return;
@@ -490,6 +490,7 @@ async function sync(manual,force){
   if(userCheck())changed=true;
   if(S.club.closed){try{await pushTx()}catch(e){}LASTPULL=Date.now();setTimeout(closedGo,0);return}
   if(accCheck()){try{await pushTx()}catch(e){}LASTPULL=Date.now();S.sync.last=Date.now();S.sync.err='';save();setTimeout(blockAfter,0);return}
+  try{if(purgeTestLocal())changed=true;await purgeTestSheet()}catch(e){if(e.auth)throw e;console.warn('Testmodus',e)}
   try{if(await repairShift())changed=true}catch(e){if(e.auth)throw e}changed=await pullCats()||changed;changed=await syncMembers()||changed;changed=await syncPrices()||changed;changed=await pullTx()||changed;changed=await syncBons(true)||changed;try{changed=await syncAtt(true)||changed}catch(e){if(e.auth)throw e;console.warn('Aanwezigheid',e)}try{changed=await syncPot(true)||changed}catch(e){if(e.auth)throw e;console.warn('Pot',e)}LASTPULL=Date.now()}
   if(role==='q')try{await purgeRm()}catch(e){if(e.auth)throw e}await pushTx();await pushChk();await pushRen();await pushEd();if(role==='q'){try{await fixShopRows()}catch(e){if(e.auth)throw e}try{await sortTabs()}catch(e){if(e.auth)throw e}try{await pushOverview()}catch(e){if(e.auth)throw e}try{await fmtSheets()}catch(e){if(e.auth)throw e;console.warn('Opmaak',e)}}
   if(S.bons.some(b=>!b.synced||b.dirty))changed=await syncBons(false)||changed;
@@ -706,10 +707,10 @@ function render(){if(S.club.blocked)return blockAfter();const Q=role==='q',P=rol
  let nb=Q&&feat('bon')?bonTodo().length:0,tabs=Q?[['boek','Boeken'],['dag','Overzicht'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'+(nb?' ('+nb+')':'')],['inst','Meer']]:P?[['bon','Bonnen'],['dag','Overzicht'],['schuld','Schulden'],['leden','Leden'],['me','Account']]:[['boek','Boeken'],['dag','Overzicht'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'],['me','Account']];
  tabs=tabs.filter(t=>t[0]!=='bon'||feat('bon'));if(!P&&feat('pot'))tabs.splice(tabs.length-1,0,['pot','Pot']);
  const v={pot:vPot,boek:vBoek,vandaag:vVandaag,dag:vOver,schuld:vSchuld,leden:vLeden,inst:vInst,acc:vAcc,bon:vBon,me:vMe,meld:vMeld}[tab]();
- $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${ISDEV?'Developer':HQ()?'Hoofdquaestor':RN[role]||''}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div>${bellHtml()}<button onclick="logout()">Afmelden</button></header>
+ $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${ISDEV?'Developer':HQ()?'Hoofdquaestor':RN[role]||''}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div>${bellHtml()}<button onclick="logout()">Afmelden</button></header>${testBar()}
  <main>${v}</main><nav>${tabs.map(t=>`<button class="${tab===t[0]||(tab==='acc'&&t[0]==='inst')?'on':''}" onclick="tab='${t[0]}';SDN='';SUBM='';RQ=[];ABACK='';POT=tab==='pot'?POT:'';render()">${t[1]}</button>`).join('')}</nav>`;
- if(tab!=='schuld')SDN='';if(tab==='boek')sug();if(tab==='leden')ml();refreshSt()}
-const row=(t,st)=>`<div class="row${t.void?' void':''}"><div><b>${esc(t.name||'Zonder naam')}</b>${t.exp&&!t.storno?` <span class="tag">${t.ref?'Terugbetaling':'Uitgave'}</span>`:''}<div class="mu">${esc(t.h)}${t.s?' · '+esc(t.s):''} · ${ML[t.method]}${t.desc?' · '+esc(t.desc):''}${t.adv&&!t.ref?' · door '+esc(t.adv):''}${t.who?' · '+esc(t.who):''}${t.storno?' · annulering':''}</div></div><div class="amt ${t.v<0?'neg':''}">${eur(t.v)}${st&&!t.void&&!t.storno?`<button class="sm" onclick="storno('${t.id}')">Annuleren</button>`:''}</div></div>`;
+ document.documentElement.classList.toggle('tm',TEST());if(tab!=='schuld')SDN='';if(tab==='boek')sug();if(tab==='leden')ml();refreshSt()}
+const row=(t,st)=>`<div class="row${t.void?' void':''}"><div><b>${esc(t.name||'Zonder naam')}</b>${t.exp&&!t.storno?` <span class="tag">${t.ref?'Terugbetaling':'Uitgave'}</span>`:''}${t.test?' <span class="tag tmtag">Test</span>':''}<div class="mu">${esc(t.h)}${t.s?' · '+esc(t.s):''} · ${ML[t.method]}${t.desc?' · '+esc(t.desc):''}${t.adv&&!t.ref?' · door '+esc(t.adv):''}${t.who?' · '+esc(t.who):''}${t.storno?' · annulering':''}</div></div><div class="amt ${t.v<0?'neg':''}">${eur(t.v)}${st&&!t.void&&!t.storno?`<button class="sm" onclick="storno('${t.id}')">Annuleren</button>`:''}</div></div>`;
 const empty=t=>`<p class="mu">${t}</p>`;
 const opts=(l,sel,blank)=>(blank?'<option value="">(geen)</option>':'')+l.map(x=>`<option${x===sel?' selected':''}>${esc(x)}</option>`).join('');
 
@@ -738,7 +739,7 @@ function onAmt(v){B.amt=v;B.man=String(v).trim()!==''}
 function setCat(k,v){B[k]=v;if(k==='h'){if(B.s&&!subsFor(v).includes(B.s))B.s='';const e=document.getElementById('bs');if(e)e.innerHTML=opts(subsFor(v),B.s,true)}autoPrice();mi()}
 function stSel(el,id,fb){if(role==='p')return;const m=S.members.find(x=>x.id===id);if(!m)return;if(el.value==='__new'){el.value=m.status;return modal(`<h3>Nieuwe status</h3><label>Naam van de status<input id="nst" autocomplete="off" placeholder="bv. schacht" onkeydown="if(event.key==='Enter')newStOk('${id}',${fb?1:0})"></label><button class="btn" onclick="newStOk('${id}',${fb?1:0})">Toevoegen</button>`)}setSt(id,el.value,fb)}
 function newStOk(id,fb){const t=cleanSt($('#nst').value);if(!t)return toast('Vul een naam in');closeM();setSt(id,t,!!fb)}
-function setSt(id,v,fromBook){const m=S.members.find(x=>x.id===id),n=canonSt(v)||addSt(v);if(!m||!n)return;m.status=n;m.dirty=true;save();queueSync();
+function setSt(id,v,fromBook){const m=S.members.find(x=>x.id===id);if(m&&lockR(m)){if(fromBook)mi();else ml();return}const n=canonSt(v)||addSt(v);if(!m||!n)return;m.status=n;m.dirty=true;save();queueSync();
  if(fromBook){autoPrice();mi()}else{ml();toast('Status aangepast')}}
 function onQ(v){const had=!!B.mid;B.name=v;B.mid=null;if(had){if(!B.man)B.amt='';mi()}sug()}
 function sug(){const e=$('#sug');if(!e)return;const t=B.name.trim().toLowerCase();let h='';
@@ -760,7 +761,7 @@ function commit(a){const m=S.members.find(x=>x.id===B.mid);
 function vGroup(t){let R=null;if(t.exp&&t.ref)R=t.ref;else if(t.method==='verrekening'){const r=S.tx.find(x=>x.method==='verrekening'&&x.exp&&x.ref&&!x.void&&!x.storno&&uk(x.name)===uk(t.name)&&x.date===t.date&&t.ts>=x.ts&&t.ts-x.ts<500);if(r)R=r.ref}
  if(!R)return [t];const refs=S.tx.filter(x=>x.exp&&x.ref===R&&!x.void&&!x.storno),v=refs.find(x=>x.method==='verrekening');if(!v)return [t];
  return refs.concat(S.tx.filter(x=>x.method==='verrekening'&&!x.exp&&x.ref&&!x.void&&!x.storno&&uk(x.name)===uk(v.name)&&x.date===v.date&&x.ts>v.ts&&x.ts-v.ts<500))}
-function storno(id){if(RO())return;const t=S.tx.find(x=>x.id===id);if(!t)return;
+function storno(id){if(RO())return;const t=S.tx.find(x=>x.id===id);if(!t||lockR(t))return;
  const vg=vGroup(t);if(vg.length>1){const v=vg.find(x=>x.exp&&x.method==='verrekening'),rest=vg.filter(x=>x.exp&&x.method!=='verrekening').reduce((a,x)=>a-x.v,0);
   return ask(`Deze terugbetaling hoort bij een verrekening met de schuld van ${esc(v.name)}: ${eur(-v.v)} verrekend${rest>.005?' en '+eur(rest)+' terugbetaald':''}. Alles wordt samen geannuleerd: de schuld staat dan weer open en het voorschot wacht opnieuw op terugbetaling.`,'Alles annuleren',()=>{vg.forEach(x=>doStorno(x.id,1));relink();save();toast('Verrekening geannuleerd');render();queueSync()})}
  if(t.method==='schuld'&&(t.paid||0)>0)return toast('Annuleer eerst de betalingen van deze schuld');
@@ -801,19 +802,19 @@ const curAct=()=>S.att.find(x=>x.id===ACT&&!x.rm);
 async function syncAtt(pull){const c=S.club,g=c.gid;let ch=false;const dirty=S.att.some(a=>a.dirty);
  if(!pull&&!dirty)return false;
  if(!c.attTab){const has=await hasTab(TAB_A);if(!has){if(!dirty||role==='p')return false;await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:TAB_A}}}]})})}await head(TAB_A,HEAD_A);c.attTab=true;c.fmtK='';save()}
- const d=await api(`/${g}/values/${enc(rng(TAB_A,'A2:I'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[];
+ const d=await api(`/${g}/values/${enc(rng(TAB_A,'A2:J'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[];
  const sid=x=>String(x==null?'':x).trim().replace(/^'/,''),isRm=x=>/^ja$/i.test(String(x||'').trim()),seenA=new Set(),seenP=new Set();
- rows.filter(r=>sid(r[0])&&!String(r[4]==null?'':r[4]).trim()).forEach(r=>{const id=sid(r[0]),dt=toDate(r[1]),ts=toTs(sid(r[5]),dt),o={date:dt,h:String(r[2]||'').trim(),s:String(r[3]||'').trim(),by:String(r[6]||'').trim(),note:String(r[7]==null?'':r[7]),rm:isRm(r[8])};seenA.add(id);
-  const a=S.att.find(x=>x.id===id);if(!a){S.att.push(Object.assign({id,ts,nts:ts,p:[],dirty:false},o));ch=true;return}
+ let stale=false;rows.filter(r=>sid(r[0])&&!String(r[4]==null?'':r[4]).trim()).forEach(r=>{if(isJa(r[9])&&!TEST()){stale=true;return}const id=sid(r[0]),dt=toDate(r[1]),ts=toTs(sid(r[5]),dt),o={date:dt,h:String(r[2]||'').trim(),s:String(r[3]||'').trim(),by:String(r[6]||'').trim(),note:String(r[7]==null?'':r[7]),rm:isRm(r[8])};seenA.add(id);
+  const a=S.att.find(x=>x.id===id);if(!a){S.att.push(Object.assign({id,ts,nts:ts,p:[],dirty:false,test:isJa(r[9])?1:0},o));ch=true;return}
   if(!a.dirty&&ts>aTs(a)){Object.assign(a,o);a.nts=ts;ch=true}});
- rows.filter(r=>sid(r[0])&&String(r[4]==null?'':r[4]).trim()).forEach(r=>{const id=sid(r[0]),n=String(r[4]).trim(),dt=toDate(r[1]),ts=toTs(sid(r[5]),dt),rm=isRm(r[8]);seenP.add(id+'|'+uk(n));
-  let a=S.att.find(x=>x.id===id);if(!a){a={id,date:dt,h:String(r[2]||'').trim(),s:String(r[3]||'').trim(),ts:0,nts:0,by:'',note:'',rm:false,p:[],dirty:false};S.att.push(a);ch=true}
+ rows.filter(r=>sid(r[0])&&String(r[4]==null?'':r[4]).trim()).forEach(r=>{if(isJa(r[9])&&!TEST()){stale=true;return}const id=sid(r[0]),n=String(r[4]).trim(),dt=toDate(r[1]),ts=toTs(sid(r[5]),dt),rm=isRm(r[8]);seenP.add(id+'|'+uk(n));
+  let a=S.att.find(x=>x.id===id);if(!a){a={id,date:dt,h:String(r[2]||'').trim(),s:String(r[3]||'').trim(),ts:0,nts:0,by:'',note:'',rm:false,p:[],dirty:false,test:isJa(r[9])?1:0};S.att.push(a);ch=true}
   const p=a.p.find(x=>uk(x.n)===uk(n));if(!p){a.p.push({n,ts,by:String(r[6]||'').trim(),rm});ch=true}else if(ts>(p.ts||0)){p.rm=rm;p.ts=ts;p.n=n;ch=true}});
  let miss=false;S.att.forEach(a=>{if(!seenA.has(a.id))miss=true;a.p.forEach(p=>{if(!seenP.has(a.id+'|'+uk(p.n)))miss=true})});
- if((dirty||miss)&&role!=='p'){const iso=t=>"'"+new Date(t||Date.now()).toISOString(),V=[];
-  S.att.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||'')||(x.ts||0)-(y.ts||0)).forEach(a=>{V.push(["'"+a.id,a.date,cell(a.h||''),cell(a.s||''),'',iso(aTs(a)),cell(a.by||''),cell(a.note||''),a.rm?'Ja':'']);
-   a.p.slice().sort((x,y)=>(x.ts||0)-(y.ts||0)).forEach(p=>V.push(["'"+a.id,a.date,cell(a.h||''),cell(a.s||''),cell(p.n),iso(p.ts),cell(p.by||''),'',p.rm?'Ja':'']))});
-  await api(`/${g}/values/${enc(rng(TAB_A,'A2:I'))}:clear`,{method:'POST',body:'{}'});
+ if((dirty||miss||stale)&&role!=='p'){const iso=t=>"'"+new Date(t||Date.now()).toISOString(),V=[];
+  S.att.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||'')||(x.ts||0)-(y.ts||0)).forEach(a=>{V.push(["'"+a.id,a.date,cell(a.h||''),cell(a.s||''),'',iso(aTs(a)),cell(a.by||''),cell(a.note||''),a.rm?'Ja':'',a.test?'Ja':'']);
+   a.p.slice().sort((x,y)=>(x.ts||0)-(y.ts||0)).forEach(p=>V.push(["'"+a.id,a.date,cell(a.h||''),cell(a.s||''),cell(p.n),iso(p.ts),cell(p.by||''),'',p.rm?'Ja':'',a.test?'Ja':'']))});
+  await api(`/${g}/values/${enc(rng(TAB_A,'A2:J'))}:clear`,{method:'POST',body:'{}'});
   if(V.length)await api(`/${g}/values/${enc(rng(TAB_A,'A2'))}?valueInputOption=USER_ENTERED`,{method:'PUT',body:JSON.stringify({values:V})});
   S.att.forEach(a=>a.dirty=false);ch=true}
  if(ch)save();return ch}
@@ -829,7 +830,7 @@ function attToday(){if(!feat('att'))return '';const L=S.att.filter(a=>!a.rm&&a.d
  return L.map(a=>{const P=attPeople(a),o=P.filter(p=>p.st==='open').length;return `<div class="card banner"><div class="row" style="padding:0;border:0;align-items:center"><div><b>Aanwezigheidslijst: ${esc(actName(a))}</b><div class="mu">${P.length} aanwezig · ${o?`<span class="neg">${o} nog niet geboekt</span>`:'iedereen is geboekt'}</div></div><button class="sm" style="margin:0" onclick="tab='dag';OVT='act';ACT='${a.id}';render();scrollTo(0,0)">Openen</button></div></div>`}).join('')}
 function vOver(){const segs=[['dag','Per dag'],['act','Aanwezigheid'],['rap','Verslag']].filter(x=>(x[0]!=='act'||feat('att'))&&(x[0]!=='rap'||feat('rap')));if(!segs.some(x=>x[0]===OVT))OVT='dag';
  return `<div class="seg np">${segs.map(x=>`<button class="${OVT===x[0]?'on':''}" onclick="OVT='${x[0]}';ACT='';render();scrollTo(0,0)">${x[1]}</button>`).join('')}</div>`+(OVT==='act'?vAct():OVT==='rap'?vRap():vDag())}
-function vAct(){const ro=!AW(),L=S.att.filter(a=>!a.rm).sort((x,y)=>(y.date||'').localeCompare(x.date||'')||(y.ts||0)-(x.ts||0)),a=curAct();
+function vAct(){const ro=!AW()||!!(curAct()&&TEST()&&!curAct().test),L=S.att.filter(a=>!a.rm).sort((x,y)=>(y.date||'').localeCompare(x.date||'')||(y.ts||0)-(x.ts||0)),a=curAct();
  if(!a){ACT='';return `<div class="card"><h2>Aanwezigheidslijsten</h2><p class="mu">Houd tijdens een activiteit bij wie er binnenkomt. Je ziet meteen wie nog niet geboekt is, zodat niemand vergeten wordt. Wie al geboekt is voor de activiteit, staat er vanzelf op.</p>${ro?'':'<button class="btn" onclick="actNew()">Nieuwe aanwezigheidslijst</button>'}</div>`+(L.length?`<div class="card">${L.slice(0,40).map(x=>{const P=attPeople(x),o=P.filter(p=>p.st==='open').length;return `<button class="drow" onclick="ACT='${x.id}';render();scrollTo(0,0)"><span><b>${esc(actName(x))}</b><span class="mu" style="font-size:13px;display:block">${fdt(x.date)} · ${P.length} aanwezig${o?` · <span class="neg">${o} nog niet geboekt</span>`:''}${x.note?' · notitie':''}</span></span><span aria-hidden="true">›</span></button>`}).join('')}</div>`:'')}
  const P=attPeople(a),cnt=k=>P.filter(p=>p.st===k).length,op=cnt('open');
  return `<button class="back" onclick="ACT='';NOTE='';render()">← Alle lijsten</button><div class="card"><h2 style="margin-bottom:2px">${esc(actName(a))}</h2><div class="mu">${fdt(a.date)}${a.s?' · '+esc(a.h):''}</div>
@@ -849,14 +850,14 @@ function actSug(){const e=$('#asug');if(!e)return;const t=AQ.trim().toLowerCase(
  if(!S.members.some(m=>uk(m.name)===uk(t)))h+=`<button class="opt new" data-n="${esc(AQ.trim())}" onclick="actAdd(this.dataset.n)"><span>“${esc(AQ.trim())}” toevoegen</span><span class="mu">niet in de ledenlijst</span></button>`;
  e.innerHTML=h}
 function actAddTyped(){const t=AQ.trim();if(!t)return;const m=S.members.find(x=>uk(x.name)===uk(t))||S.members.filter(x=>uk(x.name).includes(uk(t))).slice(0,1)[0];actAdd(m?m.name:t)}
-function actAdd(n){const a=curAct();n=String(n||'').trim();if(!a||!n||!AW())return;const p=a.p.find(x=>uk(x.n)===uk(n)),pp=attPeople(a).find(x=>uk(x.n)===uk(n));
+function actAdd(n){const a=curAct();n=String(n||'').trim();if(!a||!n||!AW())return;if(lockR(a))return;const p=a.p.find(x=>uk(x.n)===uk(n)),pp=attPeople(a).find(x=>uk(x.n)===uk(n));
  if(p&&!p.rm||pp){AQ='';render();setTimeout(()=>{const e=$('#aq');if(e)e.focus()},30);return toast(n+' staat al op de lijst'+(pp&&pp.st!=='open'?' en is geboekt':''))}
  if(p){p.rm=false;p.ts=Date.now();p.by=WHO}else a.p.push({n,ts:Date.now(),by:WHO,rm:false});a.dirty=true;AQ='';save();render();queueSync();toast(n+' staat op de lijst: nog niet geboekt');setTimeout(()=>{const e=$('#aq');if(e)e.focus()},30)}
-function actRm(n){const a=curAct();if(!a||!AW())return;const p=a.p.find(x=>uk(x.n)===uk(n));if(!p)return;p.rm=true;p.ts=Date.now();p.by=WHO;a.dirty=true;save();render();queueSync()}
-function actBook(n){const a=curAct();if(!a||!AW())return;const m=S.members.find(x=>uk(x.name)===uk(n));ABACK=a.id;tab='boek';
+function actRm(n){const a=curAct();if(!a||!AW())return;if(lockR(a))return;const p=a.p.find(x=>uk(x.n)===uk(n));if(!p)return;p.rm=true;p.ts=Date.now();p.by=WHO;a.dirty=true;save();render();queueSync()}
+function actBook(n){const a=curAct();if(!a||!AW())return;if(lockR(a))return;const m=S.members.find(x=>uk(x.name)===uk(n));ABACK=a.id;tab='boek';
  Object.assign(B,{h:a.h,s:a.s,amt:'',desc:'',man:false});if(m)return pick(m.id);B.mid=null;B.name=n;render();setTimeout(sug,0)}
-function actNote(v){const a=curAct();if(!a||!AW())return;a.note=String(v||'').replace(/\s+$/,'');a.nts=Date.now();a.dirty=true;if(!a.note)NOTE='';save();queueSync();if(!a.note)render()}
-function actDel(){const a=curAct();if(!a||RO())return;ask('Deze aanwezigheidslijst verwijderen? De boekingen zelf blijven staan.','Lijst verwijderen',()=>{a.rm=true;a.nts=Date.now();a.dirty=true;ACT='';save();render();queueSync()})}
+function actNote(v){const a=curAct();if(!a||!AW())return;if(lockR(a))return;a.note=String(v||'').replace(/\s+$/,'');a.nts=Date.now();a.dirty=true;if(!a.note)NOTE='';save();queueSync();if(!a.note)render()}
+function actDel(){const a=curAct();if(!a||RO())return;if(lockR(a))return;ask('Deze aanwezigheidslijst verwijderen? De boekingen zelf blijven staan.','Lijst verwijderen',()=>{a.rm=true;a.nts=Date.now();a.dirty=true;ACT='';save();render();queueSync()})}
 /* ---------- functies aan/uit ---------- */
 const FEATS=[['pot','Pot','Een pot bijhouden tijdens een kroegentocht of activiteit: inleg, sponsoring van de club en uitgaven.'],['att','Aanwezigheidslijsten','Bijhouden wie er op een activiteit is en wie nog moet betalen.'],['bon','Bonnetjes','Bonnetjes laten indienen door het praesidium en ze inboeken.'],['rap','Verslag','Het mini-verslag met inkomsten en uitgaven per activiteit.']];
 const feat=k=>!(S&&S.club&&S.club.feat&&S.club.feat[k]===false);
@@ -864,6 +865,40 @@ const canFeat=()=>role==='q'&&(ISDEV||HQ()||!(S.club.hq&&S.club.hq.id));
 function featCard(){const can=canFeat();
  return `<div class="card"><h2>Functies van de app</h2><p class="mu">${can?'Kies welke functies jullie club gebruikt. Wat uit staat, verdwijnt voor iedereen uit de app. Er gaat niets verloren: zet je een functie weer aan, dan staat alles er nog.':'Alleen de Hoofdquaestor of de developer kan functies aan- of uitzetten.'}</p>${FEATS.map(f=>`<label style="display:flex;gap:10px;align-items:flex-start;color:var(--tx);font-size:1rem;margin:12px 0"><input type="checkbox" style="width:auto;margin:3px 0 0" ${feat(f[0])?'checked':''} ${can?'':'disabled'} onchange="setFeat('${f[0]}',this.checked)"><span><b>${f[1]}</b><span class="mu" style="display:block;font-size:13px">${f[2]}</span></span></label>`).join('')}</div>`}
 function setFeat(k,on){if(!canFeat())return;const c=S.club;c.feat=Object.assign({},c.feat||{},{[k]:!!on});c.setDirty=true;save();queueSync();toast(on?'Functie aangezet':'Functie uitgezet');render()}
+/* ---------- testmodus ---------- */
+function TEST(){return !!(S&&S.club&&S.club.test&&S.club.test.on)}
+function isJa(x){return /^ja$/i.test(String(x==null?"":x).trim())}
+/* Nieuwe gegevens krijgen bij het bewaren het testlabel als de testmodus aan staat. Gegevens uit de spreadsheet krijgen hun label bij het ophalen. */
+function tagNew(){if(!S)return;const v=TEST()?1:0;[S.tx,S.members,S.att,S.pots,S.bons].forEach(L=>(L||[]).forEach(o=>{if(o&&o.test===undefined)o.test=v}))}
+/* In testmodus blijven echte gegevens onaangeroerd: je kunt alleen testgegevens aanpassen. */
+function lockR(o){if(TEST()&&o&&!o.test){toast('Testmodus: echte gegevens kun je nu niet aanpassen, alleen testgegevens');return true}return false}
+function purgeTestLocal(){if(TEST()||!S)return false;const f=o=>o&&o.test,n0=S.tx.length+S.members.length+S.att.length+S.pots.length+S.bons.length;
+ const mids=new Set(S.members.filter(f).map(m=>m.id));
+ S.tx=S.tx.filter(t=>!f(t));S.members=S.members.filter(m=>!f(m));S.att=S.att.filter(a=>!f(a));S.pots=S.pots.filter(p=>!f(p));S.bons=S.bons.filter(b=>!f(b));
+ if(S.tx.length+S.members.length+S.att.length+S.pots.length+S.bons.length===n0)return false;
+ if(B.mid&&mids.has(B.mid))B=newB();if(ACT&&!S.att.some(a=>a.id===ACT))ACT='';if(POT&&!S.pots.some(p=>p.id===POT))POT='';if(SDN&&!memDebt(SDN))SDN='';
+ relink();save();return true}
+async function purgeTestSheet(){const c=S.club;if(role!=='q'||TEST()||!c.gid||!c.gok||!c.test||!c.test.ts||Date.now()-c.test.ts>7*864e5)return;
+ if(c.tpDone===c.test.ts&&Date.now()-(c.tpAt||0)<10*6e4)return;
+ const g=c.gid,m=await api(`/${g}?fields=sheets.properties(sheetId,title)`),sid=t=>{const x=(m.sheets||[]).find(s=>s.properties.title===t);return x?x.properties.sheetId:null},R=[];
+ const del=(id,rows)=>rows.sort((a,b)=>b-a).forEach(i=>R.push({deleteDimension:{range:{sheetId:id,dimension:'ROWS',startIndex:i,endIndex:i+1}}}));
+ const scan=async(tab,a1,col)=>{const id=sid(tab);if(id==null)return [];const d=await api(`/${g}/values/${enc(rng(tab,a1))}`),out=[],ids=[];(d.values||[]).forEach((r,i)=>{if(isJa(r[col])){out.push(i+1);ids.push(String(r[0]==null?'':r[0]).trim().replace(/^'/,''))}});del(id,out);return ids};
+ await scan(TAB_B,'A2:P',15);await scan(TAB_L,'A2:F',5);const bids=new Set(await scan(TAB_BN,'A2:L',11));
+ if(bids.size&&sid(TAB_BF)!=null){const d=await api(`/${g}/values/${enc(rng(TAB_BF,'A2:A'))}`),out=[];(d.values||[]).forEach((r,i)=>{if(bids.has(String(r[0]||'').trim().replace(/^'/,'')))out.push(i+1)});del(sid(TAB_BF),out)}
+ if(R.length)await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:R})});
+ c.tpDone=c.test.ts;c.tpAt=Date.now();save()}
+async function testCols(){for(const [tab,a1] of [[TAB_B,'P1'],[TAB_L,'F1']]){const u=`/${S.club.gid}/values/${enc(rng(tab,a1))}`,d=await api(u);
+ if(!(d.values&&d.values[0]&&String(d.values[0][0]||'').trim()))await api(u+'?valueInputOption=RAW',{method:'PUT',body:JSON.stringify({values:[['Testmodus']]})})}}
+function testCount(){const f=o=>o&&o.test;return{tx:S.tx.filter(f).length,mem:S.members.filter(f).length,att:S.att.filter(f).length,pot:S.pots.filter(f).length,bon:S.bons.filter(f).length}}
+function testBar(){if(!TEST())return '';const t=S.club.test;return `<div class="tmbar"><b>TESTMODUS</b> · alles wat je nu doet is een oefening en wordt verwijderd zodra de testmodus uitgaat${t.by?` · aangezet door ${esc(t.by)}`:''}</div>`}
+function testCard(){const can=canFeat(),on=TEST(),k=testCount(),n=k.tx+k.mem+k.att+k.pot+k.bon;
+ return `<div class="card"${on?' style="border:2px solid var(--tm)"':''}><h2>Testmodus${on?' <span class="tag tmtag">Aan</span>':''}</h2><p class="mu">Om nieuwe Quaestors, helpers en praesidiumleden de app uit te leggen. In testmodus kan iedereen oefenen: boekingen maken, schulden en betalingen, aanwezigheidslijsten, een pot en bonnetjes. Alles wat in testmodus gemaakt wordt, krijgt een oranje label in de app en in de spreadsheet. Zet je de testmodus uit, dan wordt alles wat in testmodus gemaakt werd <b>volledig verwijderd</b> uit de app en de spreadsheet, zonder tegenboekingen.</p>
+ <p class="mu">Echte gegevens kun je in testmodus bekijken maar niet aanpassen. Herinneringen versturen kan niet in testmodus.</p>
+ ${on?`<p style="margin:8px 0">Nu in testmodus gemaakt: <b>${k.tx}</b> boekingen${k.mem?`, <b>${k.mem}</b> leden`:''}${k.att?`, <b>${k.att}</b> aanwezigheidslijsten`:''}${k.pot?`, <b>${k.pot}</b> potten`:''}${k.bon?`, <b>${k.bon}</b> bonnetjes`:''}.</p>`:''}
+ ${can?`<button class="btn${on?'':' ghost'}" style="${on?'background:var(--tm);border-color:var(--tm)':''}" onclick="${on?'testOff()':'testOn()'}">${on?'Testmodus uitzetten en testgegevens verwijderen':'Testmodus aanzetten'}</button>`:`<p class="mu">Alleen de Hoofdquaestor of de developer kan de testmodus aan- of uitzetten.</p>`}</div>`}
+function testOn(){if(!canFeat()||TEST())return;ask('Testmodus aanzetten voor iedereen?<div class="mu" style="font-weight:400;font-size:14px;margin-top:8px">Binnen een halve minuut ziet iedereen met internet de oranje rand. Wat je daarna maakt, wordt verwijderd zodra je de testmodus weer uitzet. Gebeurt er intussen iets echts (bv. een echte betaling), zet de testmodus dan eerst uit.</div>','Testmodus aanzetten',()=>{const c=S.club;c.test={on:true,ts:Date.now(),by:WHO||''};c.setDirty=true;save();render();queueSync();toast('Testmodus staat aan')})}
+async function testOff(){if(!canFeat()||!TEST())return;toast('Eerst alles ophalen…');try{LASTPULL=0;await sync(true)}catch(e){}for(let i=0;SYNCING&&i<100;i++)await new Promise(r=>setTimeout(r,150));
+ const k=testCount();ask(`Testmodus uitzetten?<div class="mu" style="font-weight:400;font-size:14px;margin-top:8px">Dit wordt <b>definitief verwijderd</b> uit de app en de spreadsheet: ${k.tx} boekingen, ${k.mem} leden, ${k.att} aanwezigheidslijsten, ${k.pot} potten en ${k.bon} bonnetjes uit de testmodus. Echte gegevens blijven staan.</div>`,'Uitzetten en verwijderen',()=>{const c=S.club;c.test={on:false,ts:Date.now(),by:WHO||''};c.tpDone=0;c.setDirty=true;purgeTestLocal();save();render();LASTPULL=0;sync(true);toast('Testmodus uit, testgegevens verwijderd')})}
 
 /* ---------- pot ---------- */
 const MP={cash:'Cash uit de pot',payconiq:'Payconiq van de club',overschrijving:'Overschrijving van de clubrekening',voorschot:'Voorgeschoten door iemand (nog terug te betalen)'};
@@ -881,12 +916,12 @@ function potLines(p,bk){const out=[];potC(p,'x').forEach(x=>{if(x.cp)return;cons
   if(!['cash','payconiq','overschrijving'].includes(t.method))return;if((t.method==='cash')!==(bk==='kas'))return;out.push({x,t})});
  return out.sort((a,b)=>(a.t.date||'').localeCompare(b.t.date||'')||(a.t.ts||0)-(b.t.ts||0))}
 const potDirty=p=>{p.nts=Date.now();p.dirty=true;save();queueSync()};
-const potRO=p=>!AW()||!p||p.closed;
+const potRO=p=>!AW()||!p||p.closed||(TEST()&&!p.test);
 
 function vPot(){const L=S.pots.filter(p=>!p.rm).sort((x,y)=>(y.date||'').localeCompare(x.date||'')||(y.ts||0)-(x.ts||0)),p=curPot();
  if(!p){POT='';return `<div class="card"><h2>Pot</h2><p class="mu">Houd een pot bij tijdens een kroegentocht of activiteit. Leden leggen in (cash, overschrijving, Payconiq of op de schuldenlijst), aspiranten kunnen gratis meedrinken en de club kan een bedrag sponsoren. Je ziet altijd wat er nog in de pot zit, en de app maakt de regels klaar voor het kasboek en het bankboek.</p>${RO()?'':'<button class="btn" onclick="potNew()">Nieuwe pot</button>'}</div>`+
   (L.length?`<div class="card">${L.slice(0,40).map(x=>{const k=potCalc(x);return `<button class="drow" onclick="POT='${x.id}';PQ='';render();scrollTo(0,0)"><span><b>${esc(x.name||'Pot')}</b><span class="mu" style="font-size:13px;display:block">${fdt(x.date)} · ${x.closed?'afgesloten':'open'} · ingelegd ${eur(k.inl)} · nog ${eur(k.left)}</span></span><span aria-hidden="true">›</span></button>`}).join('')}</div>`:'')}
- const k=potCalc(p),ro=potRO(p),q=!RO()&&!p.closed,nk=potLines(p,'kas').length,nb=potLines(p,'bank').length;
+ const lk=TEST()&&!p.test,k=potCalc(p),ro=potRO(p),q=!RO()&&!p.closed&&!lk,nk=potLines(p,'kas').length,nb=potLines(p,'bank').length;
  const res=k.sp?(k.cost<=k.spon+.005?`<span class="pos">Binnen de sponsoring.</span> De club legt nu ${eur(Math.max(0,k.cost))} bij van de ${eur(k.spon)}${k.cost<k.spon-.005?`, er is nog ${eur(k.spon-Math.max(0,k.cost))} sponsoring over`:''}.`:`<span class="neg">${eur(k.cost-k.spon)} boven de sponsoring.</span> De club legt in totaal ${eur(k.cost)} bij.`):(k.cost>.005?`<span class="neg">De club legt ${eur(k.cost)} bij</span>, terwijl er geen sponsoring is aangeduid.`:`De pot kost de club niets${k.cost<-.005?`: er is ${eur(-k.cost)} over`:''}.`);
  return `<button class="back" onclick="POT='';render()">← Alle potten</button>
  <div class="card"><h2 style="margin-bottom:2px">${esc(p.name||'Pot')}${p.closed?' <span class="tag">Afgesloten</span>':''}</h2><div class="mu">${fdt(p.date)} · ${esc(p.h)}${p.s?' · '+esc(p.s):''} · inleg ${eur(p.inleg||0)} per lid</div>
@@ -897,7 +932,7 @@ function vPot(){const L=S.pots.filter(p=>!p.rm).sort((x,y)=>(y.date||'').localeC
  ${k.free.length?`<div class="card"><h2>Gratis mee (${k.free.length})</h2>${k.free.map(x=>`<div class="row"><div><b>${esc(x.n)}</b><div class="mu">Drinkt gratis mee</div></div>${ro?'':`<button class="lnk" data-n="${esc(x.n)}" onclick="potFreeRm(this.dataset.n)">Weghalen</button>`}</div>`).join('')}</div>`:''}
  <div class="card"><h2>Uitgaven (${k.O.length})</h2>${k.O.length?k.O.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).map(t=>row(t,q)).join(''):empty('Nog niets uitgegeven.')}</div>
  <div class="card"><h2>Resultaat voor de club</h2><p style="margin:0">${res}</p><p class="mu" style="margin:8px 0 0">Uitgaven ${eur(k.out)} − inleg ${eur(k.inl)} = ${eur(k.cost)}. De sponsoring is geen geld dat binnenkomt: het is wat de club wil bijleggen. In de boekhouding zie je het als het verschil tussen de uitgaven en de inleg op ${esc(p.s||p.h)}.</p></div>
- ${RO()?'':`<div class="card"><h2>Sponsoring door de club</h2><label style="display:flex;gap:10px;align-items:center;color:var(--tx);font-size:1rem"><input type="checkbox" style="width:auto;margin:0" ${k.sp?'checked':''} ${p.closed?'disabled':''} onchange="potSpon(this.checked)"> De club sponsort deze pot</label>${k.sp?`<label style="margin-top:10px">Bedrag van de sponsoring<input id="psv" type="number" inputmode="decimal" step="1" min="0" value="${k.spon}" ${p.closed?'readonly':''} onchange="potSponV(this.value)"></label>`:''}</div>
+ ${RO()||lk?'':`<div class="card"><h2>Sponsoring door de club</h2><label style="display:flex;gap:10px;align-items:center;color:var(--tx);font-size:1rem"><input type="checkbox" style="width:auto;margin:0" ${k.sp?'checked':''} ${p.closed?'disabled':''} onchange="potSpon(this.checked)"> De club sponsort deze pot</label>${k.sp?`<label style="margin-top:10px">Bedrag van de sponsoring<input id="psv" type="number" inputmode="decimal" step="1" min="0" value="${k.spon}" ${p.closed?'readonly':''} onchange="potSponV(this.value)"></label>`:''}</div>
  <div class="card"><h2>Naar de boekhouding</h2><p class="mu">Elke betaling staat op een eigen regel, met de juiste categorie, zodat de Controle ze terugvindt. Kopieer de regels en plak ze in het kasboek of bankboek in kolom A van de eerste lege regel. Wie op de schuldenlijst staat, komt pas in de boeken als die betaalt. Een voorschot boek je bij de terugbetaling.</p>
  <button class="btn${nk?'':' ghost'}" onclick="potCopy('kas')">Regels voor het kasboek (${nk} nieuw)</button><button class="btn${nb?'':' ghost'}" style="margin-top:8px" onclick="potCopy('bank')">Regels voor het bankboek (${nb} nieuw)</button></div>
  <div class="card"><h2>Instellingen</h2>${p.closed?'':`<label>Inleg per lid<input id="pin" type="number" inputmode="decimal" step="1" min="0" value="${p.inleg||0}" onchange="potSet('inleg',this.value)"></label><button class="btn ghost" onclick="potCalcM()">Bereken een goede inleg</button>`}
@@ -928,19 +963,19 @@ function potOutOk(){const p=curPot();if(potRO(p))return;const w=($('#pua').value
  if(!w)return toast('Vul in waar het geld naartoe ging');if(!(a>0))return toast('Vul een bedrag in');if(m==='voorschot'&&!adv)return toast('Vul in wie het voorschoot');
  const now=Date.now(),t={who:WHO,id:uid(),ts:now,date:$('#pud').value||today(),mid:null,name:w,v:-a,method:m,h:p.h,s:p.s,desc:'Pot '+p.name,by:role,exp:true,adv,void:false,synced:false};S.tx.push(t);
  p.c.push({t:'x',so:'Uitgave',n:w,v:-a,txid:t.id,cp:false,ts:now,rm:false});closeM();potDirty(p);toast('Uitgave geboekt');render()}
-function potSpon(on){const p=curPot();if(RO()||!p||p.closed)return;const now=Date.now();let x=p.c.find(y=>y.t==='sp');if(!x){x={t:'sp',n:'Club',v:100,ts:now,rm:false};p.c.push(x)}x.rm=!on;x.ts=now;potDirty(p);render()}
-function potSponV(v){const p=curPot();if(RO()||!p||p.closed)return;const x=p.c.find(y=>y.t==='sp'&&!y.rm);if(!x)return;x.v=pamt(v)||0;x.ts=Date.now();potDirty(p);render()}
-function potSet(k,v){const p=curPot();if(RO()||!p)return;if(k==='inleg')p.inleg=pamt(v)||0;else if(k==='note')p.note=String(v||'').replace(/\s+$/,'');else return;potDirty(p);if(k==='inleg')render()}
-function potClose(){const p=curPot();if(RO()||!p)return;if(p.closed){p.closed=false;potDirty(p);render();return toast('Pot heropend')}
+function potSpon(on){const p=curPot();if(RO()||!p||p.closed)return;if(lockR(p))return;const now=Date.now();let x=p.c.find(y=>y.t==='sp');if(!x){x={t:'sp',n:'Club',v:100,ts:now,rm:false};p.c.push(x)}x.rm=!on;x.ts=now;potDirty(p);render()}
+function potSponV(v){const p=curPot();if(RO()||!p||p.closed)return;if(lockR(p))return;const x=p.c.find(y=>y.t==='sp'&&!y.rm);if(!x)return;x.v=pamt(v)||0;x.ts=Date.now();potDirty(p);render()}
+function potSet(k,v){const p=curPot();if(RO()||!p)return;if(lockR(p))return;if(k==='inleg')p.inleg=pamt(v)||0;else if(k==='note')p.note=String(v||'').replace(/\s+$/,'');else return;potDirty(p);if(k==='inleg')render()}
+function potClose(){const p=curPot();if(RO()||!p)return;if(lockR(p))return;if(p.closed){p.closed=false;potDirty(p);render();return toast('Pot heropend')}
  const k=potCalc(p),nk=potLines(p,'kas').length+potLines(p,'bank').length;
  ask(`Pot afsluiten?<div class="mu" style="font-weight:400;font-size:14px;margin-top:8px">Ingelegd ${eur(k.inl)}${k.sp?' · sponsoring '+eur(k.spon):''} · uitgegeven ${eur(k.out)} · de club legt ${eur(Math.max(0,k.cost))} bij.${k.cash>.005?`<br>Er hoort nog ${eur(k.cash)} cash in de pot: die gaat naar de kas.`:''}${nk?`<br><span class="neg">${nk} regels zijn nog niet overgenomen in het kasboek of bankboek.</span>`:''}</div>`,'Afsluiten',()=>{p.closed=true;potDirty(p);render();toast('Pot afgesloten')})}
-function potDel(){const p=curPot();if(RO()||!p)return;ask('Deze pot verwijderen? De boekingen zelf (inleg en uitgaven) blijven staan.','Pot verwijderen',()=>{p.rm=true;potDirty(p);POT='';render()})}
+function potDel(){const p=curPot();if(RO()||!p)return;if(lockR(p))return;ask('Deze pot verwijderen? De boekingen zelf (inleg en uitgaven) blijven staan.','Pot verwijderen',()=>{p.rm=true;potDirty(p);POT='';render()})}
 const nlN=v=>r2(v).toFixed(2).replace('.',',');
 function potCopy(bk){const p=curPot();if(!p)return;const L=potLines(p,bk);
  if(!L.length)return toast('Geen nieuwe regels voor het '+bk+'boek');
  const txt=L.map(({t})=>[fdt(t.date),'Pot '+p.name+': '+t.name+(t.exp?'':' (inleg)'),t.h,t.s||'',t.v>0?nlN(t.v):'',t.v<0?nlN(-t.v):''].map(x=>String(x).replace(/[\t\n]/g,' ')).join('\t')).join('\n');
  modal(`<h3>Regels voor het ${bk}boek</h3><p class="mu" style="margin:0 0 8px">${L.length} ${L.length===1?'regel':'regels'}: Datum, Omschrijving, Hoofdcategorie, Subcategorie, IN, UIT. Plak in kolom A van de eerste lege regel.</p><textarea id="tx" readonly>${esc(txt)}</textarea><button class="btn" style="margin-top:10px" onclick="cp()">Kopiëren</button>${RO()?'':`<button class="btn ghost" style="margin-top:8px" onclick="potMark('${bk}')">Ik heb ze geplakt: markeer als overgenomen</button>`}`)}
-function potMark(bk){const p=curPot();if(RO()||!p)return;const now=Date.now();potLines(p,bk).forEach(({x})=>{x.cp=true;x.ts=now});closeM();potDirty(p);render();toast('Gemarkeerd als overgenomen')}
+function potMark(bk){const p=curPot();if(RO()||!p)return;if(lockR(p))return;const now=Date.now();potLines(p,bk).forEach(({x})=>{x.cp=true;x.ts=now});closeM();potDirty(p);render();toast('Gemarkeerd als overgenomen')}
 function potCalcM(){const p=curPot();if(!p)return;const k=potCalc(p),n=(id,l,v,st)=>`<label>${l}<input id="${id}" type="number" inputmode="decimal" min="0" step="${st||1}" value="${v}" oninput="potK()"></label>`;
  modal(`<h3>Welke inleg vragen?</h3>${n('k1','Leden die inleggen',k.payers>=5?k.payers:15)}${n('k2','Aspiranten die gratis meedrinken',k.free.length>=3?k.free.length:10)}${n('k3','Verwacht verbruik per persoon (€)',15,0.5)}${n('k4','Sponsoring van de club (€)',k.sp?k.spon:0)}<div id="kr" class="card" style="margin:6px 0 10px;padding:12px"></div><button class="btn" onclick="potKUse()">Dit bedrag gebruiken</button><p class="mu" style="margin:10px 0 0;font-size:13px">Reken per café op ongeveer één drankje per persoon. Een pintje kost meestal 2,5 à 3,5 euro.</p>`);potK()}
 var KSUG=0;
@@ -953,24 +988,24 @@ function potKUse(){const p=curPot();if(!p||RO())return closeM();if(!KSUG)return 
 async function syncPot(pull){const c=S.club,g=c.gid;let ch=false;const dirty=S.pots.some(p=>p.dirty);
  if(!pull&&!dirty)return false;
  if(!c.potTab){if(!dirty&&!feat('pot'))return false;const has=await hasTab(TAB_PT);if(!has){if(!dirty||role==='p')return false;await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:[{addSheet:{properties:{title:TAB_PT}}}]})})}await head(TAB_PT,HEAD_PT);c.potTab=true;c.fmtK='';save()}
- const d=await api(`/${g}/values/${enc(rng(TAB_PT,'A2:N'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[];
- const sv=x=>String(x==null?'':x).trim().replace(/^'/,''),isRm=x=>/^ja$/i.test(sv(x)),seen=new Set();
- rows.forEach(r=>{const id=sv(r[0]),so=sv(r[5]).toLowerCase();if(!id||!so)return;const dt=toDate(r[1]),ts=toTs(sv(r[10]),dt);let p=S.pots.find(x=>x.id===id);
+ const d=await api(`/${g}/values/${enc(rng(TAB_PT,'A2:O'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[];
+ const sv=x=>String(x==null?'':x).trim().replace(/^'/,''),isRm=x=>/^ja$/i.test(sv(x)),seen=new Set();let stale=false;
+ rows.forEach(r=>{const id=sv(r[0]),so=sv(r[5]).toLowerCase();if(!id||!so)return;if(isJa(r[14])&&!TEST()){stale=true;return}const dt=toDate(r[1]),ts=toTs(sv(r[10]),dt);let p=S.pots.find(x=>x.id===id);
   if(so==='pot'){const o={date:dt,name:sv(r[2]),h:sv(r[3]),s:sv(r[4]),inleg:+r[7]||0,closed:/afgesloten/i.test(sv(r[8])),by:sv(r[11]),note:String(r[12]==null?'':r[12]),rm:isRm(r[13])};seen.add(id);
-   if(!p){S.pots.push(Object.assign({id,ts,nts:ts,c:[],dirty:false},o));ch=true;return}
+   if(!p){S.pots.push(Object.assign({id,ts,nts:ts,c:[],dirty:false,test:isJa(r[14])?1:0},o));ch=true;return}
    if(!p.dirty&&ts>aTs(p)){Object.assign(p,o);p.nts=ts;ch=true}return}
-  if(!p){p={id,date:dt,name:sv(r[2]),h:sv(r[3]),s:sv(r[4]),inleg:0,closed:false,by:'',note:'',rm:false,ts:0,nts:0,c:[],dirty:false};S.pots.push(p);ch=true}
+  if(!p){p={id,date:dt,name:sv(r[2]),h:sv(r[3]),s:sv(r[4]),inleg:0,closed:false,by:'',note:'',rm:false,ts:0,nts:0,c:[],dirty:false,test:isJa(r[14])?1:0};S.pots.push(p);ch=true}
   const t=so==='gratis'?'g':so==='sponsoring'?'sp':'x',o={t,n:sv(r[6]),v:+r[7]||0,ts,rm:isRm(r[13])};
   if(t==='x'){o.txid=sv(r[9]);o.so=so==='uitgave'?'Uitgave':'Inleg';o.cp=/overgenomen/i.test(sv(r[12]));if(!o.txid)return}
   const k=ck(o);seen.add(id+'|'+k);const x=p.c.find(y=>ck(y)===k);if(!x){p.c.push(o);ch=true}else if(ts>(x.ts||0)){Object.assign(x,o);ch=true}});
  let miss=false;S.pots.forEach(p=>{if(!seen.has(p.id))miss=true;p.c.forEach(x=>{if(!seen.has(p.id+'|'+ck(x)))miss=true})});
- if((dirty||miss)&&role!=='p'){const iso=t=>"'"+new Date(t||Date.now()).toISOString(),V=[];
-  S.pots.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||'')||(x.ts||0)-(y.ts||0)).forEach(p=>{const W=(so,n,v,m,tx,ts,by,info,rm)=>V.push(["'"+p.id,p.date,cell(p.name||''),cell(p.h||''),cell(p.s||''),so,cell(n||''),v,cell(m||''),tx?"'"+tx:'',iso(ts),cell(by||''),cell(info||''),rm?'Ja':'']);
+ if((dirty||miss||stale)&&role!=='p'){const iso=t=>"'"+new Date(t||Date.now()).toISOString(),V=[];
+  S.pots.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||'')||(x.ts||0)-(y.ts||0)).forEach(p=>{const W=(so,n,v,m,tx,ts,by,info,rm)=>V.push(["'"+p.id,p.date,cell(p.name||''),cell(p.h||''),cell(p.s||''),so,cell(n||''),v,cell(m||''),tx?"'"+tx:'',iso(ts),cell(by||''),cell(info||''),rm?'Ja':'',p.test?'Ja':'']);
    W('Pot','',p.inleg||0,p.closed?'Afgesloten':'Open','',aTs(p),p.by,p.note,p.rm);
    p.c.slice().sort((a,b)=>(a.ts||0)-(b.ts||0)).forEach(x=>{if(x.t==='g')return W('Gratis',x.n,'','','',x.ts,'','',x.rm);if(x.t==='sp')return W('Sponsoring','Club',x.v||0,'','',x.ts,'','',x.rm);
     const t=S.tx.find(y=>y.id===x.txid),bk=t&&['cash','payconiq','overschrijving'].includes(t.method)?(t.method==='cash'?'kasboek':'bankboek'):'';
     W(t?(t.exp?'Uitgave':'Inleg'):x.so||'Inleg',t?t.name:x.n,t?t.v:x.v,t?ML[t.method]+(t.void||t.storno?' (geannuleerd)':''):'',x.txid,x.ts,'',x.cp?'Overgenomen in '+(bk||'boek'):'',x.rm)})});
-  await api(`/${g}/values/${enc(rng(TAB_PT,'A2:N'))}:clear`,{method:'POST',body:'{}'});
+  await api(`/${g}/values/${enc(rng(TAB_PT,'A2:O'))}:clear`,{method:'POST',body:'{}'});
   if(V.length)await api(`/${g}/values/${enc(rng(TAB_PT,'A2'))}?valueInputOption=USER_ENTERED`,{method:'PUT',body:JSON.stringify({values:V})});
   S.pots.forEach(p=>p.dirty=false);ch=true}
  if(ch)save();return ch}
@@ -1173,7 +1208,7 @@ async function bonTabs(){const g=S.club.gid,m=await api(`/${g}?fields=sheets.pro
  if(!ti.includes(TAB_BN))rq.push({addSheet:{properties:{title:TAB_BN}}});if(!ti.includes(TAB_BF))rq.push({addSheet:{properties:{title:TAB_BF,hidden:true}}});
  if(rq.length)await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:rq})});
  await head(TAB_BN,HEAD_BN);await head(TAB_BF,['ID','Foto (gebruikt door de app, niet aanpassen)']);S.club.bonTab=true;S.club.fmtK='';save()}
-const bonRow=b=>["'"+b.id,b.date,cell(b.shop),b.total,cell(b.items),cell(b.desc),cell(b.who),"'"+new Date(b.ts).toISOString(),b.status,b.txid?"'"+b.txid:'',cell(b.adv||'')];
+const bonRow=b=>["'"+b.id,b.date,cell(b.shop),b.total,cell(b.items),cell(b.desc),cell(b.who),"'"+new Date(b.ts).toISOString(),b.status,b.txid?"'"+b.txid:'',cell(b.adv||''),b.test?'Ja':''];
 const HEAL=new Set();
 async function syncBons(pull){const c=S.club,g=c.gid;let ch=false;
  const nw=S.bons.filter(b=>!b.synced);
@@ -1181,24 +1216,24 @@ async function syncBons(pull){const c=S.club,g=c.gid;let ch=false;
  for(const b of nw){const ph=phGet(b.id);
   if(ph){const v=["'"+b.id];for(let i=0;i<ph.length;i+=40000)v.push(ph.slice(i,i+40000));
    await api(`/${g}/values/${enc(rng(TAB_BF,'A:A'))}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{method:'POST',body:JSON.stringify({values:[v.map((x,i)=>i?x:b.id)]})})}
-  await append(TAB_BN,'A:K',[bonRow(b)]);NSORT.add(TAB_BN);b.synced=true;b.dirty=false;if(ph){PH.set(b.id,ph);phDel(b.id)}save();ch=true}
+  await append(TAB_BN,'A:L',[bonRow(b)]);NSORT.add(TAB_BN);b.synced=true;b.dirty=false;if(ph){PH.set(b.id,ph);phDel(b.id)}save();ch=true}
  const dir=S.bons.filter(b=>b.dirty&&b.synced);
  if(!pull&&!dir.length)return ch;
- const d=await api(`/${g}/values/${enc(rng(TAB_BN,'A2:K'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[],idx=new Map();
+ const d=await api(`/${g}/values/${enc(rng(TAB_BN,'A2:L'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[],idx=new Map();
  rows.forEach((r,i)=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(id)idx.set(id,i)});
- if(dir.length){const data=[];dir.forEach(b=>{const i=idx.get(b.id);if(i!=null){data.push({range:rng(TAB_BN,'A'+(i+2)+':K'+(i+2)),values:[bonRow(b)]});rows[i]=[b.id,b.date,b.shop,b.total,b.items,b.desc,b.who,rows[i][7],b.status,b.txid,b.adv||'']}});
+ if(dir.length){const data=[];dir.forEach(b=>{const i=idx.get(b.id);if(i!=null){data.push({range:rng(TAB_BN,'A'+(i+2)+':L'+(i+2)),values:[bonRow(b)]});rows[i]=[b.id,b.date,b.shop,b.total,b.items,b.desc,b.who,rows[i][7],b.status,b.txid,b.adv||'']}});
   if(data.length)await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'USER_ENTERED',data})});dir.forEach(b=>b.dirty=false);ch=true}
  const by=new Map(S.bons.map(b=>[b.id,b])),seen=new Set();
- rows.forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(!id)return;seen.add(id);const tot=pnum(r[3]);
+ rows.forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(!id)return;if(isJa(r[11])&&!TEST())return;seen.add(id);const tot=pnum(r[3]);
   const o={date:toDate(r[1]),shop:String(r[2]||'').trim(),total:tot==null?0:tot,items:String(r[4]||''),desc:String(r[5]||''),who:String(r[6]||'').trim(),status:String(r[8]||'Nieuw').trim()||'Nieuw',txid:String(r[9]==null?'':r[9]).trim().replace(/^'/,''),adv:String(r[10]||'').trim()};
   if(o.status==='Nieuw'&&role==='q'){const x=S.tx.find(t=>t.bon===id&&t.exp&&!t.void&&!t.storno);if(x){o.status='Ingeboekt';o.txid=x.id;HEAL.add(id)}}
-  const b=by.get(id);if(!b){S.bons.push(Object.assign({id,ts:toTs(String(r[7]||'').replace(/^'/,''),o.date),h:'',synced:true,dirty:false,mine:false},o));NEW.bons.push(S.bons[S.bons.length-1]);ch=true;return}
+  const b=by.get(id);if(!b){S.bons.push(Object.assign({id,ts:toTs(String(r[7]||'').replace(/^'/,''),o.date),h:'',synced:true,dirty:false,mine:false,test:isJa(r[11])?1:0},o));NEW.bons.push(S.bons[S.bons.length-1]);ch=true;return}
   if(b.dirty)return;if(String(b.status)!==String(o.status))NEW.bst.push({b,from:b.status,to:o.status});for(const k in o)if(String(b[k])!==String(o[k])){b[k]=o[k];ch=true}});
  if(HEAL.size){S.bons.forEach(b=>{if(HEAL.has(b.id)&&b.synced)b.dirty=true});HEAL.clear();queueSync()}
  const before=S.bons.length;S.bons=S.bons.filter(b=>!b.synced||seen.has(b.id));if(S.bons.length!==before)ch=true;
  if(ch)save();return ch}
 const MX={cash:'Cash uit de kas',overschrijving:'Overschrijving van de clubrekening',payconiq:'Payconiq',voorschot:'Voorgeschoten door iemand (nog terug te betalen)'};
-function bonBook(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q')return;const c=S.cats;
+function bonBook(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q'||lockR(b))return;const c=S.cats;
  modal(`<h3>Inboeken als uitgave</h3><p class="mu">${esc(b.shop)} · ${esc(b.date)}${b.who?' · ingediend door '+esc(b.who):''}</p>
  <label>Bedrag<input id="xb" inputmode="decimal" value="${fmt2(b.total)}"></label><label>Datum<input id="xd" type="date" value="${esc(b.date||today())}"></label>
  <label>Omschrijving<input id="xo" value="${esc(b.desc||b.items.slice(0,80))}"></label>
@@ -1212,13 +1247,13 @@ function bonBookOk(id){const b=S.bons.find(x=>x.id===id);if(!b)return;const a=pa
  S.tx.push(tx);b.status='Ingeboekt';b.txid=tx.id;b.dirty=!!b.synced;closeM();save();render();queueSync();
  const od=adv?memDebt(adv):null;if(od&&od.tot>.005){toast(`Ingeboekt. ${adv} heeft nog ${eur(od.tot)} schuld: je kan meteen verrekenen.`);return refund(tx.id)}toast('Ingeboekt als uitgave')}
 function bonTx(b){const x=b&&b.txid&&S.tx.find(t=>t.id===b.txid);return x&&!x.void?x:null}
-function bonEdit(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q')return;const x=bonTx(b);
+function bonEdit(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q'||lockR(b))return;const x=bonTx(b);
  modal(`<h3>Bonnetje aanpassen</h3>${x?'<p class="mu">Dit bonnetje is al ingeboekt. Pas je winkel, datum of bedrag aan, dan wordt de boeking geannuleerd en opnieuw ingeboekt met de nieuwe gegevens.</p>':''}
  <label>Winkel<input id="ebs" value="${esc(b.shop)}"></label><label>Datum van de aankoop<input id="ebd" type="date" value="${esc(b.date)}"></label><label>Totaal in euro<input id="ebt" inputmode="decimal" value="${fmt2(b.total)}"></label>
  <label>Wat werd er gekocht<textarea id="ebi" rows="3">${esc(String(b.items||'').split('; ').join('\n'))}</textarea></label><label>Waarvoor<input id="ebo" value="${esc(b.desc)}"></label>
  <label>Voorgeschoten door (leeg als het niet voorgeschoten werd)<input id="eba" value="${esc(b.adv||'')}"></label>
  <button class="btn" onclick="bonEditOk('${esc(id)}')">Opslaan</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
-function bonEditOk(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q')return;
+function bonEditOk(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q'||lockR(b))return;
  const n={shop:($('#ebs').value||'').trim().slice(0,80),date:$('#ebd').value||b.date,total:pamt($('#ebt').value),items:($('#ebi').value||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean).join('; ').slice(0,2000),desc:($('#ebo').value||'').trim().slice(0,200),adv:($('#eba').value||'').trim().slice(0,40)};
  if(!n.shop)return toast('Vul de winkel in');if(!(n.total>0))return toast('Vul het totaal in');
  const x=bonTx(b),money=x&&(n.total!==b.total||n.date!==b.date||n.shop!==b.shop||(!!n.adv)!==(x.method==='voorschot')||(n.adv&&n.adv!==x.adv));
@@ -1227,7 +1262,7 @@ function bonEditOk(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q')retur
  if(money){doStorno(x.id);const m=n.adv?'voorschot':(x.method==='voorschot'?'cash':x.method),nt={who:WHO,id:uid(),ts:Date.now(),date:n.date,mid:null,name:n.shop,v:-n.total,method:m,h:x.h,s:x.s,desc:n.desc||x.desc,by:role,exp:true,bon:b.id,adv:n.adv,void:false,synced:false};
   S.tx.push(nt);b.txid=nt.id;b.status='Ingeboekt'}
  closeM();save();render();queueSync();toast(money?'Aangepast en opnieuw ingeboekt':'Bonnetje aangepast')}
-function bonReject(id){const b=S.bons.find(x=>x.id===id);if(!b)return;ask(`Bonnetje van ${esc(b.shop)} (${eur(b.total)}) afwijzen? Het blijft bewaard in de spreadsheet met status Afgewezen.`,'Afwijzen',()=>{b.status='Afgewezen';b.dirty=!!b.synced;save();render();queueSync()})}
+function bonReject(id){const b=S.bons.find(x=>x.id===id);if(!b||lockR(b))return;ask(`Bonnetje van ${esc(b.shop)} (${eur(b.total)}) afwijzen? Het blijft bewaard in de spreadsheet met status Afgewezen.`,'Afwijzen',()=>{b.status='Afgewezen';b.dirty=!!b.synced;save();render();queueSync()})}
 const advOpen=()=>S.tx.filter(t=>t.method==='voorschot'&&t.exp&&!t.void&&!t.storno&&!t.paidBy);
 function refund(id){const d=S.tx.find(x=>x.id===id);if(!d)return;const X=-d.v,o=d.adv?memDebt(d.adv):null,D=o?o.tot:0,Y0=Math.round(Math.min(D,X)*100)/100;
  modal(`<h3>Terugbetalen</h3><p>${esc(d.adv)} schoot ${eur(X)} voor: ${esc(d.desc||d.name)}</p>
@@ -1382,9 +1417,9 @@ function rmdOther(n){const m=memOf(n),R=rmd(),k=n+(m&&m.rem&&m.rem.n?'|2':'|1');
 function rmdDone(n){const m=memOf(n);if(!m)return;const t=today();m.rem={d:t,n:(m.rem&&m.rem.d!==t?(m.rem.n||0)+1:(m.rem&&m.rem.n)||1)};m.remDirty=true;save();queueSync();setTimeout(render,600)}
 const daysAgo=d=>d?Math.floor((Date.parse(today())-Date.parse(d))/864e5):1e9;
 function rmdTodo(){return Object.values(debts()).filter(o=>{const m=memOf(o.name);return m&&telNorm(m.tel).n&&daysAgo(m.rem&&m.rem.d)>=7}).sort((a,b)=>b.tot-a.tot).map(o=>o.name)}
-function rmdStart(){RQ=rmdTodo();RQI=0;if(!RQ.length)return toast('Iedereen met een gsm-nummer kreeg de voorbije week al een herinnering');SDN=RQ[0];render();scrollTo(0,0)}
+function rmdStart(){if(TEST())return toast('In testmodus worden geen herinneringen verstuurd');RQ=rmdTodo();RQI=0;if(!RQ.length)return toast('Iedereen met een gsm-nummer kreeg de voorbije week al een herinnering');SDN=RQ[0];render();scrollTo(0,0)}
 function rmdNext(d){RQI+=d;if(RQI<0)RQI=0;if(RQI>=RQ.length){RQ=[];SDN='';toast('Klaar met herinneringen');return render()}SDN=RQ[RQI];render();scrollTo(0,0)}
-function rmdCard(o){if(role!=='q')return '';const m=memOf(o.name),t=telNorm(m&&m.tel),R=rmd(),r=m&&m.rem;
+function rmdCard(o){if(role!=='q')return '';if(TEST())return '<div class="card"><p class="mu" style="margin:0">In testmodus worden geen herinneringen verstuurd.</p></div>';const m=memOf(o.name),t=telNorm(m&&m.tel),R=rmd(),r=m&&m.rem;
  const q=RQ.length?`<div class="row" style="border:0;padding:0 0 8px"><b>Herinnering ${RQI+1} van ${RQ.length}</b><span><button class="sm" onclick="rmdNext(1)">${RQI+1<RQ.length?'Volgende →':'Klaar'}</button><button class="sm" onclick="RQ=[];render()">Stoppen</button></span></div>`:'';
  const last=r&&r.d?`Laatste herinnering: ${r.d.split('-').reverse().join('/')}${r.n>1?` (${r.n}e keer)`:''}.`:'Nog geen herinnering gestuurd.';
  if(!t.n)return `<div class="card">${q}<h2>Herinnering sturen</h2><p class="mu">${esc(t.why)}${t.no?'':' Voeg het nummer toe bij Leden → Lijst plakken, of in kolom C van het tabblad Leden.'}</p><p class="mu">${last}</p></div>`;
@@ -1430,19 +1465,19 @@ function vSchuldDet(){const o=memDebt(SDN),Q=role==='q';const back=`<button clas
  <div class="card"><h2>Openstaande schulden</h2>${Q?'<p class="mu" style="margin-top:-6px">Vink aan wat je gecontroleerd hebt. Met ✎ pas je een schuld aan.</p>':''}${o.debts.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(d=>`<div class="row"><div>${esc(d.desc||d.h||'Schuld')}${d.paid>.005?' <span class="tag" style="border-color:#C98A2B;color:#8A5A12">Deels betaald</span>':''}<div class="mu">${esc([fd(d.date),d.h,d.s].filter(Boolean).join(' · '))}</div>${d.paid>.005?`<div class="mu">${eur(d.paid)} van ${eur(d.v)} betaald</div>`:''}</div><div class="amt" style="display:flex;align-items:center;gap:8px"><span style="text-align:right">${eur(rem(d))}${d.paid>.005?'<div class="mu" style="font-weight:400;font-size:.75rem">nog te betalen</div>':''}</span>${Q?`<label style="margin:0" title="Gecontroleerd"><input type="checkbox" style="width:20px;height:20px" ${d.chk?'checked':''} onchange="chkSet('${d.id}',this.checked)" aria-label="Gecontroleerd"></label>`:(d.chk?'<span class="mu" title="Gecontroleerd">✓</span>':'')}${RO()?'':`<button class="sm" onclick="pay('${d.id}')">Betaald</button>`}${Q?`<button class="sm" aria-label="Aanpassen" title="Aanpassen" onclick="debtEdit('${d.id}')">✎</button>`:''}</div></div>`).join('')}</div>
  ${(()=>{const pd=S.tx.filter(t=>t.method==='schuld'&&t.v>0&&!t.void&&!t.storno&&uk(t.name)===uk(o.name)&&rem(t)<=.005).sort((a,b)=>(a.date||'').localeCompare(b.date||''));return pd.length?`<div class="card"><details><summary><b>Betaalde schulden (${pd.length})</b></summary>${pd.map(d=>`<div class="row"><div>${esc(d.desc||d.h||'Schuld')}<div class="mu">${esc([fd(d.date),d.h,d.s].filter(Boolean).join(' · '))}</div></div><div class="amt" style="display:flex;align-items:center;gap:8px">${eur(d.v)}${Q?`<button class="sm" aria-label="Aanpassen" title="Aanpassen" onclick="debtEdit('${d.id}')">✎</button>`:''}</div></div>`).join('')}</details></div>`:''})()}
  <div class="card"><h2>Ontvangen betalingen</h2>${o.pays.length?o.pays.slice().sort((a,b)=>b.ts-a.ts).map(t=>`<div class="row"><div>${esc(t.desc)}<div class="mu">${fd(t.date)} · ${ML[t.method]||t.method}${t.who?' · '+esc(t.who):''}</div></div><div class="amt">${eur(t.v)}</div></div>`).join(''):empty('Nog niets betaald.')}</div>`}
-function debtEdit(id){if(role!=='q')return;const d=S.tx.find(x=>x.id===id);if(!d)return;const c=S.cats,pd=d.paid||0;
+function debtEdit(id){if(role!=='q')return;const d=S.tx.find(x=>x.id===id);if(!d||lockR(d))return;const c=S.cats,pd=d.paid||0;
  modal(`<h3>Schuld aanpassen</h3><p class="mu">${esc(d.name)}${pd>.005?` · al ${eur(pd)} betaald`:''}</p>
  <label>Omschrijving<input id="eo" value="${esc(d.desc||'')}"></label>
  <label>Bedrag<input id="eb" inputmode="decimal" value="${fmt2(d.v)}"></label>${pd>.005?`<p class="mu" style="margin:-6px 0 10px;font-size:.85rem">Minstens ${eur(pd)}: zoveel werd al betaald.</p>`:''}
  <label>Datum<input id="ed" type="date" value="${esc(d.date||today())}"></label>
  <label>Hoofdcategorie<select id="eh" onchange="fillS(this,'es')">${opts(c.h.includes(d.h)||!d.h?c.h:[d.h].concat(c.h),d.h)}</select></label><label>Subcategorie<select id="es">${opts(!d.s||subsFor(d.h).includes(d.s)?subsFor(d.h):[d.s].concat(subsFor(d.h)),d.s,true)}</select></label>
  <button class="btn" onclick="debtEditOk('${d.id}')">Opslaan</button><button class="btn ghost" style="margin-top:8px" onclick="debtDel('${d.id}')">Schuld schrappen</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
-function debtEditOk(id){if(role!=='q')return;const d=S.tx.find(x=>x.id===id);if(!d)return;const v=pamt($('#eb').value),pd=d.paid||0;
+function debtEditOk(id){if(role!=='q')return;const d=S.tx.find(x=>x.id===id);if(!d||lockR(d))return;const v=pamt($('#eb').value),pd=d.paid||0;
  if(!(v>0))return toast('Vul een bedrag in');if(v<pd-.004)return toast(`Het bedrag moet minstens ${eur(pd)} zijn: zoveel werd al betaald`);
  const n={desc:($('#eo').value||'').trim(),v:Math.round(v*100)/100,date:$('#ed').value||d.date,h:$('#eh').value,s:$('#es').value};
  if(['desc','v','date','h','s'].every(k=>String(n[k]||'')===String(d[k]||'')))return closeM();
  Object.assign(d,n);if(d.synced)d.edD=true;relink();save();closeM();toast('Schuld aangepast');render();queueSync()}
-function debtDel(id){const d=S.tx.find(x=>x.id===id);if(!d)return;
+function debtDel(id){const d=S.tx.find(x=>x.id===id);if(!d||lockR(d))return;
  if((d.paid||0)>.005){const ps=S.tx.filter(t=>t.ref===d.id&&!t.storno&&!t.void&&!t.exp);
   return ask(`Op deze schuld werd al ${eur(d.paid)} betaald. Schrap je ze, dan worden ook ${ps.length===1?'die betaling':'die '+ps.length+' betalingen'} geannuleerd. Was het geld echt ontvangen, pas dan liever het bedrag aan.`,'Schuld en betalingen schrappen',()=>{ps.forEach(t=>doStorno(t.id,1));doStorno(d.id,1);relink();save();toast('Schuld geschrapt');render();queueSync()})}
  ask('Deze schuld schrappen? Ze blijft doorstreept staan in de spreadsheet met een tegenboeking. Er wordt niets gewist.','Schuld schrappen',()=>doStorno(id))}
@@ -1459,7 +1494,7 @@ function payPrev(name){const o=memDebt(name),e=$('#pp');if(!o||!e)return;let a=p
 function payAllOk(name){if(RO())return;const o=memDebt(name);if(!o)return;let a=pamt($('#pa').value)||0;if(!(a>0))return toast('Vul een bedrag in');if(a>o.tot+.005)return toast('Dat is meer dan het openstaande bedrag');
  const m=$('#pm').value,dt0=$('#pd').value||today();o.debts.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||'')||x.ts-y.ts).forEach(d=>{if(a<=.005)return;const p=Math.min(a,rem(d));payTx(d,Math.round(p*100)/100,m,dt0);a=Math.round((a-p)*100)/100});
  relink();save();closeM();toast('Betaling opgeslagen');render();queueSync()}
-function chkSet(id,v){if(role!=='q')return;const t=S.tx.find(x=>x.id===id);if(!t)return;t.chk=!!v;t.chkD=true;save();queueSync()}
+function chkSet(id,v){if(role!=='q')return;const t=S.tx.find(x=>x.id===id);if(!t)return;if(lockR(t))return render();t.chk=!!v;t.chkD=true;save();queueSync()}
 
 /* ---------- leden ---------- */
 function vLeden(){if(RO())return `<div class="card"><h2>${S.members.length} leden</h2><p class="mu">Alleen lezen.</p><label>Zoeken<input oninput="LQ=this.value;ml()"></label><div id="ml"></div></div>`;
@@ -1468,11 +1503,11 @@ function vLeden(){if(RO())return `<div class="card"><h2>${S.members.length} lede
 function addMOpen(){if(RO())return;modal(`<h3>Lid toevoegen</h3><label>Clubnaam<input id="mn" autocomplete="off" placeholder="bv. Spelt"></label><label>Status<select id="ms">${S.statuses.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select></label><label>Of een nieuwe status (niet verplicht)<input id="ms2" autocomplete="off" placeholder="bv. schacht"></label><button class="btn" onclick="addM()">Toevoegen</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`);setTimeout(()=>{const e=$('#mn');if(e)e.focus()},50)}
 function ml(){const e=$('#ml');if(!e)return;const q=LQ.toLowerCase(),o=open(),l=S.members.filter(m=>uk(m.name).includes(uk(q))).sort((a,b)=>a.name.localeCompare(b.name));
  e.innerHTML=l.length?l.map(m=>{const d=Math.max(0,debtOf(m.name));return `<div class="row"><div>${esc(m.name)}${role==='q'&&m.tel?`<div class="mu">${esc(m.tel)}</div>`:''}${d?`<div class="neg" style="white-space:nowrap">Schuld ${eur(d)}</div>`:''}</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">${RO()?`<span class="mu">${esc(m.status)}</span>`:`<select class="ss" aria-label="Status van ${esc(m.name)}" onchange="stSel(this,'${m.id}',false)">${stOpts(m.status)}</select><span style="display:flex;gap:10px"><button class="lnk" onclick="editM('${m.id}')" aria-label="${esc(m.name)} aanpassen">Aanpassen</button><button class="lnk" onclick="delM('${m.id}')" aria-label="${esc(m.name)} verwijderen">Verwijderen</button></span>`}</div></div>`}).join(''):empty('Geen leden gevonden.')}
-function editM(id){if(RO())return;const m=S.members.find(x=>x.id===id);if(!m)return;const nc=/geen\s*contact/i.test(m.tel||'');
+function editM(id){if(RO())return;const m=S.members.find(x=>x.id===id);if(!m||lockR(m))return;const nc=/geen\s*contact/i.test(m.tel||'');
  modal(`<h3>Lid aanpassen</h3><label>Clubnaam<input id="en" autocomplete="off" value="${esc(m.name)}"></label><label>Status<select id="es">${S.statuses.map(x=>`<option value="${esc(x)}"${x===m.status?' selected':''}>${esc(x)}</option>`).join('')}</select></label><label>Of een nieuwe status (niet verplicht)<input id="es2" autocomplete="off" placeholder="bv. schacht"></label>
  <label>Gsm-nummer<input id="et" inputmode="tel" autocomplete="off" value="${nc?'':esc(m.tel||'')}" placeholder="bv. 0485 12 34 56"${nc?' disabled':''}></label><label style="display:flex;gap:8px;align-items:center;margin-top:-4px"><input type="checkbox" id="eg" style="width:20px;height:20px"${nc?' checked':''} onchange="$('#et').disabled=this.checked">Wenst geen contact</label>
  <p class="mu">Pas je de clubnaam aan, dan verandert die ook bij alle boekingen en schulden van dit lid, in de app en in de spreadsheet.</p><button class="btn" data-id="${esc(id)}" onclick="editMOk(this.dataset.id)">Opslaan</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
-function editMOk(id){if(RO())return;const m=S.members.find(x=>x.id===id);if(!m)return;const n=$('#en').value.trim().replace(/\s+/g,' ');if(!n)return toast('Vul een clubnaam in');
+function editMOk(id){if(RO())return;const m=S.members.find(x=>x.id===id);if(!m||lockR(m))return;const n=$('#en').value.trim().replace(/\s+/g,' ');if(!n)return toast('Vul een clubnaam in');
  const o=S.members.find(x=>x!==m&&uk(x.name)===uk(n));if(o)return toast(n+' staat al in de ledenlijst');
  const st=cleanSt($('#es2').value)?addSt($('#es2').value):$('#es').value,tel=$('#eg').checked?'Wenst geen contact':$('#et').value.trim();let ch=[];
  if(n!==m.name){if(!m.ren)m.ren=m.name;renameM(m,n);m.dirty=true;ch.push('clubnaam')}
@@ -1486,7 +1521,7 @@ async function pushRen(){const l=S.tx.filter(t=>t.renD&&t.synced);if(!l.length)r
  const data=l.filter(t=>idx.has(t.id)&&!isShop(t)).map(t=>({range:rng(TAB_B,'C'+idx.get(t.id)),values:[[t.name]]}));if(data.length)await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data})});l.forEach(t=>delete t.renD);save()}
 function addM(){if(RO())return;const n=$('#mn').value.trim();if(!n)return toast('Vul een naam in');if(memOf(n))return toast(n+' staat al in de ledenlijst');unDel(n);S.members.push({id:uid(),name:n,status:cleanSt($('#ms2').value)?addSt($('#ms2').value):$('#ms').value,dirty:true});save();closeM();toast(n+' toegevoegd');render();queueSync()}
 const unDel=n=>{S.delM=S.delM.filter(x=>x.toLowerCase()!==String(n).toLowerCase())};
-function delM(id){if(RO())return;const m0=S.members.find(x=>x.id===id);if(!m0)return;
+function delM(id){if(RO())return;const m0=S.members.find(x=>x.id===id);if(!m0||lockR(m0))return;
  ask('Dit lid verwijderen uit de lijst? Bestaande boekingen blijven staan.'+(S.club.gid?' Het lid wordt ook uit het tabblad Leden van je spreadsheet verwijderd.':''),'Verwijderen',()=>{S.delM.push(m0.name);S.members=S.members.filter(m=>m.id!==id);save();render();queueSync()})}
 function impM(){return telImp()}
 function impMOld(){if(RO())return;modal(`<h3>Ledenlijst plakken</h3><p class="mu">Eén lid per regel: naam, of naam en status (bv. schacht of actief student) gescheiden door een tab of puntkomma. Je kan dus kolommen uit je spreadsheet kopiëren.</p><textarea id="it"></textarea><button class="btn" style="margin-top:10px" onclick="impOk()">Importeren</button>`)}
@@ -1540,11 +1575,11 @@ function limCard(){const c=S.club,L=c.lim||{};return `<div class="card"><h2>Schu
 function setLim(s,v){if(role!=='q')return;const c=S.club;c.lim=Object.assign({},c.lim);const n=String(v).trim()===''?'':pamt(v);c.lim[s]=n==null?'':n;c.setDirty=true;save();queueSync();toast('Opgeslagen')}
 let OVH='';
 /* ---------- opmaak van de tabbladen ---------- */
-const FMT_V='10';
+const FMT_V='11';
 async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)return;const key=c.gid+'|'+FMT_V+'|'+c.color;if(!force&&(c.fmtK===key||(c.fmtFailK===key&&Date.now()-c.fmtFail<36e5)))return;
  const m=await api(`/${c.gid}?fields=sheets(properties(sheetId,title),bandedRanges(bandedRangeId),conditionalFormats(ranges))`),SH={};(m.sheets||[]).forEach(x=>SH[x.properties.title]=x);
  const rgb=h=>{h=String(h||'#8B1E3F').replace('#','');return{red:parseInt(h.slice(0,2),16)/255,green:parseInt(h.slice(2,4),16)/255,blue:parseInt(h.slice(4,6),16)/255}};
- const AC=rgb(c.color),TI={red:AC.red+(1-AC.red)*.86,green:AC.green+(1-AC.green)*.86,blue:AC.blue+(1-AC.blue)*.86},WH={red:1,green:1,blue:1},ZG=rgb('#F6F7F9'),GR=rgb('#8A8F99'),RD=rgb('#9B1C1C'),RB=rgb('#FBE3E3'),GN=rgb('#1E6B3A'),GB=rgb('#E2F3E8'),AM=rgb('#FDF0E1'),AT=rgb('#6B4A12');
+ const AC=rgb(c.color),TI={red:AC.red+(1-AC.red)*.86,green:AC.green+(1-AC.green)*.86,blue:AC.blue+(1-AC.blue)*.86},WH={red:1,green:1,blue:1},ZG=rgb('#F6F7F9'),GR=rgb('#8A8F99'),RD=rgb('#9B1C1C'),RB=rgb('#FBE3E3'),GN=rgb('#1E6B3A'),GB=rgb('#E2F3E8'),AM=rgb('#FDF0E1'),AT=rgb('#6B4A12'),TO=rgb('#FCD9B0'),TT=rgb('#7A3A00');
  const EUR={type:'CURRENCY',pattern:'"€ "#,##0.00;[Red]"-€ "#,##0.00'},DAT={type:'DATE',pattern:'dd/mm/yyyy'},TXT={type:'TEXT'};
  const R=[],G=(id,r0,r1,c0,c1)=>{const g={sheetId:id};if(r0!=null)g.startRowIndex=r0;if(r1!=null)g.endRowIndex=r1;if(c0!=null)g.startColumnIndex=c0;if(c1!=null)g.endColumnIndex=c1;return g};
  const fmt=(g,f,fields)=>R.push({repeatCell:{range:g,cell:{userEnteredFormat:f},fields:'userEnteredFormat('+fields+')'}});
@@ -1559,20 +1594,21 @@ async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)ret
   if(!o.ov){fmt(G(id,0,1,0,o.w.length),{backgroundColor:AC,textFormat:{bold:true,foregroundColor:WH,fontSize:10},verticalAlignment:'MIDDLE',wrapStrategy:'CLIP'},'backgroundColor,textFormat,verticalAlignment,wrapStrategy');
    R.push({addBanding:{bandedRange:{range:G(id,0,null,0,o.w.length),rowProperties:{headerColor:AC,firstBandColor:WH,secondBandColor:ZG}}}})}
   Object.entries(o.num||{}).forEach(([j,f])=>fmt(G(id,1,null,+j,+j+1),{numberFormat:f},'numberFormat'));return id};
- let id=base(TAB_B,{w:[80,90,120,190,120,120,110,90,95,90,120,150,70,130,105],hide:[0,9,11,12],num:{1:DAT,7:EUR}});
- if(id!=null)R.push({setBasicFilter:{filter:{range:G(id,0,null,0,15)}}});
+ let id=base(TAB_B,{w:[80,90,120,190,120,120,110,90,95,90,120,150,70,130,105,90],hide:[0,9,11,12],num:{1:DAT,7:EUR}});
+ if(id!=null)R.push({setBasicFilter:{filter:{range:G(id,0,null,0,16)}}});
  if(id!=null){cond(G(id,1,null,0,15),formula('=$I2="Storno"'),{textFormat:{foregroundColor:GR,italic:true}});
   cond(G(id,1,null,6,7),{type:'TEXT_EQ',values:[{userEnteredValue:M.schuld}]},{textFormat:{foregroundColor:AT,bold:true},backgroundColor:AM});
   cond(G(id,1,null,14,15),{type:'TEXT_EQ',values:[{userEnteredValue:'Ja'}]},{textFormat:{foregroundColor:GN,bold:true}})}
- id=base(TAB_L,{w:[160,130,140,150,120],hide:[4],num:{2:TXT}});
+ if(id!=null)cond(G(id,1,null,0,16),formula('=$P2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}});
+ id=base(TAB_L,{w:[160,130,140,150,120,90],hide:[4],num:{2:TXT}});if(id!=null)cond(G(id,1,null,0,6),formula('=$F2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}});
  const ph=SH[TAB_P]?Math.max(5,S.statuses.length+2):5;id=base(TAB_P,{w:[150,150].concat(Array(ph-2).fill(110)),num:Object.fromEntries(Array.from({length:ph-2},(_,i)=>[i+2,EUR]))});
- id=base(TAB_BN,{w:[80,90,150,90,260,200,130,150,100,90,140],hide:[0,7,9],num:{1:DAT,3:EUR}});
+ id=base(TAB_BN,{w:[80,90,150,90,260,200,130,150,100,90,140,90],hide:[0,7,9],num:{1:DAT,3:EUR}});
  if(id!=null){cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Nieuw'}]},{backgroundColor:AM,textFormat:{foregroundColor:AT,bold:true}});
   cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Ingeboekt'}]},{textFormat:{foregroundColor:GN,bold:true}});
-  cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Afgewezen'}]},{textFormat:{foregroundColor:GR,italic:true}})}
- id=base(TAB_A,{w:[80,90,130,150,160,150,110,280,90],hide:[0,5],num:{1:DAT}});
- id=base(TAB_PT,{w:[80,90,140,120,130,95,160,90,170,90,150,110,200,90],hide:[0,9,10],num:{1:DAT,7:EUR}});
- if(id!=null){cond(G(id,1,null,0,14),formula('=$F2="Pot"'),{textFormat:{bold:true},backgroundColor:TI});cond(G(id,1,null,0,14),formula('=$N2="Ja"'),{textFormat:{foregroundColor:GR,italic:true,strikethrough:true}})}
+  cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Afgewezen'}]},{textFormat:{foregroundColor:GR,italic:true}});cond(G(id,1,null,0,12),formula('=$L2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}})}
+ id=base(TAB_A,{w:[80,90,130,150,160,150,110,280,90,90],hide:[0,5],num:{1:DAT}});if(id!=null)cond(G(id,1,null,0,10),formula('=$J2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}});
+ id=base(TAB_PT,{w:[80,90,140,120,130,95,160,90,170,90,150,110,200,90,90],hide:[0,9,10],num:{1:DAT,7:EUR}});
+ if(id!=null){cond(G(id,1,null,0,14),formula('=$F2="Pot"'),{textFormat:{bold:true},backgroundColor:TI});cond(G(id,1,null,0,14),formula('=$N2="Ja"'),{textFormat:{foregroundColor:GR,italic:true,strikethrough:true}});cond(G(id,1,null,0,15),formula('=$O2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}})}
  id=base(TAB_OV,{ov:1,frz:2,w:[90,110,110,200,120,120,85,85,85,85,105,24,110,110,105,95,105],num:{6:EUR,7:EUR,8:EUR,9:EUR,14:EUR,15:EUR,16:EUR}});
  if(id!=null){R.push({unmergeCells:{range:G(id,0,1,0,17)}},{mergeCells:{range:G(id,0,1,0,11),mergeType:'MERGE_ALL'}},{mergeCells:{range:G(id,0,1,12,17),mergeType:'MERGE_ALL'}});
   [[0,11],[12,17]].forEach(([a,b])=>{fmt(G(id,0,1,a,b),{backgroundColor:AC,textFormat:{bold:true,foregroundColor:WH,fontSize:11},verticalAlignment:'MIDDLE'},'backgroundColor,textFormat,verticalAlignment');
@@ -1641,7 +1677,7 @@ function wipeTx(){const n=S.tx.length,u=S.tx.filter(t=>!t.synced).length,g=S.clu
 function wipeTxSheet(){if(role!=='q')return;modal(`<h3>Ook uit de spreadsheet wissen</h3><p>Alle rijen in het tabblad Boekingen verdwijnen voor iedereen. Dit is niet ongedaan te maken in de app. Typ WISSEN om te bevestigen.</p><input id="wc2" autocomplete="off"><button class="btn" style="margin-top:10px" onclick="wipeTxSheetOk()">Definitief wissen</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
 function wipeTxSheetOk(){if(($('#wc2').value||'').trim().toUpperCase()!=='WISSEN')return toast('Typ WISSEN om te bevestigen');wipeTxGo(true)}
 async function wipeTxGo(sheet){if(role!=='q')return;closeM();
- if(sheet){SI=true;try{await api(`/${S.club.gid}/values/${enc(rng(TAB_B,'A2:O'))}:clear`,{method:'POST',body:'{}'})}catch(e){SI=false;return toast(e.message||'Wissen in de spreadsheet is niet gelukt')}SI=false}
+ if(sheet){SI=true;try{await api(`/${S.club.gid}/values/${enc(rng(TAB_B,'A2:P'))}:clear`,{method:'POST',body:'{}'})}catch(e){SI=false;return toast(e.message||'Wissen in de spreadsheet is niet gelukt')}SI=false}
  S.tx=[];S.club.wipeTs=Date.now();save();render();toast(sheet?'Boekingen gewist, ook in de spreadsheet':'Boekingen gewist op dit toestel')}
 function wipeMem(){const g=S.club.gid&&S.club.gok;
  ask('De ledenlijst leegmaken?'+(g?' Ook de lijst in het tabblad Leden van je spreadsheet wordt leeggemaakt, anders komt ze terug.':'')+' Bestaande boekingen blijven staan.','Leegmaken',async()=>{
@@ -1678,8 +1714,8 @@ function gCardEnd(c,on){return `<button class="btn" onclick="connect()">${on?'Op
  ${c.gid?`<a class="btn ghost" style="margin-top:8px" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/${esc(c.gid)}">Spreadsheet openen</a><button class="btn ghost" style="margin-top:8px" onclick="unlink()">Ontkoppelen</button>`:''}
  <p class="mu" style="margin-top:12px">De app vraagt alleen toegang tot spreadsheets die ze zelf aanmaakt of die je zelf kiest. <a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>${sheetTip()}`}
 let SUBM='';
-const MSEC=[['club','Club en uiterlijk','Naam, kleur, logo en weergave'],['mensen','Accounts en helpers','Wie toegang heeft, helpers uitnodigen, rollen'],['leden','Werkjaar, leden en prijzen','Begin werkjaar, statussen, prijzen en schuldlimieten'],['rmd','Herinneringen','Rekeningnummer en berichten voor schulden'],['meld','Meldingen','Kies welke meldingen je krijgt'],['sheet','Spreadsheet en tabbladen','Google Sheets, categorieën en schulden overnemen'],['func','Functies','Kies welke onderdelen de app gebruikt'],['data','Back-up en wissen','Back-up maken, terugzetten en gegevens wissen']];
-function mSum(k){const c=S.club;if(k==='func'){const n=FEATS.filter(f=>!feat(f[0])).length;return n?n+'&nbsp;uit':''}if(k==='sheet'&&!(c.gid&&c.gok))return '<span class="neg">Niet verbonden</span>';if(k==='mensen'){const n=actU().length;return n?n+'&nbsp;'+(n===1?'account':'accounts'):''}return ''}
+const MSEC=[['club','Club en uiterlijk','Naam, kleur, logo en weergave'],['mensen','Accounts en helpers','Wie toegang heeft, helpers uitnodigen, rollen'],['leden','Werkjaar, leden en prijzen','Begin werkjaar, statussen, prijzen en schuldlimieten'],['rmd','Herinneringen','Rekeningnummer en berichten voor schulden'],['meld','Meldingen','Kies welke meldingen je krijgt'],['sheet','Spreadsheet en tabbladen','Google Sheets, categorieën en schulden overnemen'],['func','Functies en testmodus','Onderdelen aan of uit, testmodus voor uitleg'],['data','Back-up en wissen','Back-up maken, terugzetten en gegevens wissen']];
+function mSum(k){const c=S.club;if(k==='func'){if(TEST())return '<span style="color:var(--tm);font-weight:600">Testmodus aan</span>';const n=FEATS.filter(f=>!feat(f[0])).length;return n?n+'&nbsp;uit':''}if(k==='sheet'&&!(c.gid&&c.gok))return '<span class="neg">Niet verbonden</span>';if(k==='mensen'){const n=actU().length;return n?n+'&nbsp;'+(n===1?'account':'accounts'):''}return ''}
 function vInst(){const c=S.club;
  if(!SUBM)return `<div class="card">${MSEC.map(x=>`<button class="drow" onclick="SUBM='${x[0]}';render();scrollTo(0,0)"><span><b>${x[1]}</b><span class="mu" style="font-size:13px">${x[2]}</span></span><span class="dra"><span class="mu" style="font-size:12px;text-align:right;white-space:nowrap">${mSum(x[0])}</span><span aria-hidden="true">›</span></span></button>`).join('')}</div><p class="mu" style="text-align:center">Versie ${APP_LABEL}</p>`;
  const t=(MSEC.find(x=>x[0]===SUBM)||[])[1]||'';
@@ -1692,7 +1728,7 @@ ${USER?'':`<div class="card"><h2>Jouw naam</h2><label>Naam van de Quaestor<input
   leden:()=>`${wjCard()}${statCard()}${limCard()}${prCard()}`,
   sheet:()=>`${gCard()}${bkCard()}${catCard()}`,
   rmd:()=>rmdSetCard(),
-  func:()=>featCard(),
+  func:()=>testCard()+featCard(),
   meld:()=>nCard(),
   data:()=>`<div class="card"><h2>Back-up</h2><button class="btn ghost" onclick="showT('Boekingen als csv',csv())">Boekingen kopiëren (voor Excel)</button><button class="btn ghost" style="margin-top:8px" onclick="showT('Volledige back-up',JSON.stringify(S))">Volledige back-up kopiëren</button><button class="btn ghost" style="margin-top:8px" onclick="restore()">Back-up terugzetten</button></div><div class="card"><h2>Gegevens wissen</h2><p class="mu">Maak eerst een back-up als je twijfelt. Bij boekingen en de ledenlijst kies je of de spreadsheet ook meegaat. Bij Alles wissen blijft de spreadsheet staan.</p><button class="btn ghost" onclick="wipeTx()">Alle boekingen wissen</button><button class="btn ghost" style="margin-top:8px" onclick="wipeMem()">Ledenlijst leegmaken</button><button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="wipeAll()">Alles wissen op dit toestel</button>${ISDEV||HQ()?`<button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="closeClub()">Club afsluiten voor iedereen</button><p class="mu" style="margin-top:6px">Alles wissen op dit toestel wist alleen jouw toestel. Club afsluiten wist de club ook op alle andere toestellen zodra die synchroniseren.</p>`:'<p class="mu" style="margin-top:6px">Alles wissen op dit toestel wist alleen dit toestel, niet bij de andere accounts.</p>'}</div>`}[SUBM];
  if(!body){SUBM='';return vInst()}
