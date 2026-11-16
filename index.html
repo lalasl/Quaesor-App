@@ -122,7 +122,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='73',APP_LABEL='1.7.3';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='74',APP_LABEL='1.7.4';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -174,7 +174,10 @@ function newProfile(){const id='c'+Date.now().toString(36);REG.list.push({id,nam
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2800)}
 function modal(h){$('#mbox').innerHTML=h;$('#modal').classList.add('on')}
 function closeM(){$('#modal').classList.remove('on')}
-$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeM()});
+/* Het venster sluit alleen als je naast het venster tikt: begon de klik in het venster (bv. tekst selecteren en de muis schiet erbuiten), dan blijft het open. */
+/* Niet hertekenen terwijl iemand in een veld typt: na het verlaten van het veld volgt de update. */
+var PENDR=false;const typing=()=>{const e=document.activeElement;return !!(e&&/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName)&&e.closest&&e.closest('main'))};document.addEventListener('focusout',()=>{if(PENDR)setTimeout(()=>{if(PENDR&&!typing()){PENDR=false;if(role)render()}},150)});
+let MDOWN=null;$('#modal').addEventListener('pointerdown',e=>{MDOWN=e.target});$('#modal').addEventListener('click',e=>{const d=MDOWN;MDOWN=null;if(e.target.id==='modal'&&d&&d.id==='modal')closeM()});
 function ask(t,yes,fn){ASK=fn;modal(`<h3>${t}</h3><button class="btn" onclick="askOk()">${yes}</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
 function askOk(){const f=ASK;ASK=null;closeM();if(f)f()}
 function theme(){const c=S.club,r=document.documentElement;r.style.setProperty('--ac',c.color);const n=parseInt(c.color.slice(1),16),l=.299*(n>>16)+.587*(n>>8&255)+.114*(n&255);r.style.setProperty('--on',l>150?'#111':'#fff');c.theme==='auto'?r.removeAttribute('data-theme'):r.setAttribute('data-theme',c.theme);document.querySelectorAll('meta[name=theme-color]').forEach(m=>m.setAttribute('content',c.color))}
@@ -501,7 +504,7 @@ async function sync(manual,force){
   if(manual)toast('Alles bijgewerkt')}
  catch(e){S.sync.err=e.message||'Onbekende fout';S.sync.auth=!!e.auth;S.sync.pick=!!e.pick;if(!e.auth)ENS='';save();if(manual)toast(S.sync.err)}
  finally{SYNCING=false;SI=false;if(AGAIN){AGAIN=false;queueSync()}}
- if(changed&&tab!=='boek'&&role)render();else refreshSt()}
+ if(changed&&tab!=='boek'&&role){if(typing())PENDR=true;else render()}else refreshSt()}
 function queueSync(){clearTimeout(QT);QT=setTimeout(()=>sync(false),1500)}
 function statusTap(){sync(true)}
 function stText(){const c=S.club;if(!c.gid)return '';if(!c.gok)return c.helperOnly||role!=='q'?'Opnieuw verbinden: zie Boeken':'Opnieuw verbinden: ga naar Meer';const un=S.tx.filter(t=>!t.synced).length,u=un?` · ${un} nog te versturen`:'';
