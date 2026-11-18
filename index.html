@@ -122,7 +122,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='75',APP_LABEL='1.7.5';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='76',APP_LABEL='1.7.6';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -1037,7 +1037,7 @@ async function syncPot(pull){const c=S.club,g=c.gid;let ch=false;const dirty=S.p
   const k=ck(o);seen.add(id+'|'+k);const x=p.c.find(y=>ck(y)===k);if(!x){p.c.push(o);ch=true}else if(ts>(x.ts||0)){Object.assign(x,o);ch=true}});
  let miss=false;S.pots.forEach(p=>{if(!seen.has(p.id))miss=true;p.c.forEach(x=>{if(!seen.has(p.id+'|'+ck(x)))miss=true})});
  if((dirty||miss||stale)&&role!=='p'){const iso=t=>"'"+new Date(t||Date.now()).toISOString(),V=[];
-  S.pots.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||'')||(x.ts||0)-(y.ts||0)).forEach(p=>{const W=(so,n,v,m,tx,ts,by,info,rm)=>V.push(["'"+p.id,p.date,cell(p.name||''),cell(p.h||''),cell(p.s||''),so,cell(n||''),v,cell(m||''),tx?"'"+tx:'',iso(ts),cell(by||''),cell(info||''),rm?'Ja':'',p.test?'Ja':'']);
+  S.pots.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||'')||(x.ts||0)-(y.ts||0)).forEach(p=>{const W=(so,n,v,m,tx,ts,by,info,rm)=>V.push(["'"+p.id,p.date,cell(p.name||''),cell(p.h||''),cell(p.s||''),so,cell(n||''),v,cell(m||''),tx?"'"+tx:'',iso(ts),cell(by||''),cell(info||''),rm||p.rm?'Ja':'',p.test?'Ja':'']);
    W('Pot','',p.inleg||0,PSL[pSt(p)],'',aTs(p),p.by,p.note,p.rm);
    p.c.slice().sort((a,b)=>(a.ts||0)-(b.ts||0)).forEach(x=>{if(x.t==='g')return W('Gratis',x.n,'','','',x.ts,'','',x.rm);if(x.t==='sp')return W('Sponsoring','Club',x.v||0,'','',x.ts,'','',x.rm);if(x.t==='opt')return W('Gratis meedrinkers','',x.v?1:0,x.v?'Ja':'Nee','',x.ts,'','',x.rm);if(x.t==='cnt')return W('Telling',x.n||'',x.v===''||x.v==null?'':x.v,'Geteld bij afsluiten','',x.ts,'','',x.rm);
     const t=S.tx.find(y=>y.id===x.txid),bk=t&&['cash','payconiq','overschrijving'].includes(t.method)?(t.method==='cash'?'kasboek':'bankboek'):'';
