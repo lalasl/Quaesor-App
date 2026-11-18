@@ -122,7 +122,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='80',APP_LABEL='1.8.0';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='81',APP_LABEL='1.8.1';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -1471,8 +1471,12 @@ async function nOs(v){if(!v){S.nset=Object.assign({},S.nset,{os:false});save();r
 const RMD_T1=['De kas van {club} mist je nog even! Er staat nog {bedrag} open voor {lijst}.\nHoe sneller de kas vol, hoe sneller het volgende vat er staat! 🍻','Pluk de dag… en betaal je schuld 😉 Nog {bedrag} voor {lijst}. Je bent er in een halve minuut vanaf!','Je Quaestor hier met goed nieuws: je kan vandaag schuldenvrij worden! Nog {bedrag} te gaan voor {lijst}. Je bent een topper!','Even een seintje van de kas: er staat nog {bedrag} op jouw naam voor {lijst}. Regel je het vandaag nog? Dan drinken we er straks eentje op! 🍻'];
 const RMD_T2=['Vorige keer stuurde ik je al een berichtje, maar de {bedrag} voor {lijst} staat nog open. Zou je het vandaag even regelen? Dan kan ik je uit mijn lijstje schrappen 😄','Ik weet het, betalen is minder leuk dan cantussen 😉 Maar de {bedrag} voor {lijst} staat nog altijd open. Doe je het vandaag nog even?','Nog eens je Quaestor! De {bedrag} voor {lijst} wacht nog op je. Twee minuten werk, en de kas is je eeuwig dankbaar 🙏'];
 const rmd=()=>{const r=S.club.rmd||{};return {iban:r.iban||'',bc:r.bc||'',t1:(r.t1&&r.t1.length?r.t1:RMD_T1),t2:(r.t2&&r.t2.length?r.t2:RMD_T2)}};
-function remParse(v){const m=String(v==null?'':v).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:.*?(\d+)\s*x)?/i);if(!m)return null;return {d:`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`,n:+(m[4]||1)}}
-const remStr=r=>r&&r.d?`${r.d.split('-').reverse().join('/')} (${r.n||1}x)`:'';
+/* Herinneringen per lid: elke keer met datum en het bedrag dat toen openstond. In de spreadsheet staat de laatste eerst, zodat oudere versies van de app de laatste datum en het aantal blijven lezen. */
+function remParse(v){const S0=String(v==null?'':v),rx=/(\d{1,2})\/(\d{1,2})\/(\d{4})\s*(?:\(([^)]*)\))?/g,h=[];let m,n=0;
+ while((m=rx.exec(S0))){const d=`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`,p=m[4]||'',x=p.match(/(\d+)\s*x/i),am=p.match(/€\s*([\d.]*\d(?:,\d{1,2})?)/);if(x&&!n)n=+x[1];h.push({d,a:am?+am[1].replace(/\./g,'').replace(',','.'):null})}
+ if(!h.length)return null;h.sort((a,b)=>a.d.localeCompare(b.d));return {d:h[h.length-1].d,n:Math.max(n,h.length),h}}
+const remStr=r=>{if(!r||!r.d)return '';const H=(r.h&&r.h.length?r.h:[{d:r.d,a:null}]).slice().sort((a,b)=>b.d.localeCompare(a.d)),f=d=>d.split('-').reverse().join('/'),am=a=>a!=null?'€ '+fmt2(a):'';
+ const L=H[0];return `${f(L.d)} (${r.n||H.length}x${L.a!=null?', '+am(L.a):''})`+(H.length>1?' · eerder: '+H.slice(1).map(e=>f(e.d)+(e.a!=null?` (${am(e.a)})`:'')).join(', '):'')};
 function telNorm(s){s=String(s||'').trim();if(!s)return {why:'Geen gsm-nummer bekend.'};if(/geen\s*contact/i.test(s))return {no:1,why:'Wenst geen contact.'};
  let d=s.replace(/\(0\)/g,'').replace(/\D/g,'');if(d.length<8)return {why:'Geen geldig gsm-nummer ('+s+').'};
  if(d.startsWith('00'))d=d.slice(2);else if(d[0]==='0')d='32'+d.slice(1);else if(d.length===9&&d[0]==='4')d='32'+d;
@@ -1490,14 +1494,14 @@ function rmdMsg(o){const m=memOf(o.name),R=rmd(),follow=!!(m&&m.rem&&m.rem.n),T=
  return `Waarde ${nm},\n\n${f(t)}${pay.length?'\n\n'+pay.join('\n'):''}\n\nMet plukkende groeten\n${WHO||S.club.names.q||''}`}
 const nameF=n=>{n=String(n||'').trim();return /[A-Z]/.test(n)&&!/[a-zà-ÿ]/.test(n)?n.charAt(0)+n.slice(1).toLowerCase():n};
 function rmdOther(n){const m=memOf(n),R=rmd(),k=n+(m&&m.rem&&m.rem.n?'|2':'|1');RIDX[k]=(RIDX[k]||0)+1;render()}
-function rmdDone(n){const m=memOf(n);if(!m)return;const t=today();m.rem={d:t,n:(m.rem&&m.rem.d!==t?(m.rem.n||0)+1:(m.rem&&m.rem.n)||1)};m.remDirty=true;save();queueSync();setTimeout(render,600)}
+function rmdDone(n){const m=memOf(n);if(!m)return;const t=today(),o=memDebt(n),a=o?Math.round(o.tot*100)/100:null,r=m.rem||{},H=(r.h&&r.h.length?r.h:(r.d?[{d:r.d,a:null}]:[])).map(e=>Object.assign({},e)),L=H[H.length-1];if(L&&L.d===t)L.a=a;else H.push({d:t,a});m.rem={d:t,n:L&&L.d===t?(r.n||H.length):(r.n||H.length-1)+1,h:H.slice(-30)};m.remDirty=true;save();queueSync();setTimeout(render,600)}
 const daysAgo=d=>d?Math.floor((Date.parse(today())-Date.parse(d))/864e5):1e9;
 function rmdTodo(){return Object.values(debts()).filter(o=>{const m=memOf(o.name);return m&&telNorm(m.tel).n&&daysAgo(m.rem&&m.rem.d)>=7}).sort((a,b)=>b.tot-a.tot).map(o=>o.name)}
 function rmdStart(){if(TEST())return toast('In testmodus worden geen herinneringen verstuurd');RQ=rmdTodo();RQI=0;if(!RQ.length)return toast('Iedereen met een gsm-nummer kreeg de voorbije week al een herinnering');SDN=RQ[0];render();scrollTo(0,0)}
 function rmdNext(d){RQI+=d;if(RQI<0)RQI=0;if(RQI>=RQ.length){RQ=[];SDN='';toast('Klaar met herinneringen');return render()}SDN=RQ[RQI];render();scrollTo(0,0)}
 function rmdCard(o){if(role!=='q')return '';if(TEST())return '<div class="card"><p class="mu" style="margin:0">In testmodus worden geen herinneringen verstuurd.</p></div>';const m=memOf(o.name),t=telNorm(m&&m.tel),R=rmd(),r=m&&m.rem;
  const q=RQ.length?`<div class="row" style="border:0;padding:0 0 8px"><b>Herinnering ${RQI+1} van ${RQ.length}</b><span><button class="sm" onclick="rmdNext(1)">${RQI+1<RQ.length?'Volgende →':'Klaar'}</button><button class="sm" onclick="RQ=[];render()">Stoppen</button></span></div>`:'';
- const last=r&&r.d?`Laatste herinnering: ${r.d.split('-').reverse().join('/')}${r.n>1?` (${r.n}e keer)`:''}.`:'Nog geen herinnering gestuurd.';
+ const RH=r&&r.d?(r.h&&r.h.length?r.h:[{d:r.d,a:null}]).slice().sort((a,b)=>b.d.localeCompare(a.d)):[],last=RH.length?`<b>${r.n||RH.length} ${(r.n||RH.length)===1?'herinnering':'herinneringen'} gestuurd</b>${(r.n||0)>RH.length?` (van ${(r.n||0)-RH.length} oudere is de datum niet bewaard)`:''}:<span style="display:block;margin-top:4px">${RH.map((e,i)=>`${fdt(e.d)}${e.a!=null?` · toen ${eur(e.a)} open`:''}${i===0?' <span class="tag">laatste</span>':''}`).join('<br>')}</span>`:'Nog geen herinnering gestuurd.';
  if(!t.n)return `<div class="card">${q}<h2>Herinnering sturen</h2><p class="mu">${esc(t.why)}${t.no?'':' Voeg het nummer toe bij Leden → Lijst plakken, of in kolom C van het tabblad Leden.'}</p><p class="mu">${last}</p></div>`;
  const msg=rmdMsg(o),e=encodeURIComponent(msg);
  return `<div class="card">${q}<h2>Herinnering sturen</h2><p class="mu" style="margin-top:-6px">${last}${!R.iban?' <span class="neg">Vul eerst je rekeningnummer in bij Meer → Herinneringen.</span>':''}</p>
