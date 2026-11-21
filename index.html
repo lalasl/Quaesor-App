@@ -114,7 +114,7 @@ const effR=u=>isDev(u.e)?'q':u.r==='d'?'q':u.r;
 const SCOPE='https://www.googleapis.com/auth/drive.file openid email';
 const TAB_PT='Potten',HEAD_PT=['Pot-ID','Datum','Pot','Hoofdcategorie','Subcategorie','Soort','Persoon','Bedrag','Betaalwijze of status','Boeking-ID','Tijdstip','Door','Info','Verwijderd','Testmodus'];
 const TAB_A='Aanwezigheid',HEAD_A=['Activiteit-ID','Datum','Hoofdcategorie','Subcategorie','Lid','Tijdstip','Door','Notitie','Verwijderd','Testmodus'];
-var POT='',PQ='',BKD=null,BKL=false,OVT='dag',ACT='',AQ='',NOTE='',ABACK='',RV='',RT='';
+var LASTVK='',POT='',PQ='',BKD=null,BKL=false,OVT='dag',ACT='',AQ='',NOTE='',ABACK='',RV='',RT='';
 const TAB_OV='Schulden (overzicht)',TAB_B='Boekingen',TAB_L='Leden',TAB_P='Prijzen',TAB_I='Instellingen',TAB_BN='Bonnetjes',TAB_BF='Bonnetjes-foto';
 const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingediend door','Ingediend op','Status','Boeking-ID','Voorgeschoten door','Testmodus'];
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
@@ -122,7 +122,7 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='83',APP_LABEL='1.8.3';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='84',APP_LABEL='1.8.4';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -394,24 +394,25 @@ async function syncMembers(){const gid=S.club.gid;
   if(del.length){const mt=await api(`/${gid}?fields=sheets.properties(sheetId,title)`),sh=(mt.sheets||[]).find(x=>x.properties.title===TAB_L);
    if(sh)await api(`/${gid}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:del.sort((x,y)=>y-x).map(i=>({deleteDimension:{range:{sheetId:sh.properties.sheetId,dimension:'ROWS',startIndex:i+1,endIndex:i+2}}}))})})}
   S.delM=[];save()}
- const d=await api(`/${gid}/values/${enc(rng(TAB_L,'A2:F'))}`),rows=d.values||[],idx=new Map();let changed=false;const upd=[],out=[],mine=new Set(),gone=new Set();
+ const d=await api(`/${gid}/values/${enc(rng(TAB_L,'A2:G'))}`),rows=d.values||[],idx=new Map();let changed=false;const upd=[],out=[],mine=new Set(),gone=new Set();
  /* Kolom E bevat het vaste ID van elk lid. Zo herkent de app een clubnaam die in de spreadsheet werd aangepast als hetzelfde lid. */
  const byId=new Map(S.members.map(m=>[m.id,m]));
  rows.forEach((r,i)=>{const n=String(r[0]||'').trim(),id=String(r[4]==null?'':r[4]).trim(),m=id&&byId.get(id);if(!n||!m||m.ren||uk(m.name)===uk(n))return;
   if(S.members.some(x=>x!==m&&uk(x.name)===uk(n)))return;renameM(m,n);changed=true});
- rows.forEach((r,i)=>{const n=String(r[0]||'').trim();if(n&&!idx.has(n.toLowerCase()))idx.set(n.toLowerCase(),{row:i+2,st:cleanSt(r[1]),tel:String(r[2]==null?'':r[2]).trim(),rem:remParse(r[3]),id:String(r[4]==null?'':r[4]).trim(),test:isJa(r[5])})});
+ rows.forEach((r,i)=>{const n=String(r[0]||'').trim();if(n&&!idx.has(n.toLowerCase()))idx.set(n.toLowerCase(),{row:i+2,st:cleanSt(r[1]),tel:String(r[2]==null?'':r[2]).trim(),rem:remParse(r[3]),id:String(r[4]==null?'':r[4]).trim(),test:isJa(r[5]),iban:ibanFmt(r[6])})});
  S.members.forEach(m=>{if(!m.ren)return;const e=idx.get(m.ren.toLowerCase());if(e&&!idx.has(m.name.toLowerCase())){upd.push({range:rng(TAB_L,'A'+e.row),values:[[m.name]]});idx.delete(m.ren.toLowerCase());idx.set(m.name.toLowerCase(),e);rows[e.row-2][0]=m.name}delete m.ren});
  S.members.forEach(m=>{const k=m.name.toLowerCase();mine.add(k);const e=idx.get(k);
   if(!e){if(m.on&&!m.dirty){gone.add(m.id);return}out.push(m);m.dirty=false;m.on=true;return}
   m.on=true;if(!e.id)upd.push({range:rng(TAB_L,'E'+e.row),values:[[m.id]]});else if(e.id!==m.id&&!byId.has(e.id)){const old=m.id;byId.delete(old);m.id=e.id;byId.set(m.id,m);S.tx.forEach(t=>{if(t.mid===old)t.mid=m.id});if(B.mid===old)B.mid=m.id;changed=true}
   if(m.telDirty){upd.push({range:rng(TAB_L,'C'+e.row),values:[[m.tel||'']]});m.telDirty=false}else if((m.tel||'')!==e.tel){m.tel=e.tel;changed=true}
+  if(m.ibanDirty){upd.push({range:rng(TAB_L,'G'+e.row),values:[[m.iban||'']]});m.ibanDirty=false}else if((m.iban||'')!==e.iban){m.iban=e.iban;changed=true}
   if(m.remDirty){upd.push({range:rng(TAB_L,'D'+e.row),values:[[remStr(m.rem)]]});m.remDirty=false}else if(JSON.stringify(m.rem||null)!==JSON.stringify(e.rem)){m.rem=e.rem;changed=true}
   if(m.dirty){if(sk(e.st)!==sk(m.status))upd.push({range:rng(TAB_L,'B'+e.row),values:[[m.status]]});m.dirty=false}
   else if(e.st&&sk(e.st)!==sk(m.status)){m.status=addSt(e.st);changed=true}});
  if(gone.size){S.members=S.members.filter(m=>!gone.has(m.id));changed=true}
- idx.forEach((e,k)=>{if(mine.has(k))return;if(e.test&&!TEST())return;const n=String(rows[e.row-2][0]).trim(),id=e.id&&!byId.has(e.id)?e.id:uid();if(id!==e.id)upd.push({range:rng(TAB_L,'E'+e.row),values:[[id]]});S.members.push({id,name:n,status:e.st?addSt(e.st):S.statuses[0],on:true,tel:e.tel,rem:e.rem,test:e.test?1:0});changed=true});
+ idx.forEach((e,k)=>{if(mine.has(k))return;if(e.test&&!TEST())return;const n=String(rows[e.row-2][0]).trim(),id=e.id&&!byId.has(e.id)?e.id:uid();if(id!==e.id)upd.push({range:rng(TAB_L,'E'+e.row),values:[[id]]});S.members.push({id,name:n,status:e.st?addSt(e.st):S.statuses[0],on:true,tel:e.tel,rem:e.rem,iban:e.iban,test:e.test?1:0});changed=true});
  if(upd.length)await api(`/${gid}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'RAW',data:upd})});
- if(out.length){await append(TAB_L,'A:F',out.map(m=>[cell(m.name),cell(m.status),m.tel||'',remStr(m.rem),m.id,m.test?'Ja':'']));out.forEach(m=>{m.telDirty=false;m.remDirty=false})}
+ if(out.length){await append(TAB_L,'A:G',out.map(m=>[cell(m.name),cell(m.status),m.tel||'',remStr(m.rem),m.id,m.test?'Ja':'',m.iban||'']));out.forEach(m=>{m.telDirty=false;m.remDirty=false;m.ibanDirty=false})}
  save();return changed}
 const pnum=v=>{if(v===''||v==null)return null;const n=typeof v==='number'?v:parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null};
 async function hasTab(t){const m=await api(`/${S.club.gid}?fields=sheets.properties.title`);return (m.sheets||[]).some(x=>x.properties.title===t)}
@@ -546,6 +547,15 @@ function unlink(){ask('Spreadsheet ontkoppelen? Je boekingen blijven op dit toes
 window.addEventListener('online',()=>{refreshSt();queueSync()});
 window.addEventListener('offline',refreshSt);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)queueSync()});
+/* Terugknop van de gsm of de browser: eerst binnen de app een stap terug. Pas op het beginscherm verlaat je de app. */
+function navBack(){const mo=$('#modal');if(mo&&mo.classList.contains('on')){closeM();return true}
+ if(typeof role==='undefined'||!role||!S||!S.club||!S.club.gid)return false;
+ if(SDN||RQ.length){SDN='';RQ=[]}else if(POT){POT=''}else if(tab==='dag'&&OVT==='act'&&ACT){ACT='';NOTE=''}else if(tab==='acc'){tab='inst'}else if(SUBM){SUBM=''}else if(tab==='dag'&&OVT!=='dag'){OVT='dag'}
+ else{const home=role==='p'?(feat('bon')?'bon':'dag'):'boek';if(tab===home)return false;tab=home;ABACK=''}
+ render();toTop();return true}
+function backArm(){try{if(!(history.state&&history.state.qa===2)){if(!(history.state&&history.state.qa===1))history.replaceState({qa:1},'');history.pushState({qa:2},'')}}catch(e){}}
+window.addEventListener('popstate',()=>{let ok=false;try{ok=navBack()}catch(e){}if(ok)backArm();else{try{history.back()}catch(e){}}});
+setTimeout(backArm,0);
 setInterval(()=>{if(!document.hidden)sync(false)},45000);
 
 /* ================= START EN INLOGGEN ================= */
@@ -563,7 +573,7 @@ function joinAsk(){$('#app').innerHTML=`<div class="auth"><h2>Uitnodiging</h2><p
 function addJoin(){save();const j=JOIN;newProfile();JOIN=j;joinScreen()}
 function pasteInv(){modal(`<h3>Uitnodigingslink plakken</h3><p class="mu">Kopieer de link die de Quaestor je stuurde en plak hem hier. Handig op een iPhone, waar de app op je beginscherm los staat van Safari.</p><label>Link<input id="pil" autocomplete="off" placeholder="https://…#join=…" onkeydown="if(event.key==='Enter')pasteInvOk()"></label><button class="btn" onclick="pasteInvOk()">Verder</button>`)}
 function pasteInvOk(){const j=parseJoin($('#pil').value);if(!j)return toast('Dit is geen geldige uitnodigingslink');closeM();JOIN=j;start()}
-function ignoreJoin(){JOIN=null;try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}start()}
+function ignoreJoin(){JOIN=null;try{history.replaceState(history.state,'',location.pathname+location.search)}catch(e){}start()}
 function joinScreen(){$('#app').innerHTML=`<div class="auth"><h2>Uitnodiging</h2><p class="mu">Je bent uitgenodigd om mee te werken bij <b>${esc(JOIN.n||'een club')}</b>. Meld je aan bij Google en kies de spreadsheet die de Quaestor met je deelde. Daarna maak je je eigen account voor deze club, of meld je je aan als je er al een hebt.</p><div class="err" id="re"></div><button class="btn" onclick="joinPick()">Spreadsheet kiezen</button><button class="btn ghost" style="margin-top:8px" onclick="restoreCancel()">Annuleren</button><p class="mu" style="margin-top:16px"><a href="privacy.html" target="_blank" rel="noopener">Privacyverklaring</a></p></div>`;RST={fresh:false,join:true,inv:JOIN.i}}
 function joinPick(){const o=JOIN||{},sx=v=>typeof v==='string'&&/^[\w.-]{5,120}$/.test(v)?v:'',col=/^#[0-9a-f]{6}$/i.test(o.c||'')?o.c:'#8b1e3f';
  Object.assign(S.club,{name:String(o.n||'Club').slice(0,60),color:col,catTab:String(o.t||'Categorieën').slice(0,60),cid:sx(o.ci),akey:sx(o.ak),appid:sx(o.ap)});theme();
@@ -684,7 +694,7 @@ let RST=null;
 function restoreScreen(fresh){RST={fresh:!!fresh};
  $('#app').innerHTML=`<div class="auth"><h2>Bestaande club ophalen</h2><p class="mu">Gebruik dit op een nieuw toestel voor een club die al bestaat. Je meldt aan bij Google en kiest de spreadsheet van de club. Ben je al lid van het team, dan word je meteen aangemeld. Anders maak je een account.</p><div class="err" id="re"></div><button class="btn" onclick="restorePick()">Spreadsheet kiezen</button><button class="btn ghost" style="margin-top:8px" onclick="restoreCancel()">Annuleren</button></div>`}
 function restoreCancel(){const f=RST&&RST.fresh,jn=RST&&RST.join;RST=null;if(S.club.gid&&!role&&!S.users.length&&!S.club.pinQh){S.club.gid='';S.club.gok=false}
- if(jn){JOIN=null;try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}if(emptyClub(S)&&REG.list.length>1){removeProfile(REG.active);S=null;loadProfile(REG.list[REG.list.length-1].id)}return start()}
+ if(jn){JOIN=null;try{history.replaceState(history.state,'',location.pathname+location.search)}catch(e){}if(emptyClub(S)&&REG.list.length>1){removeProfile(REG.active);S=null;loadProfile(REG.list[REG.list.length-1].id)}return start()}
  if(f){removeProfile(REG.active);S=null;loadProfile(REG.list[REG.list.length-1].id);start()}else setup()}
 async function restorePick(){const e=m=>{const x=$('#re');if(x)x.textContent=m};e('');
  if(!cid())return e('Geen Google Client ID ingesteld. Zie de handleiding.');
@@ -701,19 +711,21 @@ async function restorePick(){const e=m=>{const x=$('#re');if(x)x.textContent=m};
   S.club.closedAt=0;S.club.closed=0;S.club.setDirty=true;S.club.reopen=true;toast('Club heropend')}
  setStatuses(Array.isArray(m['Statussen'])?m['Statussen']:S.statuses);takeAcc(m);
  try{SI=true;await pullUsers()}catch(x){}finally{SI=false}
- RST=null;JOIN=null;LPULL=true;try{history.replaceState(null,'',location.pathname+location.search)}catch(x){}save();theme();
+ RST=null;JOIN=null;LPULL=true;try{history.replaceState(history.state,'',location.pathname+location.search)}catch(x){}save();theme();
  if(TEMAIL||haveTok()){try{SI=true;const em=await gEmail();if(isDev(em)){const x=S.users.find(u=>u.e===em);SI=false;if(x){devFix(x);return logIn(x)}return newAcc('d')}const u=findE(em);if(u&&!u.st){SI=false;return logIn(u)}}catch(x){}finally{SI=false}}
  if(!actU().length&&!legacyPins())return newAcc('h');if(TEMAIL&&!legacyPins())return accAsk(TEMAIL);login()}
 
 /* ================= OPBOUW ================= */
+function toTop(){const m=document.querySelector('#app main');if(m)m.scrollTop=0;try{window.scrollTo(0,0)}catch(e){}}
 function render(){if(S.club.blocked)return blockAfter();const Q=role==='q',P=role==='p';
  if(!Q&&!P&&['inst','acc'].includes(tab))tab='boek';if(P&&['inst','acc'].includes(tab))tab='bon';if(P&&!['bon','me','schuld','leden','dag','meld'].includes(tab))tab=feat('bon')?'bon':'dag';if(Q&&tab==='me')tab='boek';if(!Q&&tab==='vandaag')tab='dag';if(tab==='pot'&&(P||!feat('pot')))tab=P?'dag':'boek';if(tab==='bon'&&!feat('bon'))tab=P?'dag':'boek';
  let nb=Q&&feat('bon')?bonTodo().length:0,tabs=Q?[['boek','Boeken'],['dag','Overzicht'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'+(nb?' ('+nb+')':'')],['inst','Meer']]:P?[['bon','Bonnen'],['dag','Overzicht'],['schuld','Schulden'],['leden','Leden'],['me','Account']]:[['boek','Boeken'],['dag','Overzicht'],['schuld','Schulden'],['leden','Leden'],['bon','Bonnen'],['me','Account']];
  tabs=tabs.filter(t=>t[0]!=='bon'||feat('bon'));if(!P&&feat('pot')){const pw=Q?potWait():0;tabs.splice(tabs.length-1,0,['pot','Pot'+(pw?' ('+pw+')':'')])}
  const v={pot:vPot,boek:vBoek,vandaag:vVandaag,dag:vOver,schuld:vSchuld,leden:vLeden,inst:vInst,acc:vAcc,bon:vBon,me:vMe,meld:vMeld}[tab]();
+ const vk=[tab,SDN,POT,ACT,OVT,SUBM,RQ.length?RQI:''].join('|'),om=document.querySelector('#app main'),sy=om?om.scrollTop:0;
  $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${ISDEV?'Developer':HQ()?'Hoofdquaestor':RN[role]||''}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div>${bellHtml()}<button onclick="logout()">Afmelden</button></header>${testBar()}
  <main>${v}</main><nav>${tabs.map(t=>`<button class="${tab===t[0]||(tab==='acc'&&t[0]==='inst')?'on':''}" onclick="tab='${t[0]}';SDN='';SUBM='';RQ=[];ABACK='';POT=tab==='pot'?POT:'';render()">${t[1]}</button>`).join('')}</nav>`;
- document.documentElement.classList.toggle('tm',TEST());if(tab!=='schuld')SDN='';if(tab==='boek')sug();if(tab==='leden')ml();refreshSt()}
+ document.documentElement.classList.toggle('tm',TEST());if(tab!=='schuld')SDN='';if(tab==='boek')sug();if(tab==='leden')ml();refreshSt();{const nm=document.querySelector('#app main');if(nm&&vk===LASTVK&&sy)nm.scrollTop=sy;LASTVK=vk}}
 const row=(t,st)=>`<div class="row${t.void?' void':''}"><div><b>${esc(t.name||'Zonder naam')}</b>${t.exp&&!t.storno?` <span class="tag">${t.ref?'Terugbetaling':'Uitgave'}</span>`:''}${t.test?' <span class="tag tmtag">Test</span>':''}<div class="mu">${esc(t.h)}${t.s?' · '+esc(t.s):''} · ${ML[t.method]}${t.desc?' · '+esc(t.desc):''}${t.adv&&!t.ref?' · door '+esc(t.adv):''}${t.who?' · '+esc(t.who):''}${t.storno?' · annulering':''}</div></div><div class="amt ${t.v<0?'neg':''}">${eur(t.v)}${st&&!t.void&&!t.storno?`<button class="sm" onclick="storno('${t.id}')">Annuleren</button>`:''}</div></div>`;
 const empty=t=>`<p class="mu">${t}</p>`;
 const opts=(l,sel,blank)=>(blank?'<option value="">(geen)</option>':'')+l.map(x=>`<option${x===sel?' selected':''}>${esc(x)}</option>`).join('');
@@ -831,11 +843,11 @@ function attPeople(a){const sp=a.s?14:1,lo=dAdd(a.date,a.s?-sp:0),hi=dAdd(a.date
   o.st=paid.length?'ok':deb.length?'schuld':'open';o.m=[...new Set(paid.map(t=>ML[t.method]))].join(', ')});
  const ord={open:0,schuld:1,ok:2};return P.sort((x,y)=>ord[x.st]-ord[y.st]||x.n.localeCompare(y.n))}
 function attToday(){if(!feat('att'))return '';const L=S.att.filter(a=>!a.rm&&a.date===today());if(!L.length)return '';
- return L.map(a=>{const P=attPeople(a),o=P.filter(p=>p.st==='open').length;return `<div class="card banner"><div class="row" style="padding:0;border:0;align-items:center"><div><b>Aanwezigheidslijst: ${esc(actName(a))}</b><div class="mu">${P.length} aanwezig · ${o?`<span class="neg">${o} nog niet geboekt</span>`:'iedereen is geboekt'}</div></div><button class="sm" style="margin:0" onclick="tab='dag';OVT='act';ACT='${a.id}';render();scrollTo(0,0)">Openen</button></div></div>`}).join('')}
+ return L.map(a=>{const P=attPeople(a),o=P.filter(p=>p.st==='open').length;return `<div class="card banner"><div class="row" style="padding:0;border:0;align-items:center"><div><b>Aanwezigheidslijst: ${esc(actName(a))}</b><div class="mu">${P.length} aanwezig · ${o?`<span class="neg">${o} nog niet geboekt</span>`:'iedereen is geboekt'}</div></div><button class="sm" style="margin:0" onclick="tab='dag';OVT='act';ACT='${a.id}';render();toTop()">Openen</button></div></div>`}).join('')}
 function vOver(){const segs=[['dag','Per dag'],['act','Aanwezigheid'],['kas','Kassa'],['rap','Verslag']].filter(x=>(x[0]!=='act'||feat('att'))&&(x[0]!=='rap'||feat('rap'))&&(x[0]!=='kas'||(feat('kas')&&AW())));if(!segs.some(x=>x[0]===OVT))OVT='dag';
- return `<div class="seg np">${segs.map(x=>`<button class="${OVT===x[0]?'on':''}" onclick="OVT='${x[0]}';ACT='';render();scrollTo(0,0)">${x[1]}</button>`).join('')}</div>`+(OVT==='act'?vAct():OVT==='rap'?vRap():OVT==='kas'?vKas():vDag())}
+ return `<div class="seg np">${segs.map(x=>`<button class="${OVT===x[0]?'on':''}" onclick="OVT='${x[0]}';ACT='';render();toTop()">${x[1]}</button>`).join('')}</div>`+(OVT==='act'?vAct():OVT==='rap'?vRap():OVT==='kas'?vKas():vDag())}
 function vAct(){const ro=!AW()||!!(curAct()&&TEST()&&!curAct().test),L=S.att.filter(a=>!a.rm).sort((x,y)=>(y.date||'').localeCompare(x.date||'')||(y.ts||0)-(x.ts||0)),a=curAct();
- if(!a){ACT='';return `<div class="card"><h2>Aanwezigheidslijsten</h2><p class="mu">Houd tijdens een activiteit bij wie er binnenkomt. Je ziet meteen wie nog niet geboekt is, zodat niemand vergeten wordt. Wie al geboekt is voor de activiteit, staat er vanzelf op.</p>${ro?'':'<button class="btn" onclick="actNew()">Nieuwe aanwezigheidslijst</button>'}</div>`+(L.length?`<div class="card">${L.slice(0,40).map(x=>{const P=attPeople(x),o=P.filter(p=>p.st==='open').length;return `<button class="drow" onclick="ACT='${x.id}';render();scrollTo(0,0)"><span><b>${esc(actName(x))}</b><span class="mu" style="font-size:13px;display:block">${fdt(x.date)} · ${P.length} aanwezig${o?` · <span class="neg">${o} nog niet geboekt</span>`:''}${x.note?' · notitie':''}</span></span><span aria-hidden="true">›</span></button>`}).join('')}</div>`:'')}
+ if(!a){ACT='';return `<div class="card"><h2>Aanwezigheidslijsten</h2><p class="mu">Houd tijdens een activiteit bij wie er binnenkomt. Je ziet meteen wie nog niet geboekt is, zodat niemand vergeten wordt. Wie al geboekt is voor de activiteit, staat er vanzelf op.</p>${ro?'':'<button class="btn" onclick="actNew()">Nieuwe aanwezigheidslijst</button>'}</div>`+(L.length?`<div class="card">${L.slice(0,40).map(x=>{const P=attPeople(x),o=P.filter(p=>p.st==='open').length;return `<button class="drow" onclick="ACT='${x.id}';render();toTop()"><span><b>${esc(actName(x))}</b><span class="mu" style="font-size:13px;display:block">${fdt(x.date)} · ${P.length} aanwezig${o?` · <span class="neg">${o} nog niet geboekt</span>`:''}${x.note?' · notitie':''}</span></span><span aria-hidden="true">›</span></button>`}).join('')}</div>`:'')}
  const P=attPeople(a),cnt=k=>P.filter(p=>p.st===k).length,op=cnt('open');
  return `<button class="back" onclick="ACT='';NOTE='';render()">← Alle lijsten</button><div class="card"><h2 style="margin-bottom:2px">${esc(actName(a))}</h2><div class="mu">${fdt(a.date)}${a.s?' · '+esc(a.h):''}</div>
  <div class="grid" style="margin:12px 0 0"><div class="stat">Aanwezig<b>${P.length}</b></div><div class="stat">Betaald<b>${cnt('ok')}</b></div><div class="stat">Op de schuldenlijst<b>${cnt('schuld')}</b></div><div class="stat"${op?' style="border-color:var(--er)"':''}>Nog niet geboekt<b${op?' class="neg"':''}>${op}</b></div></div></div>
@@ -891,8 +903,8 @@ async function purgeTestSheet(){const c=S.club;if(role!=='q'||TEST()||!c.gid||!c
  if(bids.size&&sid(TAB_BF)!=null){const d=await api(`/${g}/values/${enc(rng(TAB_BF,'A2:A'))}`),out=[];(d.values||[]).forEach((r,i)=>{if(bids.has(String(r[0]||'').trim().replace(/^'/,'')))out.push(i+1)});del(sid(TAB_BF),out)}
  if(R.length)await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:R})});
  c.tpDone=c.test.ts;c.tpAt=Date.now();save()}
-async function testCols(){for(const [tab,a1] of [[TAB_B,'P1'],[TAB_L,'F1']]){const u=`/${S.club.gid}/values/${enc(rng(tab,a1))}`,d=await api(u);
- if(!(d.values&&d.values[0]&&String(d.values[0][0]||'').trim()))await api(u+'?valueInputOption=RAW',{method:'PUT',body:JSON.stringify({values:[['Testmodus']]})})}}
+async function testCols(){for(const [tab,a1,hd] of [[TAB_B,'P1','Testmodus'],[TAB_L,'F1','Testmodus'],[TAB_L,'G1','Rekeningnummer']]){const u=`/${S.club.gid}/values/${enc(rng(tab,a1))}`,d=await api(u);
+ if(!(d.values&&d.values[0]&&String(d.values[0][0]||'').trim()))await api(u+'?valueInputOption=RAW',{method:'PUT',body:JSON.stringify({values:[[hd]]})})}}
 function testCount(){const f=o=>o&&o.test;return{tx:S.tx.filter(f).length,mem:S.members.filter(f).length,att:S.att.filter(f).length,pot:S.pots.filter(f).length,bon:S.bons.filter(f).length}}
 function testBar(){if(!TEST())return '';const t=S.club.test;return `<div class="tmbar"><b>TESTMODUS</b> · alles wat je nu doet is een oefening en wordt verwijderd zodra de testmodus uitgaat${t.by?` · aangezet door ${esc(t.by)}`:''}</div>`}
 function testCard(){const can=canFeat(),on=TEST(),k=testCount(),n=k.tx+k.mem+k.att+k.pot+k.bon;
@@ -938,7 +950,7 @@ function potRow(t,canX){return `<div class="row${t.void?' void':''}"><div><b>${e
 
 function vPot(){const L=S.pots.filter(p=>!p.rm).sort((x,y)=>(y.date||'').localeCompare(x.date||'')||(y.ts||0)-(x.ts||0)),p=curPot();
  if(!p){POT='';return `<div class="card"><h2>Pot</h2><p class="mu">Een pot is gezamenlijk geld voor een kroegentocht of activiteit. Leden leggen in, aspiranten drinken gratis mee en de club kan een bedrag sponsoren. Tijdens de avond schrijf je hier op wie inlegt en wat er betaald wordt.</p>${RO()?'':'<button class="btn" onclick="potNew()">Nieuwe pot</button>'}</div>`+
-  (L.length?`<div class="card">${L.slice(0,40).map(x=>{const k=potCalc(x),st=pSt(x);return `<button class="drow" onclick="POT='${x.id}';render();scrollTo(0,0)"><span><b>${esc(x.name||'Pot')}</b>${x.test?' <span class="tag tmtag">Test</span>':''}${st==='wacht'?' <span class="tag warn">Ingediend</span>':''}<span class="mu" style="font-size:13px;display:block">${fdt(x.date)} · ${st==='dicht'?'afgesloten':st==='open'?'open':'ingediend, wacht op goedkeuring'} · ingelegd ${eur(k.inl)} · uitgegeven ${eur(k.out)}</span></span><span aria-hidden="true">›</span></button>`}).join('')}</div>`:'')}
+  (L.length?`<div class="card">${L.slice(0,40).map(x=>{const k=potCalc(x),st=pSt(x);return `<button class="drow" onclick="POT='${x.id}';render();toTop()"><span><b>${esc(x.name||'Pot')}</b>${x.test?' <span class="tag tmtag">Test</span>':''}${st==='wacht'?' <span class="tag warn">Ingediend</span>':''}<span class="mu" style="font-size:13px;display:block">${fdt(x.date)} · ${st==='dicht'?'afgesloten':st==='open'?'open':'ingediend, wacht op goedkeuring'} · ingelegd ${eur(k.inl)} · uitgegeven ${eur(k.out)}</span></span><span aria-hidden="true">›</span></button>`}).join('')}</div>`:'')}
  const k=potCalc(p),st=pSt(p),Q=role==='q',lk=TEST()&&!p.test,ed=!potRO(p)&&(st==='open'||(st==='wacht'&&Q)),qx=Q&&st!=='dicht'&&!lk,cn=k.cnt;
  const big=(l,v,sub,red)=>`<div class="stat"${red?' style="border-color:var(--er)"':''}>${l}<b${red?' class="neg"':''}>${v}</b>${sub?`<span class="mu" style="font-size:12px;display:block">${sub}</span>`:''}</div>`;
  /* Resultaat in gewone woorden */
@@ -1341,7 +1353,7 @@ function bonEditOk(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q'||lock
 function bonReject(id){const b=S.bons.find(x=>x.id===id);if(!b||lockR(b))return;ask(`Bonnetje van ${esc(b.shop)} (${eur(b.total)}) afwijzen? Het blijft bewaard in de spreadsheet met status Afgewezen.`,'Afwijzen',()=>{b.status='Afgewezen';b.dirty=!!b.synced;save();render();queueSync()})}
 const advOpen=()=>S.tx.filter(t=>t.method==='voorschot'&&t.exp&&!t.void&&!t.storno&&!t.paidBy);
 function refund(id){const d=S.tx.find(x=>x.id===id);if(!d)return;const X=-d.v,o=d.adv?memDebt(d.adv):null,D=o?o.tot:0,Y0=Math.round(Math.min(D,X)*100)/100;
- modal(`<h3>Terugbetalen</h3><p>${esc(d.adv)} schoot ${eur(X)} voor: ${esc(d.desc||d.name)}</p>
+ modal(`<h3>Terugbetalen</h3><p>${esc(d.adv)} schoot ${eur(X)} voor: ${esc(d.desc||d.name)}</p>${ibanLine(memOf(d.adv),'Rekeningnummer van '+esc(d.adv))}${role==='q'&&memOf(d.adv)&&!memOf(d.adv).iban?'<p class="mu" style="font-size:13px">Geen rekeningnummer bekend. Voeg het toe bij Leden › het lid › Aanpassen.</p>':''}
  ${D>.005?`<div class="stat" style="margin:4px 0 10px"><span class="mu">${esc(o.name)} heeft nog een openstaande schuld</span><b>${eur(D)}</b></div>
  <label class="tg" style="border:0"><span>Verrekenen met de schuld<small>Een deel van het voorschot betaalt de schuld af. Je maakt alleen het verschil over.</small></span><input type="checkbox" id="vk" checked onchange="refPrev('${id}')"></label>
  <div id="vkw"><label>Bedrag verrekenen<input id="va" inputmode="decimal" value="${fmt2(Y0)}" oninput="refPrev('${id}')"></label><div id="pp" style="margin:-4px 0 10px"></div></div>`:''}
@@ -1449,7 +1461,7 @@ async function notifyRun(){const c=S.club,Q=role==='q',now=Date.now();if(!S.nSin
  if(!Q)tx.filter(t=>t.storno&&uk(t.who||'')!==me).forEach(t=>{const o=S.tx.find(x=>x.id===t.ref);if(o&&uk(o.who||'')===me)note('mystorno',`Je boeking van ${o.name||'?'} (${eur(o.v)}) werd geannuleerd door ${t.who||'de Quaestor'}.`,{tab:'dag',day:o.date})});
  Object.keys(done).forEach(k=>{if(now-done[k]>90*864e5)delete done[k]});save();const b=document.querySelector('header .bell');if(b)b.outerHTML=bellHtml()}
 function nGo(id){const n=(S.notes||[]).find(x=>x.id===id);if(!n)return;n.read=true;save();const g=n.go||{};
- if(g.tab==='acc'&&role==='q'){accOpen();return}if(g.tab==='dag'&&g.day)DAY=g.day;tab=g.tab&&(role==='q'||!['inst','acc'].includes(g.tab))?g.tab:tab;if(g.sdn)SDN=g.sdn;render();scrollTo(0,0)}
+ if(g.tab==='acc'&&role==='q'){accOpen();return}if(g.tab==='dag'&&g.day)DAY=g.day;tab=g.tab&&(role==='q'||!['inst','acc'].includes(g.tab))?g.tab:tab;if(g.sdn)SDN=g.sdn;render();toTop()}
 function nAllRead(){(S.notes||[]).forEach(n=>n.read=true);save();render()}
 function nClear(){ask('Alle meldingen wissen?','Wissen',()=>{S.notes=[];save();render()})}
 const ago=ts=>{const m=Math.round((Date.now()-ts)/6e4);return m<1?'net nu':m<60?m+' min geleden':m<1440?Math.round(m/60)+' u geleden':new Date(ts).toLocaleDateString('nl-BE',{day:'numeric',month:'short'})};
@@ -1505,8 +1517,8 @@ function rmdReact(n,i,v){if(role!=='q'||TEST())return;const m=memOf(n),H=m&&m.re
 function rmdDone(n){const m=memOf(n);if(!m)return;remAdd(m,{d:today(),a:remAmt(n)},true);m.remDirty=true;save();queueSync();setTimeout(render,600)}
 const daysAgo=d=>d?Math.floor((Date.parse(today())-Date.parse(d))/864e5):1e9;
 function rmdTodo(){return Object.values(debts()).filter(o=>{const m=memOf(o.name);return m&&telNorm(m.tel).n&&daysAgo(m.rem&&m.rem.d)>=7}).sort((a,b)=>b.tot-a.tot).map(o=>o.name)}
-function rmdStart(){if(TEST())return toast('In testmodus worden geen herinneringen verstuurd');RQ=rmdTodo();RQI=0;if(!RQ.length)return toast('Iedereen met een gsm-nummer kreeg de voorbije week al een herinnering');SDN=RQ[0];render();scrollTo(0,0)}
-function rmdNext(d){RQI+=d;if(RQI<0)RQI=0;if(RQI>=RQ.length){RQ=[];SDN='';toast('Klaar met herinneringen');return render()}SDN=RQ[RQI];render();scrollTo(0,0)}
+function rmdStart(){if(TEST())return toast('In testmodus worden geen herinneringen verstuurd');RQ=rmdTodo();RQI=0;if(!RQ.length)return toast('Iedereen met een gsm-nummer kreeg de voorbije week al een herinnering');SDN=RQ[0];render();toTop()}
+function rmdNext(d){RQI+=d;if(RQI<0)RQI=0;if(RQI>=RQ.length){RQ=[];SDN='';toast('Klaar met herinneringen');return render()}SDN=RQ[RQI];render();toTop()}
 function rmdCard(o){if(role!=='q')return '';if(TEST())return '<div class="card"><p class="mu" style="margin:0">In testmodus worden geen herinneringen verstuurd.</p></div>';const m=memOf(o.name),t=telNorm(m&&m.tel),R=rmd(),r=m&&m.rem;
  const q=RQ.length?`<div class="row" style="border:0;padding:0 0 8px"><b>Herinnering ${RQI+1} van ${RQ.length}</b><span><button class="sm" onclick="rmdNext(1)">${RQI+1<RQ.length?'Volgende →':'Klaar'}</button><button class="sm" onclick="RQ=[];render()">Stoppen</button></span></div>`:'';
  const HX=r&&r.d?(r.h&&r.h.length?r.h:[{d:r.d,a:null}]).map((e,i)=>({e,i})).reverse().sort((a,b)=>b.e.d.localeCompare(a.e.d)):[],nm=esc(o.name),hasH=!!(r&&r.h&&r.h.length);
@@ -1546,7 +1558,7 @@ function vSchuld(){if(SDN)return vSchuldDet();const D=Object.values(debts()).sor
  ${sts.length>1?`<div class="chips" style="margin:0 0 10px"><button type="button" onclick="SF='';render()" style="${SF?'':'background:var(--ac);color:var(--on);border-color:var(--ac)'}">Alle</button>${sts.map(s=>`<button type="button" data-s="${esc(s)}" onclick="SF=this.dataset.s;render()" style="${SF===s?'background:var(--ac);color:var(--on);border-color:var(--ac)':''}">${esc(s)}</button>`).join('')}</div>`:''}
  ${role==='q'&&D.length?(()=>{const n=rmdTodo().length;return `<button class="btn${n?'':' ghost'}" style="margin-bottom:12px" onclick="rmdStart()">Herinneringen sturen${n?' ('+n+')':''}</button>`})():''}
  <div class="card"><label>Zoek een lid<input value="${esc(SQ)}" oninput="SQ=this.value;clearTimeout(window._sq);window._sq=setTimeout(()=>{const p=this.selectionStart;render();const e=document.querySelector('#sqi');if(e){e.focus();e.setSelectionRange(p,p)}},250)" id="sqi" placeholder="Naam…"></label>
- ${L.length?L.map(o=>`<button type="button" class="drow" data-n="${esc(o.name)}" onclick="SDN=this.dataset.n;render();scrollTo(0,0)"><span><b>${esc(o.name)}</b><span class="drt">${stTag(o.st)}${o.warn?`<span class="tag warn" style="font-weight:600">${esc(o.warn)}</span>`:''}${role==='q'?(()=>{const m=memOf(o.name);return m&&m.rem&&m.rem.d?`<span class="tag">Herinnerd ${m.rem.d.slice(8)}/${m.rem.d.slice(5,7)}</span>`:''})():''}</span></span><span class="dra"><b>${eur(o.tot)}</b><span class="mu">${o.debts.length} ${o.debts.length===1?'schuld':'schulden'}</span></span></button>`).join(''):empty(D.length?'Niemand gevonden.':'Geen openstaande schulden.')}</div>`}
+ ${L.length?L.map(o=>`<button type="button" class="drow" data-n="${esc(o.name)}" onclick="SDN=this.dataset.n;render();toTop()"><span><b>${esc(o.name)}</b><span class="drt">${stTag(o.st)}${o.warn?`<span class="tag warn" style="font-weight:600">${esc(o.warn)}</span>`:''}${role==='q'?(()=>{const m=memOf(o.name);return m&&m.rem&&m.rem.d?`<span class="tag">Herinnerd ${m.rem.d.slice(8)}/${m.rem.d.slice(5,7)}</span>`:''})():''}</span></span><span class="dra"><b>${eur(o.tot)}</b><span class="mu">${o.debts.length} ${o.debts.length===1?'schuld':'schulden'}</span></span></button>`).join(''):empty(D.length?'Niemand gevonden.':'Geen openstaande schulden.')}</div>`}
 function vSchuldDet(){const o=memDebt(SDN),Q=role==='q';const back=`<button class="back" onclick="SDN='';RQ=[];render()">← Alle schulden</button>`;
  if(!o)return back+(RQ.length?`<div class="card"><button class="btn" onclick="rmdNext(1)">Volgende →</button></div>`:'')+`<div class="card">${empty(esc(SDN)+' heeft geen openstaande schulden meer.')}</div>`;
  const fd=d=>d?d.split('-').reverse().join('/'):'';
@@ -1594,9 +1606,14 @@ function vLeden(){if(RO())return `<div class="card"><h2>${S.members.length} lede
 function addMOpen(){if(RO())return;modal(`<h3>Lid toevoegen</h3><label>Clubnaam<input id="mn" autocomplete="off" placeholder="bv. Spelt"></label><label>Status<select id="ms">${S.statuses.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select></label><label>Of een nieuwe status (niet verplicht)<input id="ms2" autocomplete="off" placeholder="bv. schacht"></label><button class="btn" onclick="addM()">Toevoegen</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`);setTimeout(()=>{const e=$('#mn');if(e)e.focus()},50)}
 function ml(){const e=$('#ml');if(!e)return;const q=LQ.toLowerCase(),o=open(),l=S.members.filter(m=>uk(m.name).includes(uk(q))).sort((a,b)=>a.name.localeCompare(b.name));
  e.innerHTML=l.length?l.map(m=>{const d=Math.max(0,debtOf(m.name));return `<div class="row"><div>${esc(m.name)}${role==='q'&&m.tel?`<div class="mu">${esc(m.tel)}</div>`:''}${d?`<div class="neg" style="white-space:nowrap">Schuld ${eur(d)}</div>`:''}</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">${RO()?`<span class="mu">${esc(m.status)}</span>`:`<select class="ss" aria-label="Status van ${esc(m.name)}" onchange="stSel(this,'${m.id}',false)">${stOpts(m.status)}</select><span style="display:flex;gap:10px"><button class="lnk" onclick="editM('${m.id}')" aria-label="${esc(m.name)} aanpassen">Aanpassen</button><button class="lnk" onclick="delM('${m.id}')" aria-label="${esc(m.name)} verwijderen">Verwijderen</button></span>`}</div></div>`}).join(''):empty('Geen leden gevonden.')}
+/* Rekeningnummer (IBAN) van een lid: met spaties per 4 tekens, alleen zichtbaar voor de Quaestor. */
+function ibanFmt(v){const x=String(v==null?'':v).replace(/\s+/g,'').toUpperCase();return x?x.replace(/(.{4})/g,'$1 ').trim():''}
+function ibanOk(v){const x=String(v||'').replace(/\s+/g,'').toUpperCase();if(!/^[A-Z]{2}\d{2}[A-Z0-9]{8,30}$/.test(x))return false;const r=(x.slice(4)+x.slice(0,4)).replace(/[A-Z]/g,c=>c.charCodeAt(0)-55);let m=0;for(const ch of r)m=(m*10+ +ch)%97;return m===1}
+function ibanCopy(v){try{navigator.clipboard.writeText(String(v).replace(/\s+/g,''));toast('Rekeningnummer gekopieerd')}catch(e){toast(v)}}
+const ibanLine=(m,lbl)=>role==='q'&&m&&m.iban?`<div class="row" style="border:0;padding:6px 0"><div><span class="mu" style="font-size:13px">${lbl||'Rekeningnummer'}</span><div style="font-variant-numeric:tabular-nums"><b>${esc(m.iban)}</b></div></div><button class="sm" data-v="${esc(m.iban)}" onclick="ibanCopy(this.dataset.v)">Kopiëren</button></div>`:'';
 function editM(id){if(RO())return;const m=S.members.find(x=>x.id===id);if(!m||lockR(m))return;const nc=/geen\s*contact/i.test(m.tel||'');
  modal(`<h3>Lid aanpassen</h3><label>Clubnaam<input id="en" autocomplete="off" value="${esc(m.name)}"></label><label>Status<select id="es">${S.statuses.map(x=>`<option value="${esc(x)}"${x===m.status?' selected':''}>${esc(x)}</option>`).join('')}</select></label><label>Of een nieuwe status (niet verplicht)<input id="es2" autocomplete="off" placeholder="bv. schacht"></label>
- <label>Gsm-nummer<input id="et" inputmode="tel" autocomplete="off" value="${nc?'':esc(m.tel||'')}" placeholder="bv. 0485 12 34 56"${nc?' disabled':''}></label><label style="display:flex;gap:8px;align-items:center;margin-top:-4px"><input type="checkbox" id="eg" style="width:20px;height:20px"${nc?' checked':''} onchange="$('#et').disabled=this.checked">Wenst geen contact</label>
+ <label>Gsm-nummer<input id="et" inputmode="tel" autocomplete="off" value="${nc?'':esc(m.tel||'')}" placeholder="bv. 0485 12 34 56"${nc?' disabled':''}></label><label style="display:flex;gap:8px;align-items:center;margin-top:-4px"><input type="checkbox" id="eg" style="width:20px;height:20px"${nc?' checked':''} onchange="$('#et').disabled=this.checked">Wenst geen contact</label>${role==='q'?`<label>Rekeningnummer (niet verplicht)<input id="ei" autocomplete="off" autocapitalize="characters" value="${esc(m.iban||'')}" placeholder="bv. BE68 5390 0754 7034"></label>`:''}
  <p class="mu">Pas je de clubnaam aan, dan verandert die ook bij alle boekingen en schulden van dit lid, in de app en in de spreadsheet.</p><button class="btn" data-id="${esc(id)}" onclick="editMOk(this.dataset.id)">Opslaan</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
 function editMOk(id){if(RO())return;const m=S.members.find(x=>x.id===id);if(!m||lockR(m))return;const n=$('#en').value.trim().replace(/\s+/g,' ');if(!n)return toast('Vul een clubnaam in');
  const o=S.members.find(x=>x!==m&&uk(x.name)===uk(n));if(o)return toast(n+' staat al in de ledenlijst');
@@ -1604,6 +1621,7 @@ function editMOk(id){if(RO())return;const m=S.members.find(x=>x.id===id);if(!m||
  if(n!==m.name){if(!m.ren)m.ren=m.name;renameM(m,n);m.dirty=true;ch.push('clubnaam')}
  if(st&&sk(st)!==sk(m.status)){m.status=canonSt(st)||st;m.dirty=true;ch.push('status')}
  if(tel!==(m.tel||'')){m.tel=tel;m.telDirty=true;ch.push('gsm-nummer')}
+ if($('#ei')){const ib=ibanFmt($('#ei').value);if(ib&&!ibanOk(ib))return toast('Dat rekeningnummer klopt niet. Kijk het nog eens na.');if(ib!==(m.iban||'')){m.iban=ib;m.ibanDirty=true;ch.push('rekeningnummer')}}
  closeM();if(!ch.length)return toast('Er was niets veranderd');relink();save();render();queueSync();toast(m.name+': '+ch.join(', ')+' aangepast')}
 /* Een lid een andere clubnaam geven: overal in de app mee aanpassen (boekingen, schulden, herinneringen). */
 function renameM(m,n){const old=m.name;if(old===n)return;S.tx.forEach(t=>{if(t.mid===m.id||(!t.mid&&uk(t.name)===uk(old))||(uk(t.name)===uk(old)&&!t.exp)){if(t.name!==n){t.name=n;t.mid=t.mid||m.id;if(t.synced)t.renD=true}}});
@@ -1809,7 +1827,7 @@ let SUBM='';
 const MSEC=[['club','Club en uiterlijk','Naam, kleur, logo en weergave'],['mensen','Accounts en helpers','Wie toegang heeft, helpers uitnodigen, rollen'],['leden','Werkjaar, leden en prijzen','Begin werkjaar, statussen, prijzen en schuldlimieten'],['rmd','Herinneringen','Rekeningnummer en berichten voor schulden'],['meld','Meldingen','Kies welke meldingen je krijgt'],['sheet','Spreadsheet en tabbladen','Google Sheets, categorieën en schulden overnemen'],['func','Functies en testmodus','Onderdelen aan of uit, testmodus voor uitleg'],['data','Back-up en wissen','Back-up maken, terugzetten en gegevens wissen']];
 function mSum(k){const c=S.club;if(k==='func'){if(TEST())return '<span style="color:var(--tm);font-weight:600">Testmodus aan</span>';const n=FEATS.filter(f=>!feat(f[0])).length;return n?n+'&nbsp;uit':''}if(k==='sheet'&&!(c.gid&&c.gok))return '<span class="neg">Niet verbonden</span>';if(k==='mensen'){const n=actU().length;return n?n+'&nbsp;'+(n===1?'account':'accounts'):''}return ''}
 function vInst(){const c=S.club;
- if(!SUBM)return `<div class="card">${MSEC.map(x=>`<button class="drow" onclick="SUBM='${x[0]}';render();scrollTo(0,0)"><span><b>${x[1]}</b><span class="mu" style="font-size:13px">${x[2]}</span></span><span class="dra"><span class="mu" style="font-size:12px;text-align:right;white-space:nowrap">${mSum(x[0])}</span><span aria-hidden="true">›</span></span></button>`).join('')}</div><p class="mu" style="text-align:center">Versie ${APP_LABEL}</p>`;
+ if(!SUBM)return `<div class="card">${MSEC.map(x=>`<button class="drow" onclick="SUBM='${x[0]}';render();toTop()"><span><b>${x[1]}</b><span class="mu" style="font-size:13px">${x[2]}</span></span><span class="dra"><span class="mu" style="font-size:12px;text-align:right;white-space:nowrap">${mSum(x[0])}</span><span aria-hidden="true">›</span></span></button>`).join('')}</div><p class="mu" style="text-align:center">Versie ${APP_LABEL}</p>`;
  const t=(MSEC.find(x=>x[0]===SUBM)||[])[1]||'';
  const body={
   club:()=>`<div class="card"><label>Naam van de club<input id="in" value="${esc(c.name)}"></label><label>Clubkleur<input type="color" id="ic" value="${c.color}" oninput="prevColor(this.value)"></label>
@@ -1824,9 +1842,9 @@ ${USER?'':`<div class="card"><h2>Jouw naam</h2><label>Naam van de Quaestor<input
   meld:()=>nCard(),
   data:()=>`<div class="card"><h2>Back-up</h2><button class="btn ghost" onclick="showT('Boekingen als csv',csv())">Boekingen kopiëren (voor Excel)</button><button class="btn ghost" style="margin-top:8px" onclick="showT('Volledige back-up',JSON.stringify(S))">Volledige back-up kopiëren</button><button class="btn ghost" style="margin-top:8px" onclick="restore()">Back-up terugzetten</button></div><div class="card"><h2>Gegevens wissen</h2><p class="mu">Maak eerst een back-up als je twijfelt. Bij boekingen en de ledenlijst kies je of de spreadsheet ook meegaat. Bij Alles wissen blijft de spreadsheet staan.</p><button class="btn ghost" onclick="wipeTx()">Alle boekingen wissen</button><button class="btn ghost" style="margin-top:8px" onclick="wipeMem()">Ledenlijst leegmaken</button><button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="wipeAll()">Alles wissen op dit toestel</button>${ISDEV||HQ()?`<button class="btn ghost" style="margin-top:8px;color:var(--er)" onclick="closeClub()">Club afsluiten voor iedereen</button><p class="mu" style="margin-top:6px">Alles wissen op dit toestel wist alleen jouw toestel. Club afsluiten wist de club ook op alle andere toestellen zodra die synchroniseren.</p>`:'<p class="mu" style="margin-top:6px">Alles wissen op dit toestel wist alleen dit toestel, niet bij de andere accounts.</p>'}</div>`}[SUBM];
  if(!body){SUBM='';return vInst()}
- return `<button class="back" onclick="SUBM='';render();scrollTo(0,0)">← Meer</button><h2 style="margin:0 0 4px">${t}</h2>${['club','leden','rmd'].includes(SUBM)?'<p class="mu" style="margin:0 0 10px">Wijzigingen worden meteen bewaard.</p>':'<div style="height:8px"></div>'}<div onchange="autoSave(event)">${body()}</div>`}
+ return `<button class="back" onclick="SUBM='';render();toTop()">← Meer</button><h2 style="margin:0 0 4px">${t}</h2>${['club','leden','rmd'].includes(SUBM)?'<p class="mu" style="margin:0 0 10px">Wijzigingen worden meteen bewaard.</p>':'<div style="height:8px"></div>'}<div onchange="autoSave(event)">${body()}</div>`}
 let ACCL=null,ACCE='';
-function accOpen(){tab='acc';ACCL=null;ACCE='';render();scrollTo(0,0);accLoad()}
+function accOpen(){tab='acc';ACCL=null;ACCE='';render();toTop();accLoad()}
 async function accLoad(){if(!S.club.gid||!S.club.gok){ACCE='Verbind eerst met Google (Meer → Google Sheets). De accounts worden in de spreadsheet bijgehouden.';return tab==='acc'&&render()}
  for(let i=0;SYNCING&&i<100;i++)await new Promise(r=>setTimeout(r,150));
  try{SI=true;await syncSettings();try{await pushUsers();await pullUsers()}catch(e){if(e.auth)throw e}const l=await accList(S.club.gid),A=S.club.acc||{},by=new Map(),junk=[];
