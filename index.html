@@ -114,15 +114,16 @@ const effR=u=>isDev(u.e)?'q':u.r==='d'?'q':u.r;
 const SCOPE='https://www.googleapis.com/auth/drive.file openid email';
 const TAB_PT='Potten',HEAD_PT=['Pot-ID','Datum','Pot','Hoofdcategorie','Subcategorie','Soort','Persoon','Bedrag','Betaalwijze of status','Boeking-ID','Tijdstip','Door','Info','Verwijderd','Testmodus'];
 const TAB_A='Aanwezigheid',HEAD_A=['Activiteit-ID','Datum','Hoofdcategorie','Subcategorie','Lid','Tijdstip','Door','Notitie','Verwijderd','Testmodus'];
-var LASTVK='',POT='',PQ='',BKD=null,BKL=false,OVT='dag',ACT='',AQ='',NOTE='',ABACK='',RV='',RT='';
+var UPDV=null,UPDT=0,UPDP=null,LASTVK='',POT='',PQ='',BKD=null,BKL=false,OVT='dag',ACT='',AQ='',NOTE='',ABACK='',RV='',RT='';
 const TAB_OV='Schulden (overzicht)',TAB_B='Boekingen',TAB_L='Leden',TAB_P='Prijzen',TAB_I='Instellingen',TAB_BN='Bonnetjes',TAB_BF='Bonnetjes-foto';
-const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingediend door','Ingediend op','Status','Boeking-ID','Voorgeschoten door','Testmodus'];
+const HEAD_BN=['ID','Datum','Winkel','Totaal','Artikelen','Omschrijving','Ingediend door','Ingediend op','Status','Boeking-ID','Voorgeschoten door','Testmodus','Subcategorie','Soort','Bestand','Map','Vervaldatum','Rekeningnummer','Mededeling','Factuurnummer','Betaald op','Bestand-ID','In kas-/bankboek'];
 const HEAD_P=['Hoofdcategorie','Subcategorie','Lid','Niet-lid','Oud-lid'];
 const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie','Betaalwijze','Bedrag','Type','Verwijst naar','Ingevoerd door','Tijdstip','Rol'];
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='85',APP_LABEL='1.8.5';document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='90',APP_LABEL='1.9.0';
+const RELN={"1.9.0":["Je krijgt een melding als er een nieuwe versie is, met wat er nieuw is.","Bonnetjes: kies ook de subcategorie (activiteit). Wie zelf betaalde, kan zijn rekeningnummer meegeven.","Quaestor: foto's van bonnetjes en facturen komen op Google Drive, in de map die je kiest. Wat betaald is, verhuist naar het mapje Betaald.","Quaestor: facturen opladen (PDF of foto). De app leest leverancier, bedrag, vervaldatum, rekeningnummer en mededeling. Betalen en inboeken doe je later.","Quaestor: regels voor het kasboek en bankboek kopiëren vanuit Bonnen."],"1.8.5":["Het verslag past weer op de gsm."],"1.8.4":["De app springt niet meer naar boven tijdens het synchroniseren.","Rekeningnummers van leden bewaren (Quaestor).","De terugknop van je gsm of browser werkt in de app."]};document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -173,7 +174,7 @@ function loadProfile(id){const cur=REG.active;
 function newProfile(){const id='c'+Date.now().toString(36);REG.list.push({id,name:'',color:'#8b1e3f',helper:false});loadProfile(id)}
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2800)}
 function modal(h){$('#mbox').innerHTML=h;$('#modal').classList.add('on')}
-function closeM(){$('#modal').classList.remove('on')}
+function closeM(){$('#modal').classList.remove('on');if(UPDP)setTimeout(updTry,400)}
 /* Het venster sluit alleen als je naast het venster tikt: begon de klik in het venster (bv. tekst selecteren en de muis schiet erbuiten), dan blijft het open. */
 /* Niet hertekenen terwijl iemand in een veld typt: na het verlaten van het veld volgt de update. */
 var PENDR=false;const typing=()=>{const e=document.activeElement;return !!(e&&/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName)&&e.closest&&e.closest('main'))};document.addEventListener('focusout',()=>{if(PENDR)setTimeout(()=>{if(PENDR&&!typing()){PENDR=false;if(role)render()}},150)});
@@ -367,7 +368,7 @@ async function oldTab(gid){
  catch(e){if(e.auth)throw e;return null}}
 async function readSettings(gid){const o=await metaGet(gid);if(o)return{m:o,src:'meta'};const t=await oldTab(gid);return t?{m:t.o,src:'tab',id:t.id}:{m:{},src:null}}
 function mergeAcc(a,b){const r={};const add=o=>{if(!o||typeof o!=='object')return;for(const k in o){const v=o[k];if(!/^[\w-]{6,64}$/.test(k)||!v||typeof v!=='object')continue;if(!r[k]||(+v.t||0)>(+r[k].t||0))r[k]={s:['uit','h','weg','q'].includes(v.s)?v.s:'',t:+v.t||0}}};add(a);add(b);return r}
-function adoptTabs(m){const c=S.club;if(m['Functies']&&typeof m['Functies']==='object'&&!Array.isArray(m['Functies'])&&!(c.setDirty&&role==='q'))c.feat=m['Functies'];if(typeof m['Werkjaar start']==='string'&&/^(\d{4}-\d{2}-\d{2})?$/.test(m['Werkjaar start']))c.wj=m['Werkjaar start'];if(Array.isArray(m['Verwijderd'])){c.rmIds=[...new Set((c.rmIds||[]).concat(m['Verwijderd']))].slice(-3000);const R=new Set(c.rmIds),n0=S.tx.length;S.tx=S.tx.filter(t=>!R.has(t.id));if(S.tx.length!==n0)relink()}if(m['Herinnering']&&typeof m['Herinnering']==='object'&&!c.rmdDirty)c.rmd=m['Herinnering'];if(m['Schuldlimieten']&&typeof m['Schuldlimieten']==='object')c.lim=m['Schuldlimieten'];if(+m['Schuldimport']>(c.bkImp||0))c.bkImp=+m['Schuldimport'];if(m['Categorietabblad']&&String(m['Categorietabblad'])!==c.catTab){c.catTab=String(m['Categorietabblad']);ENS=''}}
+function adoptTabs(m){const c=S.club;if(m['Bestanden']&&typeof m['Bestanden']==='object'&&m['Bestanden'].b&&!(c.setDirty&&role==='q'))c.drv=m['Bestanden'];if(m['Functies']&&typeof m['Functies']==='object'&&!Array.isArray(m['Functies'])&&!(c.setDirty&&role==='q'))c.feat=m['Functies'];if(typeof m['Werkjaar start']==='string'&&/^(\d{4}-\d{2}-\d{2})?$/.test(m['Werkjaar start']))c.wj=m['Werkjaar start'];if(Array.isArray(m['Verwijderd'])){c.rmIds=[...new Set((c.rmIds||[]).concat(m['Verwijderd']))].slice(-3000);const R=new Set(c.rmIds),n0=S.tx.length;S.tx=S.tx.filter(t=>!R.has(t.id));if(S.tx.length!==n0)relink()}if(m['Herinnering']&&typeof m['Herinnering']==='object'&&!c.rmdDirty)c.rmd=m['Herinnering'];if(m['Schuldlimieten']&&typeof m['Schuldlimieten']==='object')c.lim=m['Schuldlimieten'];if(+m['Schuldimport']>(c.bkImp||0))c.bkImp=+m['Schuldimport'];if(m['Categorietabblad']&&String(m['Categorietabblad'])!==c.catTab){c.catTab=String(m['Categorietabblad']);ENS=''}}
 function takeAcc(m){const c=S.club,cl=+m['Afgesloten']||0;{const t=m['Testmodus'];if(t&&typeof t==='object'&&(+t.ts||0)>((c.test&&+c.test.ts)||0)){c.test={on:!!t.on,ts:+t.ts,by:String(t.by||'')};save()}}{const h=m['Hoofdquaestor'];if(h&&typeof h==='object'&&(+h.ts||0)>((c.hq&&+c.hq.ts)||0))c.hq=h}if(+m['Schuldimport']>(c.bkImp||0))c.bkImp=+m['Schuldimport'];if(cl>0&&!c.closedAt&&!c.closed&&!c.reopen){c.closed=cl;save()}
  const n=mergeAcc(c.acc,m['Toegang']);if(JSON.stringify(n)!==JSON.stringify(c.acc)){c.acc=n;save()}}
 async function syncSettings(){const c=S.club;
@@ -379,7 +380,7 @@ async function syncSettings(){const c=S.club;
  if(((c.setDirty&&role==='q')||!m['Naam'])&&!c.closed){if(!c.salt)c.salt=rnd();let qh=c.pinQh,hh=c.pinHh;
   try{if(c.pinQ)qh=await hashPin(c.pinQ,c.salt);if(c.pinH)hh=await hashPin(c.pinH,c.salt)}catch(e){}
   c.pinQh=qh||'';c.pinHh=hh||'';c.setTs=Date.now();
-  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Toegang':c.acc,'Schuldlimieten':c.lim||{},'Herinnering':c.rmd||{},'Hoofdquaestor':c.hq||null,'Verwijderd':[...new Set((Array.isArray(m['Verwijderd'])?m['Verwijderd']:[]).concat(c.rmIds||[]))].slice(-3000),'Schuldimport':c.bkImp||0,'Werkjaar start':c.wj||'','Functies':c.feat||{},'Testmodus':c.test||{on:false,ts:0,by:''},'Afgesloten':c.reopen?0:Math.max(+m['Afgesloten']||0,c.closedAt||0),'Gewijzigd':c.setTs},src==='meta');c.reopen=false;
+  await metaPut(c.gid,{'Naam':c.name,'Kleur':c.color,'Categorietabblad':c.catTab,'Salt':c.salt,'Quaestor-code':c.pinQh,'Helper-code':c.pinHh,'Statussen':S.statuses,'Toegang':c.acc,'Schuldlimieten':c.lim||{},'Herinnering':c.rmd||{},'Hoofdquaestor':c.hq||null,'Verwijderd':[...new Set((Array.isArray(m['Verwijderd'])?m['Verwijderd']:[]).concat(c.rmIds||[]))].slice(-3000),'Schuldimport':c.bkImp||0,'Werkjaar start':c.wj||'','Functies':c.feat||{},'Bestanden':c.drv||null,'Testmodus':c.test||{on:false,ts:0,by:''},'Afgesloten':c.reopen?0:Math.max(+m['Afgesloten']||0,c.closedAt||0),'Gewijzigd':c.setTs},src==='meta');c.reopen=false;
   wrote=true;c.setDirty=false;save()}
  else{const ts=+m['Gewijzigd']||0;if(role!=='q')c.setDirty=false;
   if(ts>(c.setTs||0)){adoptTabs(m);c.name=String(m['Naam']||c.name);if(/^#[0-9a-f]{6}$/i.test(String(m['Kleur'])))c.color=String(m['Kleur']);
@@ -546,7 +547,7 @@ async function choose(){readG();const c=S.club;
 function unlink(){ask('Spreadsheet ontkoppelen? Je boekingen blijven op dit toestel bewaard.','Ontkoppelen',()=>{Object.assign(S.club,{gid:'',gok:false,gcreated:false,gpicked:false,gname:''});S.delM=[];S.sync={last:0,err:'',auth:false,pick:false,warn:''};ENS='';TOKEN=null;try{localStorage.removeItem('qg')}catch(e){}save();render()})}
 window.addEventListener('online',()=>{refreshSt();queueSync()});
 window.addEventListener('offline',refreshSt);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)queueSync()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){queueSync();updCheck()}});updAfter();setTimeout(()=>updCheck(1),5000);setInterval(()=>updCheck(),30*60000);
 /* Terugknop van de gsm of de browser: eerst binnen de app een stap terug. Pas op het beginscherm verlaat je de app. */
 function navBack(){const mo=$('#modal');if(mo&&mo.classList.contains('on')){closeM();return true}
  if(typeof role==='undefined'||!role||!S||!S.club||!S.club.gid)return false;
@@ -716,6 +717,25 @@ async function restorePick(){const e=m=>{const x=$('#re');if(x)x.textContent=m};
  if(!actU().length&&!legacyPins())return newAcc('h');if(TEMAIL&&!legacyPins())return accAsk(TEMAIL);login()}
 
 /* ================= OPBOUW ================= */
+function vcmp(a,b){const x=String(a).split('.').map(Number),y=String(b).split('.').map(Number);for(let i=0;i<3;i++){if((x[i]||0)!==(y[i]||0))return (x[i]||0)-(y[i]||0)}return 0}
+function updNotes(n,from){return Object.keys(n||{}).filter(l=>vcmp(l,from)>0).sort((a,b)=>vcmp(b,a)).slice(0,4).map(l=>`<p style="margin:12px 0 4px"><b>Versie ${esc(l)}</b></p><ul style="margin:0;padding-left:20px">${(n[l]||[]).map(x=>`<li style="margin:3px 0">${esc(x)}</li>`).join('')}</ul>`).join('')}
+async function updCheck(f){if(!navigator.onLine||location.protocol.indexOf('http')!==0)return;if(!f&&Date.now()-UPDT<60000)return;UPDT=Date.now();
+ try{const r=await fetch('./index.html?v='+Date.now(),{cache:'no-store'});if(!r.ok)return;const t=await r.text(),m=t.match(/const APP_VERSION='(\d+)',APP_LABEL='([^']+)'/);if(!m||+m[1]<=+APP_VERSION)return;
+  let n={};const k=t.match(/const RELN=(\{[^\n]*\});/);if(k)try{n=JSON.parse(k[1])}catch(e){}
+  UPDV={v:+m[1],l:m[2],n};UPDP=updShow;updTry()}catch(e){}}
+function updTry(){if(!UPDP||!role||!S||!S.club||$('#modal').classList.contains('on')||typing())return;const f=UPDP;UPDP=null;setTimeout(f,250)}
+function updShow(){const u=UPDV;if(!u||!role)return;let l='';try{l=sessionStorage.getItem('qupdl')||''}catch(e){}if(l===String(u.v))return;
+ const un=S.tx.filter(t=>!t.synced).length;
+ modal(`<h3>Nieuwe versie: ${esc(u.l)}</h3><p style="margin:0">Er is een nieuwe versie van de app. Jij hebt nu versie ${APP_LABEL}.</p>${updNotes(u.n,APP_LABEL)}
+ <div style="margin:14px 0;padding:12px 14px;border:1px solid var(--bd);border-radius:12px;background:var(--in);line-height:1.45"><div style="font-weight:700;margin-bottom:4px">Wat moet je doen?</div><span>Tik op <strong>Nu bijwerken</strong>. De app start opnieuw op met de nieuwe versie. Je gegevens blijven bewaard${un?`, ook ${un===1?'de boeking':'de '+un+' boekingen'} die nog verstuurd ${un===1?'moet':'moeten'} worden`:''}.</span></div>
+ <button class="btn" onclick="updGo()">Nu bijwerken</button><button class="btn ghost" style="margin-top:8px" onclick="updLater()">Later</button>`)}
+function updLater(){try{sessionStorage.setItem('qupdl',String(UPDV.v))}catch(e){}closeM();toast('Je krijgt deze melding opnieuw als je de app nog eens opent')}
+async function updGo(){try{localStorage.setItem('qupdt',JSON.stringify({v:UPDV.v,l:UPDV.l,ts:Date.now()}))}catch(e){}try{save()}catch(e){}
+ const b=document.querySelector('#mbox .btn');if(b){b.disabled=true;b.textContent='Bijwerken…'}
+ try{const r=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration();if(r)await Promise.race([r.update(),new Promise(z=>setTimeout(z,4000))])}catch(e){}location.reload()}
+function updAfter(){let t=null,last='';try{t=JSON.parse(localStorage.getItem('qupdt')||'null');last=localStorage.getItem('qlv')||'';localStorage.setItem('qlv',APP_LABEL);localStorage.removeItem('qupdt')}catch(e){}
+ if(t&&+t.v>+APP_VERSION&&Date.now()-(+t.ts||0)<10*60000){UPDP=()=>modal(`<h3>Bijwerken lukte nog niet</h3><p>De app draait nog op versie ${APP_LABEL}. Zo krijg je versie ${esc(t.l)}:</p><ul style="padding-left:20px"><li style="margin:6px 0"><b>Op je gsm:</b> sluit de app helemaal (veeg hem weg bij je geopende apps) en open hem opnieuw. Lukt het nog niet, wacht dan een minuutje en probeer nog eens.</li><li style="margin:6px 0"><b>Op de laptop:</b> druk op Ctrl + Shift + R (op een Mac: Cmd + Shift + R).</li></ul><p class="mu">Je gegevens blijven bewaard.</p><button class="btn" onclick="closeM()">OK</button>`);return}
+ if(last&&vcmp(APP_LABEL,last)>0){const h=updNotes(RELN,last);if(h)UPDP=()=>modal(`<h3>Bijgewerkt naar versie ${APP_LABEL}</h3><p class="mu" style="margin:0">Dit is er nieuw:</p>${h}<button class="btn" style="margin-top:14px" onclick="closeM()">Begrepen</button>`)}}
 function toTop(){const m=document.querySelector('#app main');if(m)m.scrollTop=0;try{window.scrollTo(0,0)}catch(e){}}
 function render(){if(S.club.blocked)return blockAfter();const Q=role==='q',P=role==='p';
  if(!Q&&!P&&['inst','acc'].includes(tab))tab='boek';if(P&&['inst','acc'].includes(tab))tab='bon';if(P&&!['bon','me','schuld','leden','dag','meld'].includes(tab))tab=feat('bon')?'bon':'dag';if(Q&&tab==='me')tab='boek';if(!Q&&tab==='vandaag')tab='dag';if(tab==='pot'&&(P||!feat('pot')))tab=P?'dag':'boek';if(tab==='bon'&&!feat('bon'))tab=P?'dag':'boek';
@@ -725,7 +745,7 @@ function render(){if(S.club.blocked)return blockAfter();const Q=role==='q',P=rol
  const vk=[tab,SDN,POT,ACT,OVT,SUBM,RQ.length?RQI:''].join('|'),om=document.querySelector('#app main'),sy=om?om.scrollTop:0;
  $('#app').innerHTML=`<header>${S.club.logo?`<img src="${esc(S.club.logo)}" alt="">`:''}<div class="hd"><h1 onclick="clubsScreen()" style="cursor:pointer" title="Mijn clubs">${esc(S.club.name)} ▾ <small>${ISDEV?'Developer':HQ()?'Hoofdquaestor':RN[role]||''}</small></h1><button class="st" id="st" onclick="statusTap()" style="display:none"></button></div>${bellHtml()}<button onclick="logout()">Afmelden</button></header>${testBar()}
  <main>${v}</main><nav>${tabs.map(t=>`<button class="${tab===t[0]||(tab==='acc'&&t[0]==='inst')?'on':''}" onclick="tab='${t[0]}';SDN='';SUBM='';RQ=[];ABACK='';POT=tab==='pot'?POT:'';render()">${t[1]}</button>`).join('')}</nav>`;
- document.documentElement.classList.toggle('tm',TEST());if(tab!=='schuld')SDN='';if(tab==='boek')sug();if(tab==='leden')ml();refreshSt();{const nm=document.querySelector('#app main');if(nm&&vk===LASTVK&&sy)nm.scrollTop=sy;LASTVK=vk}}
+ document.documentElement.classList.toggle('tm',TEST());if(tab!=='schuld')SDN='';if(tab==='boek')sug();if(tab==='leden')ml();refreshSt();{const nm=document.querySelector('#app main');if(nm&&vk===LASTVK&&sy)nm.scrollTop=sy;LASTVK=vk}if(UPDP)updTry()}
 const row=(t,st)=>`<div class="row${t.void?' void':''}"><div><b>${esc(t.name||'Zonder naam')}</b>${t.exp&&!t.storno?` <span class="tag">${t.ref?'Terugbetaling':'Uitgave'}</span>`:''}${t.test?' <span class="tag tmtag">Test</span>':''}<div class="mu">${esc(t.h)}${t.s?' · '+esc(t.s):''} · ${ML[t.method]}${t.desc?' · '+esc(t.desc):''}${t.adv&&!t.ref?' · door '+esc(t.adv):''}${t.who?' · '+esc(t.who):''}${t.storno?' · annulering':''}</div></div><div class="amt ${t.v<0?'neg':''}">${eur(t.v)}${st&&!t.void&&!t.storno?`<button class="sm" onclick="storno('${t.id}')">Annuleren</button>`:''}</div></div>`;
 const empty=t=>`<p class="mu">${t}</p>`;
 const opts=(l,sel,blank)=>(blank?'<option value="">(geen)</option>':'')+l.map(x=>`<option${x===sel?' selected':''}>${esc(x)}</option>`).join('');
@@ -875,7 +895,7 @@ function actBook(n){const a=curAct();if(!a||!AW())return;if(lockR(a))return;cons
 function actNote(v){const a=curAct();if(!a||!AW())return;if(lockR(a))return;a.note=String(v||'').replace(/\s+$/,'');a.nts=Date.now();a.dirty=true;if(!a.note)NOTE='';save();queueSync();if(!a.note)render()}
 function actDel(){const a=curAct();if(!a||RO())return;if(lockR(a))return;ask('Deze aanwezigheidslijst verwijderen? De boekingen zelf blijven staan.','Lijst verwijderen',()=>{a.rm=true;a.nts=Date.now();a.dirty=true;ACT='';save();render();queueSync()})}
 /* ---------- functies aan/uit ---------- */
-const FEATS=[['pot','Pot','Een pot bijhouden tijdens een kroegentocht of activiteit: inleg, sponsoring van de club en uitgaven.'],['att','Aanwezigheidslijsten','Bijhouden wie er op een activiteit is en wie nog moet betalen.'],['bon','Bonnetjes','Bonnetjes laten indienen door het praesidium en ze inboeken.'],['rap','Verslag','Het mini-verslag met inkomsten en uitgaven per activiteit.'],['kas','Kassa tellen','De kassa natellen met munten en briefjes en vergelijken met het kasboek.']];
+const FEATS=[['pot','Pot','Een pot bijhouden tijdens een kroegentocht of activiteit: inleg, sponsoring van de club en uitgaven.'],['att','Aanwezigheidslijsten','Bijhouden wie er op een activiteit is en wie nog moet betalen.'],['bon','Bonnetjes en facturen','Bonnetjes laten indienen door het praesidium en ze inboeken. De Quaestor kan ook facturen opladen en later betalen.'],['rap','Verslag','Het mini-verslag met inkomsten en uitgaven per activiteit.'],['kas','Kassa tellen','De kassa natellen met munten en briefjes en vergelijken met het kasboek.']];
 const feat=k=>!(S&&S.club&&S.club.feat&&S.club.feat[k]===false);
 const canFeat=()=>role==='q'&&(ISDEV||HQ()||!(S.club.hq&&S.club.hq.id));
 function featCard(){const can=canFeat();
@@ -899,6 +919,7 @@ async function purgeTestSheet(){const c=S.club;if(role!=='q'||TEST()||!c.gid||!c
  const g=c.gid,m=await api(`/${g}?fields=sheets.properties(sheetId,title)`),sid=t=>{const x=(m.sheets||[]).find(s=>s.properties.title===t);return x?x.properties.sheetId:null},R=[];
  const del=(id,rows)=>rows.sort((a,b)=>b-a).forEach(i=>R.push({deleteDimension:{range:{sheetId:id,dimension:'ROWS',startIndex:i,endIndex:i+1}}}));
  const scan=async(tab,a1,col)=>{const id=sid(tab);if(id==null)return [];const d=await api(`/${g}/values/${enc(rng(tab,a1))}`),out=[],ids=[];(d.values||[]).forEach((r,i)=>{if(isJa(r[col])){out.push(i+1);ids.push(String(r[0]==null?'':r[0]).trim().replace(/^'/,''))}});del(id,out);return ids};
+ if(c.drv&&sid(TAB_BN)!=null){const d=await api(`/${g}/values/${enc(rng(TAB_BN,'A2:V'))}`);for(const r of d.values||[])if(isJa(r[11])&&r[21])try{await drvTrash(String(r[21]).trim())}catch(e){if(e.auth)throw e}}
  await scan(TAB_B,'A2:P',15);await scan(TAB_L,'A2:F',5);await scan(TAB_KT,'A2:I',8);const bids=new Set(await scan(TAB_BN,'A2:L',11));
  if(bids.size&&sid(TAB_BF)!=null){const d=await api(`/${g}/values/${enc(rng(TAB_BF,'A2:A'))}`),out=[];(d.values||[]).forEach((r,i)=>{if(bids.has(String(r[0]||'').trim().replace(/^'/,'')))out.push(i+1)});del(sid(TAB_BF),out)}
  if(R.length)await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:R})});
@@ -1249,7 +1270,7 @@ function canv(img,max,gray){const k=Math.min(1,max/Math.max(img.naturalWidth||im
 async function bonFile(inp){const f=inp.files&&inp.files[0];if(!f)return;inp.value='';
  let img;try{img=await imgOf(f)}catch(e){return toast(e.message)}
  let q=.6,keep=canv(img,1400).toDataURL('image/jpeg',q);while(keep.length>320000&&q>.3){q-=.1;keep=canv(img,1100).toDataURL('image/jpeg',q)}
- const id=uid();BON={id,photo:keep,shop:'',date:today(),total:'',items:'',desc:'',adv:false,h:'',st:'ok',reading:true,text:'',err:'',tch:{},sug:null};render();
+ const id=uid();FACT=null;BON={id,photo:keep,shop:'',date:today(),total:'',items:'',desc:'',adv:false,h:'',s:'',iban:'',st:'ok',reading:true,text:'',err:'',tch:{},sug:null};render();
  let p=null,err='';
  try{let pass=0;const T=await loadTess(),w=await T.createWorker('nld',1,{logger:m=>{if(m&&m.status==='recognizing text'){const e=document.querySelector('#bonp>i');if(e)e.style.width=Math.round((pass+(m.progress||0))*50)+'%'}}});
   const cv=canv(img,2200,true),rd=r=>(r&&r.data&&r.data.text)||'';
@@ -1276,21 +1297,24 @@ function bonForm(){const b=BON,c=S.cats,Q=role==='q';
  <label>Totaal in euro<input id="bt" inputmode="decimal" value="${esc(b.total)}" oninput="BON.total=this.value;BON.tch.total=1"></label>${bonSug('total')}
  <label>Wat werd er gekocht (niet verplicht)<textarea id="bi" rows="4" placeholder="Niet verplicht" oninput="BON.items=this.value;BON.tch.items=1">${esc(b.items)}</textarea></label>
  <label>Waarvoor (bv. cantus 12/11)<input id="bo" value="${esc(b.desc)}" oninput="BON.desc=this.value"></label>
- <label>Hoofdcategorie<select onchange="BON.h=this.value">${opts(c.h,b.h,true)}</select></label>
- <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" style="width:auto" ${b.adv?'checked':''} onchange="BON.adv=this.checked"> Ik heb dit zelf betaald, terugbetalen aan mij</label>
+ <label>Hoofdcategorie<select onchange="BON.h=this.value;BON.s='';fillS(this,'bss')">${opts(c.h,b.h,true)}</select></label><label>Subcategorie (activiteit)<select id="bss" onchange="BON.s=this.value">${opts(subsFor(b.h),b.s||'',true)}</select></label>
+ <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" style="width:auto" ${b.adv?'checked':''} onchange="BON.adv=this.checked;const w=$('#bibw');if(w)w.style.display=this.checked&&needIb()?'block':'none'"> Ik heb dit zelf betaald, terugbetalen aan mij</label>
+ <div id="bibw" style="display:${b.adv&&needIb()?'block':'none'}"><label>Jouw rekeningnummer (om terug te betalen)<input id="bib" autocomplete="off" value="${esc(b.iban||'')}" placeholder="BE.." oninput="BON.iban=this.value"></label></div>
  ${b.text?`<details><summary>Gelezen tekst tonen</summary><textarea readonly rows="8">${esc(b.text)}</textarea></details>`:''}
  <button class="btn" onclick="bonSubmit(0)">Bonnetje indienen</button>${Q?'<button class="btn ghost" style="margin-top:8px" onclick="bonSubmit(1)">Indienen en meteen inboeken</button>':''}<button class="btn ghost" style="margin-top:8px" onclick="BON=null;render()">Annuleren</button></div>`}
+const needIb=()=>{const m=memOf(WHO);return !(m&&m.iban)};
 const pamt=v=>{const n=parseFloat(String(v||'').replace(/\s/g,'').replace(',','.'));return isFinite(n)?Math.round(n*100)/100:null};
 function bonSubmit(now){const b=BON;if(!b)return;const tot=pamt(b.total);
- if(!b.shop.trim())return toast('Vul de winkel in');if(!(tot>0))return toast('Vul het totaal in');
- const nb={id:b.id,date:b.date||today(),shop:b.shop.trim().slice(0,80),total:tot,items:b.items.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).join('; ').slice(0,2000),desc:b.desc.trim().slice(0,200),h:b.h||'',who:WHO,ts:Date.now(),status:'Nieuw',txid:'',adv:b.adv?WHO:'',synced:false,dirty:false,mine:true};
+ if(!b.shop.trim())return toast('Vul de winkel in');if(!(tot>0))return toast('Vul het totaal in');const ib=b.adv&&b.iban?ibanFmt(b.iban):'';if(ib&&!ibanOk(ib))return toast('Dat rekeningnummer klopt niet. Kijk het nog eens na.');
+ const nb={k:'',s:b.s||'',iban:ib,id:b.id,date:b.date||today(),shop:b.shop.trim().slice(0,80),total:tot,items:b.items.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).join('; ').slice(0,2000),desc:b.desc.trim().slice(0,200),h:b.h||'',who:WHO,ts:Date.now(),status:'Nieuw',txid:'',adv:b.adv?WHO:'',synced:false,dirty:false,mine:true};
  if(!phPut(nb.id,b.photo))return toast('Te weinig opslagruimte op dit toestel voor de foto. Synchroniseer eerst de vorige bonnetjes.');
  S.bons.push(nb);BON=null;save();queueSync();if(now)return bonBook(nb.id);render();toast('Bonnetje ingediend')}
-async function bonView(id){const b=S.bons.find(x=>x.id===id);if(!b)return;
- modal(`<h3>${esc(b.shop)}</h3><p class="mu">${esc(b.date)} · ${eur(b.total)} · ${esc(b.who||'')}</p><div id="bvi"><p class="mu">Foto laden…</p></div>${b.items?`<p class="mu" style="margin-top:10px">${esc(b.items)}</p>`:''}<button class="btn ghost" style="margin-top:10px" onclick="closeM()">Sluiten</button>`);
+async function bonView(id){const b=S.bons.find(x=>x.id===id);if(!b)return;const fx=b.k==='f',pdf=b.mime==='application/pdf';
+ modal(`<h3>${esc(b.shop)}</h3><p class="mu">${esc(fdt(b.date))} · ${eur(b.total)}${fx?(b.inv?' · factuur '+esc(b.inv):''):(b.who?' · '+esc(b.who):'')} · ${esc(bonLbl(b))}</p>${fx?cpRow('Rekeningnummer',b.iban,String(b.iban||'').replace(/\s/g,''))+cpRow('Mededeling',b.ogm,/^\+{3}/.test(b.ogm||'')?b.ogm.replace(/\D/g,''):b.ogm)+(b.due?`<p class="mu" style="margin:6px 0">Vervaldatum ${fdt(b.due)}</p>`:''):''}<div id="bvi"><p class="mu">${pdf&&!PH.get(id)?'':'Foto laden…'}</p></div>${b.items?`<p class="mu" style="margin-top:10px">${esc(b.items)}</p>`:''}${b.fid?`<a class="btn ghost" style="margin-top:10px" href="${drvUrl(b.fid)}" target="_blank" rel="noopener">Openen in Google Drive</a>`:''}<button class="btn ghost" style="margin-top:10px" onclick="closeM()">Sluiten</button>`);
  let d=PH.get(id)||phGet(id);
- if(!d){try{SI=true;d=await bonFetch(id)}catch(e){d='';const x=$('#bvi');if(x)x.innerHTML=`<p class="err">${esc(e.message||'Foto laden lukte niet')}</p>`;return}finally{SI=false}}
- const x=$('#bvi');if(!x)return;if(!d){x.innerHTML='<p class="err">Geen foto gevonden in de spreadsheet.</p>';return}PH.set(id,d);
+ if(!d&&!fx){try{SI=true;d=await bonFetch(id)}catch(e){d='';if(!b.fid){const x=$('#bvi');if(x)x.innerHTML=`<p class="err">${esc(e.message||'Foto laden lukte niet')}</p>`;return}}finally{SI=false}}
+ if(!d&&b.fid&&!pdf&&role==='q'){try{SI=true;d=await blobData(await drvGet(b.fid))}catch(e){d=''}finally{SI=false}}
+ const x=$('#bvi');if(!x)return;if(!d){x.innerHTML=pdf||b.fid?'':'<p class="err">Geen foto gevonden in de spreadsheet.</p>';return}PH.set(id,d);if(pdf){x.innerHTML=`<img class="bonbig" src="${d}" alt="Eerste blad van de factuur">`;return}
  x.innerHTML=`<img class="bonbig" src="${d}" alt="Bonnetje"><a class="btn ghost" style="margin-top:8px" href="${d}" download="bonnetje-${esc(b.date)}-${esc(b.shop.replace(/[^\w-]+/g,'_'))}.jpg">Foto opslaan</a>`}
 async function bonFetch(id){const g=S.club.gid;if(!g||!S.club.gok)throw new Error('Niet verbonden met de spreadsheet');
  const d=await api(`/${g}/values/${enc(rng(TAB_BF,'A2:A'))}`),i=(d.values||[]).findIndex(r=>String(r[0]||'').replace(/^'/,'')===id);if(i<0)return '';
@@ -1299,53 +1323,179 @@ async function bonTabs(){const g=S.club.gid,m=await api(`/${g}?fields=sheets.pro
  if(!ti.includes(TAB_BN))rq.push({addSheet:{properties:{title:TAB_BN}}});if(!ti.includes(TAB_BF))rq.push({addSheet:{properties:{title:TAB_BF,hidden:true}}});
  if(rq.length)await api(`/${g}:batchUpdate`,{method:'POST',body:JSON.stringify({requests:rq})});
  await head(TAB_BN,HEAD_BN);await head(TAB_BF,['ID','Foto (gebruikt door de app, niet aanpassen)']);S.club.bonTab=true;S.club.fmtK='';save()}
-const bonRow=b=>["'"+b.id,b.date,cell(b.shop),b.total,cell(b.items),cell(b.desc),cell(b.who),"'"+new Date(b.ts).toISOString(),b.status,b.txid?"'"+b.txid:'',cell(b.adv||''),b.test?'Ja':''];
+const bonRow=b=>["'"+b.id,b.date,cell(b.shop),b.total,cell(b.items),cell(b.desc),cell(b.who),"'"+new Date(b.ts).toISOString(),b.status,b.txid?"'"+b.txid:'',cell(b.adv||''),b.test?'Ja':'',cell(b.s||''),b.k==='f'?'Factuur':'Bonnetje',b.fid?drvUrl(b.fid):'',b.fid?(b.fdir==='paid'?'Betaald':'Nog niet betaald'):'',b.due||'',b.iban||'',cell(b.ogm||''),cell(b.inv||''),b.paid||'',b.fid||'',b.cp?'Ja':''];
+async function bonCols(){const c=S.club,k=c.gid+'|2';if(c.bonCols===k)return;await api(`/${c.gid}/values/${enc(rng(TAB_BN,'M1:W1'))}?valueInputOption=RAW`,{method:'PUT',body:JSON.stringify({values:[HEAD_BN.slice(12)]})});c.bonCols=k;c.fmtK='';save()}
 const HEAL=new Set();
 async function syncBons(pull){const c=S.club,g=c.gid;let ch=false;
  const nw=S.bons.filter(b=>!b.synced);
  if(!c.bonTab){if(!nw.length&&!(pull&&await hasTab(TAB_BN)))return false;await bonTabs()}
+ await bonCols();if(role==='q'&&bonState())ch=true;
  for(const b of nw){const ph=phGet(b.id);
   if(ph){const v=["'"+b.id];for(let i=0;i<ph.length;i+=40000)v.push(ph.slice(i,i+40000));
    await api(`/${g}/values/${enc(rng(TAB_BF,'A:A'))}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{method:'POST',body:JSON.stringify({values:[v.map((x,i)=>i?x:b.id)]})})}
-  await append(TAB_BN,'A:L',[bonRow(b)]);NSORT.add(TAB_BN);b.synced=true;b.dirty=false;if(ph){PH.set(b.id,ph);phDel(b.id)}save();ch=true}
- const dir=S.bons.filter(b=>b.dirty&&b.synced);
- if(!pull&&!dir.length)return ch;
- const d=await api(`/${g}/values/${enc(rng(TAB_BN,'A2:L'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[],idx=new Map();
+  await append(TAB_BN,'A:W',[bonRow(b)]);NSORT.add(TAB_BN);b.synced=true;b.dirty=false;if(ph){PH.set(b.id,ph);phDel(b.id)}save();ch=true}
+ const dir=S.bons.filter(b=>b.dirty&&b.synced);const nd=S.bons.some(b=>b.synced&&!b.fid&&!b.test&&b.k!=='f'&&b.status!=='Afgewezen')&&role==='q'&&c.drv&&c.drv.b;
+ if(!pull&&!dir.length&&!nd)return ch;
+ const d=await api(`/${g}/values/${enc(rng(TAB_BN,'A2:W'))}?valueRenderOption=UNFORMATTED_VALUE`),rows=d.values||[],idx=new Map();
  rows.forEach((r,i)=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(id)idx.set(id,i)});
- if(dir.length){const data=[];dir.forEach(b=>{const i=idx.get(b.id);if(i!=null){data.push({range:rng(TAB_BN,'A'+(i+2)+':L'+(i+2)),values:[bonRow(b)]});rows[i]=[b.id,b.date,b.shop,b.total,b.items,b.desc,b.who,rows[i][7],b.status,b.txid,b.adv||'']}});
+ if(dir.length){const data=[];dir.forEach(b=>{const i=idx.get(b.id);if(i!=null){const v=bonRow(b);data.push({range:rng(TAB_BN,'A'+(i+2)+':W'+(i+2)),values:[v]});const o=v.map(x=>typeof x==='string'?x.replace(/^'/,''):x);o[7]=rows[i][7];o[11]=rows[i][11];rows[i]=o}});
   if(data.length)await api(`/${g}/values:batchUpdate`,{method:'POST',body:JSON.stringify({valueInputOption:'USER_ENTERED',data})});dir.forEach(b=>b.dirty=false);ch=true}
  const by=new Map(S.bons.map(b=>[b.id,b])),seen=new Set();
+ const sd=v=>v===''||v==null?'':toDate(v);
  rows.forEach(r=>{const id=String(r[0]==null?'':r[0]).trim().replace(/^'/,'');if(!id)return;if(isJa(r[11])&&!TEST())return;seen.add(id);const tot=pnum(r[3]);
-  const o={date:toDate(r[1]),shop:String(r[2]||'').trim(),total:tot==null?0:tot,items:String(r[4]||''),desc:String(r[5]||''),who:String(r[6]||'').trim(),status:String(r[8]||'Nieuw').trim()||'Nieuw',txid:String(r[9]==null?'':r[9]).trim().replace(/^'/,''),adv:String(r[10]||'').trim()};
+  const o={date:toDate(r[1]),shop:String(r[2]||'').trim(),total:tot==null?0:tot,items:String(r[4]||''),desc:String(r[5]||''),who:String(r[6]||'').trim(),status:String(r[8]||'Nieuw').trim()||'Nieuw',txid:String(r[9]==null?'':r[9]).trim().replace(/^'/,''),adv:String(r[10]||'').trim(),s:String(r[12]||'').trim(),k:String(r[13]||'').trim()==='Factuur'?'f':'',fid:String(r[21]||'').trim(),fdir:String(r[21]||'').trim()?(String(r[15]||'').trim()==='Betaald'?'paid':'open'):'',due:sd(r[16]),iban:ibanFmt(r[17]),ogm:String(r[18]||'').trim(),inv:String(r[19]==null?'':r[19]).trim(),paid:sd(r[20]),cp:isJa(r[22])};
   if(o.status==='Nieuw'&&role==='q'){const x=S.tx.find(t=>t.bon===id&&t.exp&&!t.void&&!t.storno);if(x){o.status='Ingeboekt';o.txid=x.id;HEAL.add(id)}}
   const b=by.get(id);if(!b){S.bons.push(Object.assign({id,ts:toTs(String(r[7]||'').replace(/^'/,''),o.date),h:'',synced:true,dirty:false,mine:false,test:isJa(r[11])?1:0},o));NEW.bons.push(S.bons[S.bons.length-1]);ch=true;return}
   if(b.dirty)return;if(String(b.status)!==String(o.status))NEW.bst.push({b,from:b.status,to:o.status});for(const k in o)if(String(b[k])!==String(o[k])){b[k]=o[k];ch=true}});
  if(HEAL.size){S.bons.forEach(b=>{if(HEAL.has(b.id)&&b.synced)b.dirty=true});HEAL.clear();queueSync()}
  const before=S.bons.length;S.bons=S.bons.filter(b=>!b.synced||seen.has(b.id));if(S.bons.length!==before)ch=true;
+ if(role==='q')try{if(await bonDrive())ch=true}catch(e){if(e.auth)throw e;S.sync.warn='Bestanden naar Google Drive: '+(e.message||'onbekende fout')}
+ if(S.bons.some(b=>b.dirty&&b.synced))queueSync();
  if(ch)save();return ch}
+/* ---------- Google Drive: foto's en facturen ----------
+   De app mag alleen bij bestanden die hij zelf maakte of die je hem aanwees (drive.file). De Quaestor wijst één keer de map aan;
+   daarin maakt de app Bonnetjes/Betaald en Facturen/Betaald. Alleen het toestel van de Quaestor zet bestanden op Drive en verplaatst ze. */
+const DRV='https://www.googleapis.com/drive/v3/files',DRVU='https://www.googleapis.com/upload/drive/v3/files',FOLD='application/vnd.google-apps.folder',DRVSKIP=new Set();
+const DRVOFF='Google Drive staat nog niet aan voor de app. Zet het (gratis) aan in het Google Cloud-project van de app: console.cloud.google.com › API\'s en services › Bibliotheek › Google Drive API › Inschakelen. Probeer daarna opnieuw.';
+const drvUrl=id=>'https://drive.google.com/file/d/'+id+'/view';
+async function dapi(url,opt,raw){opt=opt||{};if(!haveTok()){if(!SI)throw authErr('Opnieuw verbinden nodig.');await getToken()}
+ const r=await fetch(url,{...opt,headers:Object.assign({Authorization:'Bearer '+TOKEN},opt.headers||{})});
+ if(r.status===401){TOKEN=null;try{localStorage.removeItem('qg')}catch(e){}throw authErr('Sessie verlopen. Tik op de status bovenaan om opnieuw te verbinden.')}
+ if(!r.ok){let m='';try{m=(await r.json()).error.message}catch(e){}if(/not been used|is disabled|has not been enabled|accessNotConfigured/i.test(m))throw new Error(DRVOFF);const e=new Error(m||('Google Drive-fout '+r.status));e.st=r.status;throw e}
+ return raw?r:r.json()}
+function dataBlob(d){const m=String(d).match(/^data:([^;,]+)(;base64)?,(.*)$/);if(!m)return new Blob([]);const b=atob(m[3]),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return new Blob([a],{type:m[1]})}
+const blobData=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Bestand lezen lukte niet'));r.readAsDataURL(b)});
+async function drvUp(blob,name,parent){const fd=new FormData();fd.append('metadata',new Blob([JSON.stringify({name,parents:[parent]})],{type:'application/json'}));fd.append('file',blob,name);
+ return (await dapi(`${DRVU}?uploadType=multipart&supportsAllDrives=true&fields=id`,{method:'POST',body:fd})).id}
+async function drvMk(name,parent){return (await dapi(`${DRV}?supportsAllDrives=true&fields=id`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,mimeType:FOLD,parents:[parent]})})).id}
+async function drvGet(id){return (await dapi(`${DRV}/${id}?alt=media&supportsAllDrives=true`,{},1)).blob()}
+async function drvTrash(id){await dapi(`${DRV}/${id}?supportsAllDrives=true&fields=id`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({trashed:true})})}
+const bonFname=(b,ext)=>`${b.test?'TEST - ':''}${b.date||today()} ${b.k==='f'?'Factuur ':''}${b.shop||'Onbekend'}${b.inv?' '+b.inv:''} ${fmt2(b.total)} EUR${b.who&&b.k!=='f'?' ('+b.who+')':''}.${ext}`.replace(/[\/\\:*?"<>|\n]+/g,'-');
+function pickFolder(tok,par){return new Promise(res=>{const P=google.picker,v=new P.DocsView(P.ViewId.FOLDERS).setSelectFolderEnabled(true).setIncludeFolders(true).setMimeTypes(FOLD);try{if(par)v.setParent(par)}catch(e){}
+ const B=new P.PickerBuilder().setAppId(appId()).setDeveloperKey(apiKey()).setOAuthToken(tok).setLocale('nl').setTitle('Kies de map van je boekhouding').addView(v);try{B.enableFeature(P.Feature.SUPPORT_DRIVES)}catch(e){}
+ B.setCallback(d=>{const a=d[P.Response.ACTION];if(a===P.Action.PICKED){const x=d[P.Response.DOCUMENTS][0];res({id:x[P.Document.ID],name:x[P.Document.NAME]})}else if(a===P.Action.CANCEL)res(null)}).build().setVisible(true)})}
+async function drvSetup(){const c=S.club;if(role!=='q')return;if(!c.gid||!c.gok)return toast('Verbind eerst met je spreadsheet');if(!navigator.onLine)return toast('Geen internet');
+ try{SI=true;const tok=await getToken();let par='';try{const j=await dapi(`${DRV}/${c.gid}?fields=parents&supportsAllDrives=true`);par=(j.parents||[])[0]||''}catch(e){if(e.auth||e.message===DRVOFF)throw e}
+  await loadPicker();const pk=await pickFolder(tok,par);if(!pk)return;toast('Mappen aanmaken…');
+  const b=await drvMk('Bonnetjes',pk.id),bp=await drvMk('Betaald',b),f=await drvMk('Facturen',pk.id),fp=await drvMk('Betaald',f);
+  const old=c.drv;c.drv={root:pk.id,name:pk.name,b,bp,f,fp,ts:Date.now()};if(old&&old.b)S.bons.forEach(x=>{if(x.fid&&x.k!=='f'){x.fid='';x.fdir='';x.dirty=!!x.synced}});
+  DRVSKIP.clear();c.setDirty=true;save();render();queueSync();
+  modal(`<h3>Mappen aangemaakt</h3><p>In <b>${esc(pk.name)}</b> staan nu de mappen <b>Bonnetjes</b> en <b>Facturen</b>, elk met een mapje <b>Betaald</b>.</p><p class="mu">Nieuwe bonnetjes komen in Bonnetjes. Is een bonnetje betaald (ingeboekt, en bij een voorschot ook terugbetaald), dan verhuist het naar Bonnetjes › Betaald. Facturen werken net zo. Bonnetjes die al in de app zitten, zet de app er de komende minuten ook in.</p><button class="btn" onclick="closeM()">OK</button>`)}
+ catch(e){modal(`<h3>Map kiezen lukte niet</h3><p>${esc(e.message||'Onbekende fout')}</p><button class="btn" onclick="closeM()">OK</button>`)}finally{SI=false}}
+function bonPaid(b){if(b.status!=='Ingeboekt')return '';const x=bonTx(b);if(!x)return '';if(x.method==='voorschot'){if(!x.paidBy)return '';const r=S.tx.filter(t=>t.ref===x.id&&!t.void&&!t.storno).map(t=>t.date).sort();return r[r.length-1]||today()}return x.date||today()}
+function bonState(){let ch=false;S.bons.forEach(b=>{const p=bonPaid(b);if(p&&b.paid!==p&&!b.paid){b.paid=p;ch=true}else if(!p&&b.paid){b.paid='';b.cp=false;ch=true}else return;if(b.synced)b.dirty=true});if(ch)save();return ch}
+async function bonDrive(){const c=S.club,d=c.drv;if(role!=='q'||!d||!d.b||!navigator.onLine)return false;let ch=false,n=0;
+ for(const b of S.bons){if(b.test||!b.synced||b.fid||b.k==='f'||b.status==='Afgewezen'||DRVSKIP.has(b.id))continue;if(n>=4)break;
+  let ph=PH.get(b.id)||phGet(b.id);if(!ph){try{ph=await bonFetch(b.id)}catch(e){if(e.auth)throw e}}if(!ph){DRVSKIP.add(b.id);continue}
+  const pd=!!b.paid;b.fid=await drvUp(dataBlob(ph),bonFname(b,'jpg'),pd?d.bp:d.b);b.fdir=pd?'paid':'open';b.dirty=true;ch=true;n++;save()}
+ for(const b of S.bons){if(!b.fid||!b.fdir||DRVSKIP.has(b.id))continue;const want=b.paid?'paid':'open';if(want===b.fdir)continue;
+  const F=b.k==='f'?[d.f,d.fp]:[d.b,d.bp],to=want==='paid'?F[1]:F[0],from=want==='paid'?F[0]:F[1];
+  try{await dapi(`${DRV}/${b.fid}?addParents=${to}&removeParents=${from}&supportsAllDrives=true&fields=id`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:'{}'});b.fdir=want;b.dirty=true;ch=true}
+  catch(e){if(e.auth)throw e;if(e.message===DRVOFF)throw e;DRVSKIP.add(b.id);console.warn('Verplaatsen op Drive',e)}}
+ if(ch)save();return ch}
+/* ---------- kasboek en bankboek ---------- */
+function bonBk(b){const x=bonTx(b);if(!x)return '';if(x.method==='voorschot'){const R=S.tx.filter(t=>t.ref===x.id&&!t.void&&!t.storno),r=R.find(t=>t.method!=='verrekening')||R[0];return r?(r.method==='cash'?'kas':'bank'):''}return x.method==='cash'?'kas':'bank'}
+const bonLines=bk=>S.bons.filter(b=>b.paid&&!b.cp&&!b.test===!TEST()&&bonBk(b)===bk).sort((a,b)=>a.paid.localeCompare(b.paid));
+function bonCopy(bk){const L=bonLines(bk);if(!L.length)return toast('Geen nieuwe regels voor het '+bk+'boek');
+ const txt=L.map(b=>{const x=bonTx(b);return [fdt(b.paid),(b.k==='f'?'Factuur ':'')+b.shop+(b.inv?' '+b.inv:'')+(x.desc&&x.desc!==b.shop?' – '+x.desc.replace(/^Factuur[^–]*– ?/,''):'')+(x.method==='voorschot'?' (voorgeschoten door '+x.adv+')':''),x.h,x.s||'','',nlN(-x.v)].map(v=>String(v).replace(/[\t\n]/g,' ')).join('\t')}).join('\n');
+ const vk=L.some(b=>{const x=bonTx(b);return x.method==='voorschot'&&S.tx.some(t=>t.ref===x.id&&t.method==='verrekening'&&!t.void)});
+ modal(`<h3>Regels voor het ${bk}boek</h3><p class="mu" style="margin:0 0 8px">${L.length} ${L.length===1?'regel':'regels'}: Datum, Omschrijving, Hoofdcategorie, Subcategorie, IN, UIT. Plak in kolom A van de eerste lege regel.</p>${vk?'<p class="mu" style="margin:0 0 8px">Een voorschot werd (deels) verrekend met een schuld. Noteer die afbetaling ook, zoals de app toonde bij het terugbetalen.</p>':''}<textarea id="tx" readonly>${esc(txt)}</textarea><button class="btn" style="margin-top:10px" onclick="cp()">Kopiëren</button><button class="btn ghost" style="margin-top:8px" onclick="bonMark('${bk}')">Ik heb ze geplakt: markeer als overgenomen</button>`)}
+function bonMark(bk){bonLines(bk).forEach(b=>{b.cp=true;b.dirty=!!b.synced});closeM();save();render();queueSync();toast('Gemarkeerd als overgenomen')}
+/* ---------- facturen ---------- */
+let FACT=null;
+const ogmOk=d=>{d=String(d).replace(/\D/g,'');if(d.length!==12)return false;return (+d.slice(0,10)%97||97)===+d.slice(10)};
+const ogmFmt=d=>{d=String(d).replace(/\D/g,'');return `+++${d.slice(0,3)}/${d.slice(3,7)}/${d.slice(7)}+++`};
+function ogmIn(v){v=String(v||'').trim();const d=v.replace(/\D/g,'');if(/^[+*]{3}/.test(v)||(d.length===12&&/^[\d\s\/.+*-]+$/.test(v)))return ogmOk(d)?ogmFmt(d):null;return v.slice(0,140)}
+function cpv(v,msg){try{navigator.clipboard.writeText(v).then(()=>toast(msg||'Gekopieerd'),()=>toast(v))}catch(e){toast(v)}}
+function loadPdf(){return new Promise((res,rej)=>{if(window.pdfjsLib)return res(window.pdfjsLib);const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+ s.onload=()=>{if(!window.pdfjsLib)return rej(new Error('PDF-lezer niet geladen'));try{pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}catch(e){}res(window.pdfjsLib)};s.onerror=()=>rej(new Error('geen internet of PDF-lezer niet bereikbaar'));document.head.appendChild(s)})}
+function pdfLines(items){const L=new Map();(items||[]).forEach(it=>{if(!it.str||!it.str.trim())return;const y=Math.round(it.transform[5]/3),a=L.get(y)||[];a.push([it.transform[4],it.str]);L.set(y,a)});return [...L.entries()].sort((a,b)=>b[0]-a[0]).map(([,a])=>a.sort((p,q)=>p[0]-q[0]).map(p=>p[1]).join(' ')).join('\n')}
+async function ocr(cv){const T=await loadTess(),w=await T.createWorker('nld',1,{logger:m=>{if(m&&m.status==='recognizing text'){const e=document.querySelector('#bonp>i');if(e)e.style.width=Math.round((m.progress||0)*100)+'%'}}});
+ try{await w.setParameters({tessedit_pageseg_mode:'3',preserve_interword_spaces:'1'})}catch(e){}const r=await w.recognize(cv);try{await w.terminate()}catch(e){}return (r&&r.data&&r.data.text)||''}
+function parseFact(txt){const L=String(txt||'').split(/\r?\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean),T=L.join('\n'),pb=parseBon(txt);
+ const own=String((S.club.rmd||{}).iban||'').replace(/\s/g,'').toUpperCase(),ibans=[];
+ (T.toUpperCase().match(/\b[A-Z]{2}\d{2}(?:[ .]?[A-Z0-9]{4}){2,7}(?:[ .]?[A-Z0-9]{1,3})?\b/g)||[]).forEach(x=>{const v=x.replace(/[ .]/g,'');for(let n=v.length;n>=12;n--){const c=v.slice(0,n);if(ibanOk(c)){if(c!==own&&!ibans.includes(c))ibans.push(c);break}}});
+ let ogm='';const om=T.match(/(?:\+{3}|\*{3})\s*(\d{3})\s*\/?\s*(\d{4})\s*\/?\s*(\d{5})\s*(?:\+{3}|\*{3})/);if(om&&ogmOk(om[1]+om[2]+om[3]))ogm=ogmFmt(om[1]+om[2]+om[3]);
+ if(!ogm)for(const l of L)if(/mededeling|communicatie|referentie|betalingsreferte/i.test(l)){const d=l.replace(/\D/g,'');if(d.length===12&&ogmOk(d)){ogm=ogmFmt(d);break}}
+ const MN={jan:1,feb:2,maa:3,mrt:3,apr:4,mei:5,jun:6,jul:7,aug:8,sep:9,okt:10,oct:10,nov:11,dec:12};
+ const D=s=>{let m=s.match(/\b(\d{1,2})\s?[-\/.]\s?(\d{1,2})\s?[-\/.]\s?(20\d{2}|\d{2})\b/);if(m){let y=+m[3];if(y<100)y+=2000;const mo=+m[2],d=+m[1];if(mo>=1&&mo<=12&&d>=1&&d<=31)return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
+  m=s.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);if(m)return m[0];m=s.toLowerCase().match(/\b(\d{1,2})\s+(jan|feb|maa|mrt|apr|mei|jun|jul|aug|sep|okt|oct|nov|dec)[a-z]*\.?\s+(20\d{2})\b/);
+  if(m)return `${m[3]}-${String(MN[m[2]]).padStart(2,'0')}-${String(+m[1]).padStart(2,'0')}`;return ''};
+ const near=re=>{for(let i=0;i<L.length;i++)if(re.test(L[i])){const d=D(L[i].replace(re,' '))||(L[i+1]?D(L[i+1]):'');if(d)return d}return ''};
+ let date=near(/factuurdatum|datum factuur|datum van de factuur|invoice date|date de facture/i)||pb.date||'',due=near(/vervaldatum|vervaldag|verval|uiterste betaaldatum|te betalen (?:voor|tegen|uiterlijk|op)|betalen voor|uiterlijk|due date|échéance/i);
+ if(!due&&date){const m=T.match(/(\d{1,3})\s*dagen/i);if(m&&+m[1]<=120){const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+ +m[1]);due=d.toISOString().slice(0,10)}}
+ let inv='';const im=T.match(/(?:factuurnummer|factuur\s*(?:nr|nummer|n°|no)\.?|invoice\s*(?:no|number|nr)?\.?|n° de facture)\s*[:#]?\s*([A-Z0-9][A-Z0-9\-\/.]{2,24})/i);if(im&&/\d/.test(im[1]))inv=im[1].replace(/[.\-\/]$/,'');
+ const NUM=/(\d{1,3}(?:[.\s]\d{3})+,\d{2}|\d+,\d{2}|\d{1,3}(?:,\d{3})+\.\d{2}|\d+\.\d{2})(?!\d)/g,amt=s=>{const o=[];let m;NUM.lastIndex=0;while((m=NUM.exec(s))){let x=m[1];x=/,\d{2}$/.test(x)?x.replace(/[.\s]/g,'').replace(',','.'):x.replace(/,/g,'');const v=+x;if(v>0&&v<1e6)o.push(v)}return o};
+ let total=null;for(const re of [/(totaal|bedrag)?\s*te betalen|to pay|à payer|a payer/i,/tota(a)?l\s*(incl|inclusief|tvac|ttc|btw inbegrepen)|totaal factuur|factuurtotaal|totaal\s*(eur|€)|total due|amount due/i,/^\s*tota(a)?l\b(?!.*(excl|htva|btw|tva|vat|netto|subtot))/i]){
+  for(let i=0;i<L.length&&total==null;i++)if(re.test(L[i])){const a=amt(L[i]).length?amt(L[i]):(L[i+1]?amt(L[i+1]):[]);if(a.length)total=a[a.length-1]}if(total!=null)break}
+ if(total==null)total=pb.total;
+ return{shop:pb.shop,shops:pb.shops||[],date,due,inv,total:total!=null?fmt2(total):'',iban:ibans[0]?ibanFmt(ibans[0]):'',ibans:ibans.map(ibanFmt),ogm}}
+async function factFile(inp){const f=inp.files&&inp.files[0];if(!f)return;inp.value='';if(role!=='q')return;if(!S.club.drv||!S.club.drv.b)return toast('Kies eerst de map op Google Drive');
+ const pdf=/pdf/i.test(f.type)||/\.pdf$/i.test(f.name||'');if(f.size>15e6)return toast('Dit bestand is te groot (max. 15 MB)');if(!pdf&&!/^image\//.test(f.type||'image/'))return toast('Kies een PDF of een foto');
+ const id=uid();FACT={id,pdf,blob:null,prev:'',shop:'',inv:'',date:today(),due:'',total:'',iban:'',ogm:'',desc:'',h:'',s:'',reading:true,err:'',text:'',tch:{},sug:null};BON=null;render();toTop();
+ let text='';try{
+  if(pdf){FACT.blob=f;const P=await loadPdf(),doc=await P.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;
+   for(let i=1;i<=Math.min(doc.numPages,3);i++){const pg=await doc.getPage(i);text+=pdfLines((await pg.getTextContent()).items)+'\n'}
+   const p1=await doc.getPage(1),vp=p1.getViewport({scale:1.6}),cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;{const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height)}await p1.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+   if(FACT&&FACT.id===id)FACT.prev=cv.toDataURL('image/jpeg',.7);if(text.replace(/\s/g,'').length<40)text=await ocr(cv)}
+  else{const img=await imgOf(f);FACT.prev=canv(img,1400).toDataURL('image/jpeg',.7);FACT.blob=dataBlob(canv(img,2000).toDataURL('image/jpeg',.8));text=await ocr(canv(img,2200,true))}}
+ catch(e){if(FACT&&FACT.id===id)FACT.err='Lezen lukte niet ('+(e.message||e)+'). Vul de gegevens zelf in.'}
+ const F=FACT;if(!F||F.id!==id)return;F.reading=false;F.text=text;
+ if(text.trim()){const p=parseFact(text);F.sug=p;['shop','inv','date','due','total','iban','ogm'].forEach(k=>{if(p[k]&&!F.tch[k])F[k]=p[k]});if(!p.total&&!p.shop&&!F.err)F.err='Er werd weinig tekst herkend. Vul de gegevens zelf in.'}
+ if(tab!=='bon')return;if(typing()){const st=$('#bonst');if(st)st.outerHTML=factSt();['shop','inv','date','due','total','iban','ogm'].forEach(k=>{const e=$('#f-'+k);if(e&&!F.tch[k]&&document.activeElement!==e)e.value=F[k]||''});const pv=$('#fprev');if(pv&&F.prev)pv.src=F.prev}else render()}
+function factSt(){const F=FACT;return `<div id="bonst">${F.reading?'<p class="mu">De app leest de factuur… Je kan intussen al invullen.</p><div class="prog" id="bonp"><i></i></div>':F.err?`<p class="err">${esc(F.err)}</p>`:'<p class="mu">Gelezen. Kijk alles na voor je opslaat.</p>'}</div>`}
+function factForm(){const F=FACT,c=S.cats,fi=(k,l,t,ph)=>`<label>${l}<input id="f-${k}"${t?` type="${t}"`:''}${k==='total'?' inputmode="decimal"':''} value="${esc(F[k]||'')}"${ph?` placeholder="${ph}"`:''} oninput="FACT['${k}']=this.value;FACT.tch['${k}']=1"></label>`,
+  ch=(k,l)=>l&&l.length>1?`<div class="chips">${l.slice(0,4).map(x=>`<button type="button" data-v="${esc(x)}" onclick="FACT['${k}']=this.dataset.v;FACT.tch['${k}']=1;$('#f-${k}').value=this.dataset.v">${esc(x)}</button>`).join('')}</div>`:'';
+ return `<div class="card"><h2>Factuur</h2>${F.prev?`<img id="fprev" class="bonimg" src="${F.prev}" alt="Factuur" style="cursor:zoom-in" onclick="modal('<img class=&quot;bonbig&quot; src=&quot;'+FACT.prev+'&quot;><button class=&quot;btn ghost&quot; style=&quot;margin-top:8px&quot; onclick=&quot;closeM()&quot;>Sluiten</button>')">`:`<img id="fprev" class="bonimg" alt="" style="display:none">`}${factSt()}
+ ${fi('shop','Leverancier')}${ch('shop',F.sug&&F.sug.shops)}${fi('inv','Factuurnummer (niet verplicht)')}
+ <div class="g3">${fi('date','Factuurdatum','date')}${fi('due','Vervaldatum','date')}</div>
+ ${fi('total','Te betalen in euro')}${fi('iban','Rekeningnummer van de leverancier','','BE..')}${ch('iban',F.sug&&F.sug.ibans)}${fi('ogm','Mededeling','','+++123/4567/89012+++ of vrije tekst')}
+ <label>Waarvoor (bv. zaalhuur cantus)<input id="f-desc" value="${esc(F.desc)}" oninput="FACT.desc=this.value"></label>
+ <label>Hoofdcategorie<select onchange="FACT.h=this.value;FACT.s='';fillS(this,'fss')">${opts(c.h,F.h,true)}</select></label><label>Subcategorie (activiteit)<select id="fss" onchange="FACT.s=this.value">${opts(subsFor(F.h),F.s,true)}</select></label>
+ ${F.text?`<details><summary>Gelezen tekst tonen</summary><textarea readonly rows="8">${esc(F.text)}</textarea></details>`:''}
+ <button class="btn" id="fsave" onclick="factSave(0)">Opslaan: nog te betalen</button><button class="btn ghost" style="margin-top:8px" onclick="factSave(1)">Al betaald: opslaan en inboeken</button><button class="btn ghost" style="margin-top:8px" onclick="FACT=null;render()">Annuleren</button></div>`}
+async function factSave(now){const F=FACT;if(!F||role!=='q')return;if(F.reading)return toast('Even wachten: de app is de factuur nog aan het lezen');if(F.busy)return;
+ const tot=pamt(F.total),ib=ibanFmt(F.iban),og=ogmIn(F.ogm);
+ if(!String(F.shop).trim())return toast('Vul de leverancier in');if(!(tot>0))return toast('Vul het bedrag in');if(ib&&!ibanOk(ib))return toast('Dat rekeningnummer klopt niet. Kijk het nog eens na.');if(og===null)return toast('De gestructureerde mededeling klopt niet. Kijk ze nog eens na.');
+ if(!navigator.onLine)return toast('Je hebt internet nodig om de factuur op Google Drive te zetten');if(!F.blob)return toast('Het bestand ontbreekt. Kies de factuur opnieuw.');
+ const nb={id:F.id,k:'f',date:F.date||today(),shop:String(F.shop).trim().slice(0,80),total:tot,items:'',desc:String(F.desc||'').trim().slice(0,200),h:F.h||'',s:F.s||'',who:WHO,ts:Date.now(),status:'Nieuw',txid:'',adv:'',iban:ib,ogm:og||'',inv:String(F.inv||'').trim().slice(0,40),due:F.due||'',fid:'',fdir:'',mime:F.pdf?'application/pdf':'image/jpeg',synced:false,dirty:false,mine:true};
+ nb.test=TEST()?1:0;F.busy=true;const bt=$('#fsave');if(bt){bt.disabled=true;bt.textContent='Opladen naar Google Drive…'}
+ try{SI=true;nb.fid=await drvUp(F.blob,bonFname(nb,F.pdf?'pdf':'jpg'),S.club.drv.f);nb.fdir='open'}
+ catch(e){F.busy=false;if(bt){bt.disabled=false;bt.textContent='Opslaan: nog te betalen'}SI=false;return modal(`<h3>Opladen lukte niet</h3><p>${esc(e.message||'Onbekende fout')}</p><p class="mu">De factuur is nog niet bewaard. Probeer opnieuw.</p><button class="btn" onclick="closeM()">OK</button>`)}
+ SI=false;if(F.prev)PH.set(nb.id,F.prev);S.bons.push(nb);FACT=null;save();queueSync();if(now)return render(),bonBook(nb.id);render();toTop();toast('Factuur bewaard: staat bij Te betalen')}
+const dueTag=b=>{if(!b.due)return '';const n=Math.round((new Date(b.due+'T12:00:00')-new Date(today()+'T12:00:00'))/864e5);return n<0?`<span class="tag" style="color:var(--er);font-weight:600">${-n} dag${n===-1?'':'en'} te laat</span>`:n<=7?`<span class="tag warn">vervalt ${n===0?'vandaag':'over '+n+' dag'+(n===1?'':'en')}</span>`:`<span class="tag">vervalt ${fdt(b.due)}</span>`};
+const cpRow=(l,v,cv)=>v?`<div class="row" style="padding:8px 0;align-items:center"><div><span class="mu" style="font-size:13px">${l}</span><div style="font-weight:600;font-variant-numeric:tabular-nums;word-break:break-word">${esc(v)}</div></div><button class="sm" data-v="${esc(cv==null?v:cv)}" onclick="cpv(this.dataset.v)">Kopiëren</button></div>`:'';
+function factPay(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q'||lockR(b))return;
+ modal(`<h3>Factuur betalen</h3><p class="mu" style="margin:0 0 6px">${esc(b.shop)}${b.inv?' · factuur '+esc(b.inv):''} ${dueTag(b)}</p>${cpRow('Begunstigde',b.shop)}${cpRow('Rekeningnummer',b.iban,String(b.iban||'').replace(/\s/g,''))}${cpRow('Bedrag',eur(b.total),fmt2(b.total))}${cpRow('Mededeling',b.ogm,/^\+{3}/.test(b.ogm||'')?b.ogm.replace(/\D/g,''):b.ogm)}
+ ${b.iban?'':'<p class="mu">Geen rekeningnummer bekend. Kijk op de factuur of vul het in bij Aanpassen.</p>'}${b.fid?`<a class="btn ghost" style="margin-top:8px" href="${drvUrl(b.fid)}" target="_blank" rel="noopener">Factuur openen</a>`:''}
+ <p class="mu" style="margin:12px 0 8px">Betaal de factuur met je bankapp. Daarna:</p><button class="btn" onclick="closeM();setTimeout(()=>bonBook('${b.id}'),50)">Ik heb betaald: inboeken</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Later</button>`)}
+function bonLbl(b){const x=b.txid&&S.tx.find(t=>t.id===b.txid);return (b.status==='Afgewezen'?'Afgewezen':b.status==='Nieuw'?(b.k==='f'?'Te betalen':'Te verwerken'):(x&&x.void)?'Boeking geannuleerd':b.paid?'Betaald':'Ingeboekt, nog terug te betalen')+(b.synced?'':' · nog niet verstuurd')}
 const MX={cash:'Cash uit de kas',overschrijving:'Overschrijving van de clubrekening',payconiq:'Payconiq',voorschot:'Voorgeschoten door iemand (nog terug te betalen)'};
 function bonBook(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q'||lockR(b))return;const c=S.cats;
- modal(`<h3>Inboeken als uitgave</h3><p class="mu">${esc(b.shop)} · ${esc(b.date)}${b.who?' · ingediend door '+esc(b.who):''}</p>
- <label>Bedrag<input id="xb" inputmode="decimal" value="${fmt2(b.total)}"></label><label>Datum<input id="xd" type="date" value="${esc(b.date||today())}"></label>
- <label>Omschrijving<input id="xo" value="${esc(b.desc||b.items.slice(0,80))}"></label>
- <label>Hoofdcategorie<select id="xh" onchange="fillS(this,'xs')">${opts(c.h,b.h||c.h[0])}</select></label><label>Subcategorie<select id="xs">${opts(subsFor(b.h||c.h[0]),'',true)}</select></label>
- <label>Betaald via<select id="xm" onchange="document.getElementById('xvw').style.display=this.value==='voorschot'?'block':'none'">${Object.keys(MX).map(k=>`<option value="${k}"${(b.adv?k==='voorschot':k==='cash')?' selected':''}>${MX[k]}</option>`).join('')}</select></label>
+ const fx=b.k==='f';modal(`<h3>${fx?'Betaalde factuur inboeken':'Inboeken als uitgave'}</h3><p class="mu">${esc(b.shop)} · ${esc(fdt(b.date))}${fx?(b.inv?' · factuur '+esc(b.inv):''):(b.who?' · ingediend door '+esc(b.who):'')}</p>
+ <label>Bedrag<input id="xb" inputmode="decimal" value="${fmt2(b.total)}"></label><label>${fx?'Betaald op':'Datum'}<input id="xd" type="date" value="${esc(fx?today():(b.date||today()))}"></label>
+ <label>Omschrijving<input id="xo" value="${esc(fx?('Factuur'+(b.inv?' '+b.inv:'')+(b.desc?' – '+b.desc:'')):(b.desc||String(b.items||'').slice(0,80)))}"></label>
+ <label>Hoofdcategorie<select id="xh" onchange="fillS(this,'xs')">${opts(c.h,b.h||c.h[0])}</select></label><label>Subcategorie<select id="xs">${opts(subsFor(b.h||c.h[0]),b.s||'',true)}</select></label>
+ <label>Betaald via<select id="xm" onchange="document.getElementById('xvw').style.display=this.value==='voorschot'?'block':'none'">${Object.keys(MX).map(k=>`<option value="${k}"${(b.adv?k==='voorschot':k===(fx?'overschrijving':'cash'))?' selected':''}>${MX[k]}</option>`).join('')}</select></label>
  <div id="xvw" style="display:${b.adv?'block':'none'}"><label>Voorgeschoten door<input id="xv" value="${esc(b.adv||b.who||'')}"></label></div>
  <button class="btn" onclick="bonBookOk('${b.id}')">Inboeken</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
 function bonBookOk(id){const b=S.bons.find(x=>x.id===id);if(!b)return;const a=pamt($('#xb').value),m=$('#xm').value,adv=m==='voorschot'?($('#xv').value||'').trim():'';
  if(!(a>0))return toast('Vul een bedrag in');if(m==='voorschot'&&!adv)return toast('Vul in wie het voorschoot');
  const tx={who:WHO,id:uid(),ts:Date.now(),date:$('#xd').value||today(),mid:null,name:b.shop,v:-a,method:m,h:$('#xh').value,s:$('#xs').value,desc:($('#xo').value||'').trim(),by:role,exp:true,bon:b.id,adv,void:false,synced:false};
- S.tx.push(tx);b.status='Ingeboekt';b.txid=tx.id;b.dirty=!!b.synced;closeM();save();render();queueSync();
+ S.tx.push(tx);b.status='Ingeboekt';b.txid=tx.id;b.h=tx.h;b.s=tx.s;b.adv=adv;b.dirty=!!b.synced;if(adv&&b.iban){const mm=memOf(adv);if(mm&&!mm.iban){mm.iban=b.iban;mm.ibanDirty=true}}bonState();closeM();save();render();queueSync();
  const od=adv?memDebt(adv):null;if(od&&od.tot>.005){toast(`Ingeboekt. ${adv} heeft nog ${eur(od.tot)} schuld: je kan meteen verrekenen.`);return refund(tx.id)}toast('Ingeboekt als uitgave')}
 function bonTx(b){const x=b&&b.txid&&S.tx.find(t=>t.id===b.txid);return x&&!x.void?x:null}
 function bonEdit(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q'||lockR(b))return;const x=bonTx(b);
  modal(`<h3>Bonnetje aanpassen</h3>${x?'<p class="mu">Dit bonnetje is al ingeboekt. Pas je winkel, datum of bedrag aan, dan wordt de boeking geannuleerd en opnieuw ingeboekt met de nieuwe gegevens.</p>':''}
  <label>Winkel<input id="ebs" value="${esc(b.shop)}"></label><label>Datum van de aankoop<input id="ebd" type="date" value="${esc(b.date)}"></label><label>Totaal in euro<input id="ebt" inputmode="decimal" value="${fmt2(b.total)}"></label>
  <label>Wat werd er gekocht<textarea id="ebi" rows="3">${esc(String(b.items||'').split('; ').join('\n'))}</textarea></label><label>Waarvoor<input id="ebo" value="${esc(b.desc)}"></label>
- <label>Voorgeschoten door (leeg als het niet voorgeschoten werd)<input id="eba" value="${esc(b.adv||'')}"></label>
+ ${b.k==='f'?`<label>Factuurnummer<input id="ebn" value="${esc(b.inv||'')}"></label><label>Vervaldatum<input id="ebv" type="date" value="${esc(b.due||'')}"></label><label>Rekeningnummer van de leverancier<input id="ebr" value="${esc(b.iban||'')}"></label><label>Mededeling<input id="ebm" value="${esc(b.ogm||'')}"></label>`:`<label>Voorgeschoten door (leeg als het niet voorgeschoten werd)<input id="eba" value="${esc(b.adv||'')}"></label>`}
+ ${x?'':`<label>Hoofdcategorie<select id="ebh" onchange="fillS(this,'ebs2')">${opts(S.cats.h,b.h,true)}</select></label><label>Subcategorie<select id="ebs2">${opts(subsFor(b.h),b.s||'',true)}</select></label>`}
  <button class="btn" onclick="bonEditOk('${esc(id)}')">Opslaan</button><button class="btn ghost" style="margin-top:8px" onclick="closeM()">Annuleren</button>`)}
 function bonEditOk(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q'||lockR(b))return;
- const n={shop:($('#ebs').value||'').trim().slice(0,80),date:$('#ebd').value||b.date,total:pamt($('#ebt').value),items:($('#ebi').value||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean).join('; ').slice(0,2000),desc:($('#ebo').value||'').trim().slice(0,200),adv:($('#eba').value||'').trim().slice(0,40)};
+ const n={shop:($('#ebs').value||'').trim().slice(0,80),date:$('#ebd').value||b.date,total:pamt($('#ebt').value),items:($('#ebi').value||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean).join('; ').slice(0,2000),desc:($('#ebo').value||'').trim().slice(0,200),adv:$('#eba')?($('#eba').value||'').trim().slice(0,40):(b.adv||'')};
+ if($('#ebh')){n.h=$('#ebh').value;n.s=$('#ebs2').value}
+ if($('#ebn')){n.inv=($('#ebn').value||'').trim().slice(0,40);n.due=$('#ebv').value||'';const ib=ibanFmt($('#ebr').value),og=ogmIn($('#ebm').value);if(ib&&!ibanOk(ib))return toast('Dat rekeningnummer klopt niet');if(og===null)return toast('De gestructureerde mededeling klopt niet');n.iban=ib;n.ogm=og}
  if(!n.shop)return toast('Vul de winkel in');if(!(n.total>0))return toast('Vul het totaal in');
  const x=bonTx(b),money=x&&(n.total!==b.total||n.date!==b.date||n.shop!==b.shop||(!!n.adv)!==(x.method==='voorschot')||(n.adv&&n.adv!==x.adv));
  if(money&&x.paidBy)return toast('Dit bedrag werd al terugbetaald. Annuleer eerst de terugbetaling bij Overzicht.');
@@ -1356,7 +1506,7 @@ function bonEditOk(id){const b=S.bons.find(x=>x.id===id);if(!b||role!=='q'||lock
 function bonReject(id){const b=S.bons.find(x=>x.id===id);if(!b||lockR(b))return;ask(`Bonnetje van ${esc(b.shop)} (${eur(b.total)}) afwijzen? Het blijft bewaard in de spreadsheet met status Afgewezen.`,'Afwijzen',()=>{b.status='Afgewezen';b.dirty=!!b.synced;save();render();queueSync()})}
 const advOpen=()=>S.tx.filter(t=>t.method==='voorschot'&&t.exp&&!t.void&&!t.storno&&!t.paidBy);
 function refund(id){const d=S.tx.find(x=>x.id===id);if(!d)return;const X=-d.v,o=d.adv?memDebt(d.adv):null,D=o?o.tot:0,Y0=Math.round(Math.min(D,X)*100)/100;
- modal(`<h3>Terugbetalen</h3><p>${esc(d.adv)} schoot ${eur(X)} voor: ${esc(d.desc||d.name)}</p>${ibanLine(memOf(d.adv),'Rekeningnummer van '+esc(d.adv))}${role==='q'&&memOf(d.adv)&&!memOf(d.adv).iban?'<p class="mu" style="font-size:13px">Geen rekeningnummer bekend. Voeg het toe bij Leden › het lid › Aanpassen.</p>':''}
+ modal(`<h3>Terugbetalen</h3><p>${esc(d.adv)} schoot ${eur(X)} voor: ${esc(d.desc||d.name)}</p>${(()=>{const mo=memOf(d.adv),bi=(S.bons.find(b=>b.txid===d.id)||{}).iban;return ibanLine(mo&&mo.iban?mo:bi?{iban:bi}:mo,'Rekeningnummer van '+esc(d.adv))})()}${role==='q'&&memOf(d.adv)&&!memOf(d.adv).iban&&!(S.bons.find(b=>b.txid===d.id)||{}).iban?'<p class="mu" style="font-size:13px">Geen rekeningnummer bekend. Voeg het toe bij Leden › het lid › Aanpassen.</p>':''}
  ${D>.005?`<div class="stat" style="margin:4px 0 10px"><span class="mu">${esc(o.name)} heeft nog een openstaande schuld</span><b>${eur(D)}</b></div>
  <label class="tg" style="border:0"><span>Verrekenen met de schuld<small>Een deel van het voorschot betaalt de schuld af. Je maakt alleen het verschil over.</small></span><input type="checkbox" id="vk" checked onchange="refPrev('${id}')"></label>
  <div id="vkw"><label>Bedrag verrekenen<input id="va" inputmode="decimal" value="${fmt2(Y0)}" oninput="refPrev('${id}')"></label><div id="pp" style="margin:-4px 0 10px"></div></div>`:''}
@@ -1382,18 +1532,22 @@ function refundOk(id){const r=refCalc(id);if(!r)return;if(r.err)return toast(r.e
    S.tx.push({who:WHO,id:uid(),ts:now+(i++),date,mid:t.mid,name:t.name,v:p,method:'verrekening',...payHS(t),desc:'Afbetaling: '+(t.desc||t.h||'schuld')+' (verrekend met voorschot)',by:role,ref:t.id,void:false,synced:false});a=Math.round((a-p)*100)/100})}
  if(Z>.005)S.tx.push({who:WHO,id:uid(),ts:now+(i++),date,mid:null,name:d.adv,v:-Z,method:m,h:d.h,s:d.s,desc:'Terugbetaling '+d.name+(Y>.005?' (rest na verrekening)':''),by:role,exp:true,ref:d.id,void:false,synced:false});
  relink();save();closeM();render();queueSync();toast(Y>.005?`${eur(Y)} verrekend met de schuld`+(Z>.005?`, ${eur(Z)} terugbetaald`:''):'Terugbetaling geboekt')}
-function vBon(){const Q=role==='q';if(BON)return bonForm();
- const st=b=>{const x=b.txid&&S.tx.find(t=>t.id===b.txid);if(b.status==='Ingeboekt'&&x&&x.void)return 'Boeking geannuleerd';return b.status+(b.synced?'':' · nog niet verstuurd')};
- const it=(b,act)=>`<div class="row"><div><b>${esc(b.shop)}</b> <span class="tag">${esc(st(b))}</span><div class="mu">${esc(b.date)}${b.who?' · '+esc(b.who):''}${b.adv?' · voorgeschoten door '+esc(b.adv):''}${b.desc?' · '+esc(b.desc):''}</div>
-  <div class="accb"><button class="btn ghost" onclick="bonView('${b.id}')">Bekijken</button>${Q?`<button class="btn ghost" onclick="bonEdit('${b.id}')">Aanpassen</button>`:''}${act&&Q?`<button class="btn ghost" onclick="bonBook('${b.id}')">Inboeken</button><button class="btn ghost" onclick="bonReject('${b.id}')">Afwijzen</button>`:''}</div></div><div class="amt">${eur(b.total)}</div></div>`;
+function vBon(){const Q=role==='q',c=S.club,dv=!!(c.drv&&c.drv.b);if(FACT&&Q)return factForm();if(BON)return bonForm();
+ const it=(b,act)=>`<div class="row"><div><b>${esc(b.shop)}</b>${b.k==='f'?` <span class="tag">Factuur${b.inv?' '+esc(b.inv):''}</span>`:''} <span class="tag">${esc(bonLbl(b))}</span>${b.test?' <span class="tag tmtag">Test</span>':''}${b.k==='f'&&b.status==='Nieuw'?' '+dueTag(b):''}<div class="mu">${esc(fdt(b.date))}${b.who&&b.k!=='f'?' · '+esc(b.who):''}${b.adv?' · voorgeschoten door '+esc(b.adv):''}${b.s?' · '+esc(b.s):b.h?' · '+esc(b.h):''}${b.desc?' · '+esc(b.desc):''}</div>
+  <div class="accb"><button class="btn ghost" onclick="bonView('${b.id}')">Bekijken</button>${act&&Q&&b.k==='f'?`<button class="btn" onclick="factPay('${b.id}')">Betalen</button>`:''}${Q?`<button class="btn ghost" onclick="bonEdit('${b.id}')">Aanpassen</button>`:''}${act&&Q&&b.k!=='f'?`<button class="btn ghost" onclick="bonBook('${b.id}')">Inboeken</button>`:''}${act&&Q?`<button class="btn ghost" onclick="bonReject('${b.id}')">Afwijzen</button>`:''}</div></div><div class="amt">${eur(b.total)}</div></div>`;
  const srt=l=>l.slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
- let h=`<div class="card"><h2>Bonnetje toevoegen</h2><p class="mu">Neem een foto van het bonnetje of kies er een uit je galerij. De app leest winkel, datum, totaal en artikelen. Jij kijkt alles na voor je het indient${Q?'':', daarna boekt de Quaestor het in'}.</p><div class="btns"><label class="btn" style="cursor:pointer">📷 Foto nemen<input type="file" accept="image/*" capture="environment" style="display:none" onchange="bonFile(this)"></label><label class="btn ghost" style="cursor:pointer">Uit galerij<input type="file" accept="image/*" style="display:none" onchange="bonFile(this)"></label></div></div>`;
- if(Q){const td=srt(bonTodo()),ao=advOpen(),dn=srt(S.bons.filter(b=>!bonTodo().includes(b))).slice(0,30);
-  if(!td.length&&!ao.length&&!dn.length)h+=`<div class="card">${empty('Nog geen bonnetjes ingediend.')}</div>`;
+ const drv=Q?(dv?`<p class="mu" style="text-align:center;font-size:13px">Foto's en facturen staan op Google Drive in <b>${esc(c.drv.name||'je map')}</b> › Bonnetjes en Facturen. <button class="lnk" onclick="drvSetup()">Andere map kiezen</button></p>`:`<div class="card banner"><h2>Foto's bewaren op Google Drive</h2><p class="mu">Kies één keer de map waarin je boekhouding staat, bv. op de gedeelde drive. De app maakt daarin de mappen Bonnetjes en Facturen, elk met een mapje Betaald. Wat betaald is, verhuist vanzelf naar Betaald.</p><button class="btn" onclick="drvSetup()">Map kiezen</button></div>`):'';
+ let h=(Q&&!dv?drv:'')+`<div class="card"><h2>Bonnetje toevoegen</h2><p class="mu">Neem een foto van het bonnetje of kies er een uit je galerij. De app leest winkel, datum, totaal en artikelen. Jij kijkt alles na voor je het indient${Q?'':', daarna boekt de Quaestor het in'}.</p><div class="btns"><label class="btn" style="cursor:pointer">📷 Foto nemen<input type="file" accept="image/*" capture="environment" style="display:none" onchange="bonFile(this)"></label><label class="btn ghost" style="cursor:pointer">Uit galerij<input type="file" accept="image/*" style="display:none" onchange="bonFile(this)"></label></div></div>`;
+ if(Q){h+=`<div class="card"><h2>Factuur toevoegen</h2><p class="mu">Laad een factuur op (PDF of foto). De app leest leverancier, bedrag, vervaldatum, rekeningnummer en mededeling. Betalen en inboeken doe je later, bv. achter je computer.</p>${dv?`<label class="btn ghost" style="cursor:pointer">📄 Factuur opladen<input type="file" accept="application/pdf,image/*" style="display:none" onchange="factFile(this)"></label>`:'<p class="mu" style="margin:0">Kies eerst hierboven de map op Google Drive.</p>'}</div>`;
+  const tdo=bonTodo(),fa=tdo.filter(b=>b.k==='f'&&b.status==='Nieuw').sort((a,b)=>(a.due||'9999')<(b.due||'9999')?-1:(a.due||'9999')>(b.due||'9999')?1:(a.ts||0)-(b.ts||0)),td=srt(tdo.filter(b=>!fa.includes(b))),ao=advOpen(),dn=srt(S.bons.filter(b=>!tdo.includes(b))).slice(0,30),nk=bonLines('kas').length,nbk=bonLines('bank').length;
+  if(!fa.length&&!td.length&&!ao.length&&!dn.length)h+=`<div class="card">${empty('Nog geen bonnetjes of facturen.')}</div>`;
+  if(fa.length)h+=`<div class="card"><h2>Te betalen (${fa.length})</h2><p class="mu" style="margin:0 0 4px">Samen ${eur(fa.reduce((a,b)=>a+(+b.total||0),0))}. De eerst vervallende staat bovenaan.</p>${fa.map(b=>it(b,true)).join('')}</div>`;
   if(td.length)h+=`<div class="card"><h2>Te verwerken (${td.length})</h2>${td.map(b=>it(b,true)).join('')}</div>`;
-  if(ao.length)h+=`<div class="card"><h2>Nog terug te betalen (${ao.length})</h2>${ao.length?ao.map(t=>`<div class="row"><div><b>${esc(t.adv)}</b><div class="mu">${esc(t.name)} · ${esc(t.date)}</div><div class="accb"><button class="btn ghost" onclick="refund('${t.id}')">Terugbetaald</button></div></div><div class="amt">${eur(-t.v)}</div></div>`).join(''):empty('Niemand wacht op een terugbetaling.')}</div>`;
-  if(dn.length)h+=`<div class="card"><h2>Afgehandeld</h2>${dn.map(b=>it(b,false)).join('')}</div>`}
- else{const mine=srt(S.bons.filter(b=>b.mine||(b.who&&b.who===WHO))),owe=advOpen().filter(t=>uk(t.adv)===uk(WHO)),ow=owe.reduce((a,t)=>a-t.v,0),wait=S.bons.filter(b=>(b.mine||b.who===WHO)&&b.adv&&b.status==='Nieuw').reduce((a,b)=>a+(+b.total||0),0);
+  if(ao.length)h+=`<div class="card"><h2>Nog terug te betalen (${ao.length})</h2>${ao.map(t=>`<div class="row"><div><b>${esc(t.adv)}</b><div class="mu">${esc(t.name)} · ${esc(fdt(t.date))}</div><div class="accb"><button class="btn ghost" onclick="refund('${t.id}')">Terugbetaald</button></div></div><div class="amt">${eur(-t.v)}</div></div>`).join('')}</div>`;
+  if(nk||nbk)h+=`<div class="card"><h2>Naar de boekhouding</h2><p class="mu">Betaalde bonnetjes en facturen, klaar om te plakken in kolom A van de eerste lege regel. Een voorschot komt erin zodra het terugbetaald is.</p>${nk?`<button class="btn" onclick="bonCopy('kas')">Regels voor het kasboek (${nk} nieuw)</button>`:''}${nbk?`<button class="btn" style="margin-top:8px" onclick="bonCopy('bank')">Regels voor het bankboek (${nbk} nieuw)</button>`:''}</div>`;
+  if(dn.length)h+=`<div class="card"><h2>Afgehandeld</h2>${dn.map(b=>it(b,false)).join('')}</div>`;
+  if(dv)h+=drv}
+ else{const mine=srt(S.bons.filter(b=>b.k!=='f'&&(b.mine||(b.who&&b.who===WHO)))),owe=advOpen().filter(t=>uk(t.adv)===uk(WHO)),ow=owe.reduce((a,t)=>a-t.v,0),wait=S.bons.filter(b=>(b.mine||b.who===WHO)&&b.adv&&b.status==='Nieuw').reduce((a,b)=>a+(+b.total||0),0);
   if(ow||wait)h+=`<div class="card"><h2>Terug te krijgen</h2>${ow?`<div class="row"><div>Ingeboekt, nog terug te betalen door de Quaestor<div class="mu">${owe.map(t=>esc(t.name)).join(', ')}</div></div><div class="amt">${eur(ow)}</div></div>`:''}${wait?`<div class="row"><div>Ingediend, nog niet verwerkt</div><div class="amt">${eur(wait)}</div></div>`:''}</div>`;h+=`<div class="card"><h2>Mijn bonnetjes</h2>${mine.length?mine.map(b=>it(b,false)).join(''):empty('Je hebt nog geen bonnetjes ingediend.')}</div>`}
  return h}
 
