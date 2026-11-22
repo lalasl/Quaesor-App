@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Quaestor – ledenbetalingen</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -107,6 +107,14 @@ nav{overflow-x:hidden!important}nav button{flex:1 1 0!important;min-width:0!impo
 .nl{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-.1px}nav button .nl{font-weight:500}nav button.on .nl{font-weight:600;letter-spacing:-.3px}
 nav .nb{position:absolute;top:-5px;left:15px;margin:0}
 @media(max-width:400px){.ktr{grid-template-columns:50px 34px minmax(34px,1fr) 34px minmax(52px,auto)!important;gap:5px!important}.kts{font-size:.85rem}}
+
+/* 1.9.2: niet inzoomen of verschuiven; rekening houden met de systeembalken van Android en iPhone */
+html{touch-action:pan-x pan-y;-webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior:none}
+body{overscroll-behavior:none}
+main{overscroll-behavior-y:contain;min-height:0}
+header{padding-top:max(10px,env(safe-area-inset-top))!important;padding-left:max(14px,env(safe-area-inset-left))!important;padding-right:max(14px,env(safe-area-inset-right))!important}
+header>button,header>img,header>div:not(.hd){flex-shrink:0}header button{white-space:nowrap}
+nav{padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
 </style>
 </head>
 <body>
@@ -138,8 +146,8 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='91',APP_LABEL='1.9.1';
-const RELN={"1.9.1":["De app past weer op elk scherm, ook met grote letters op je gsm. Niets schuift nog opzij."],"1.9.0":["Je krijgt een melding als er een nieuwe versie is, met wat er nieuw is.","Bonnetjes: kies ook de subcategorie (activiteit). Wie zelf betaalde, kan zijn rekeningnummer meegeven.","Quaestor: foto's van bonnetjes en facturen komen op Google Drive, in de map die je kiest. Wat betaald is, verhuist naar het mapje Betaald.","Quaestor: facturen opladen (PDF of foto). De app leest leverancier, bedrag, vervaldatum, rekeningnummer en mededeling. Betalen en inboeken doe je later.","Quaestor: regels voor het kasboek en bankboek kopiëren vanuit Bonnen."],"1.8.5":["Het verslag past weer op de gsm."],"1.8.4":["De app springt niet meer naar boven tijdens het synchroniseren.","Rekeningnummers van leden bewaren (Quaestor).","De terugknop van je gsm of browser werkt in de app."]};document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='92',APP_LABEL='1.9.2';
+const RELN={"1.9.2":["Het scherm kan niet meer per ongeluk inzoomen of opzij schuiven. De onderste balk blijft boven de systeembalk van je gsm."],"1.9.1":["De app past weer op elk scherm, ook met grote letters op je gsm. Niets schuift nog opzij."],"1.9.0":["Je krijgt een melding als er een nieuwe versie is, met wat er nieuw is.","Bonnetjes: kies ook de subcategorie (activiteit). Wie zelf betaalde, kan zijn rekeningnummer meegeven.","Quaestor: foto's van bonnetjes en facturen komen op Google Drive, in de map die je kiest. Wat betaald is, verhuist naar het mapje Betaald.","Quaestor: facturen opladen (PDF of foto). De app leest leverancier, bedrag, vervaldatum, rekeningnummer en mededeling. Betalen en inboeken doe je later.","Quaestor: regels voor het kasboek en bankboek kopiëren vanuit Bonnen."],"1.8.5":["Het verslag past weer op de gsm."],"1.8.4":["De app springt niet meer naar boven tijdens het synchroniseren.","Rekeningnummers van leden bewaren (Quaestor).","De terugknop van je gsm of browser werkt in de app."]};document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
