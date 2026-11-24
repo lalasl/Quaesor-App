@@ -146,8 +146,8 @@ const HEAD_B=['ID','Datum','Lid','Omschrijving','Hoofdcategorie','Subcategorie',
 
 /* APP_VERSION: intern bouwnummer, telt altijd op (voor vergelijkingen). APP_LABEL: het versienummer dat mensen zien.
    Regel: 1.0.1 = kleine verbetering of foutje opgelost, 1.1 = nieuwe functie, 2.0 = grote verandering. */
-const APP_VERSION='96',APP_LABEL='1.9.6';
-const RELN={"1.9.6":["Quaestor: Overzicht › Naar kas- en bankboek. Vink nagekeken betalingen aan en tik op Overnemen: ze komen vanzelf in je kas- of bankboek."],"1.9.5":["Bij Nog terug te betalen zie je meteen of de voorschieter nog een schuld heeft en hoeveel er verrekend wordt."],"1.9.4":["Quaestor: bij Inboeken en Aanpassen kies je wie betaalde, met dezelfde knoppen: Geld van de club of Iemand schoot het voor (uit de ledenlijst).","Bonnetjes van vroeger waarbij nog niet gekozen is wie betaalde, staan duidelijk aangeduid."],"1.9.3":["Bonnetje indienen: kies verplicht wie betaalde: geld van de club, of iemand uit de ledenlijst die het voorschoot. Zo hangt het voorschot altijd aan de juiste persoon."],"1.9.2":["Het scherm kan niet meer per ongeluk inzoomen of opzij schuiven. De onderste balk blijft boven de systeembalk van je gsm."],"1.9.1":["De app past weer op elk scherm, ook met grote letters op je gsm. Niets schuift nog opzij."],"1.9.0":["Je krijgt een melding als er een nieuwe versie is, met wat er nieuw is.","Bonnetjes: kies ook de subcategorie (activiteit). Wie zelf betaalde, kan zijn rekeningnummer meegeven.","Quaestor: foto's van bonnetjes en facturen komen op Google Drive, in de map die je kiest. Wat betaald is, verhuist naar het mapje Betaald.","Quaestor: facturen opladen (PDF of foto). De app leest leverancier, bedrag, vervaldatum, rekeningnummer en mededeling. Betalen en inboeken doe je later.","Quaestor: regels voor het kasboek en bankboek kopiëren vanuit Bonnen."],"1.8.5":["Het verslag past weer op de gsm."],"1.8.4":["De app springt niet meer naar boven tijdens het synchroniseren.","Rekeningnummers van leden bewaren (Quaestor).","De terugknop van je gsm of browser werkt in de app."]};document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
+const APP_VERSION='97',APP_LABEL='1.9.7';
+const RELN={"1.9.7":["De opmaak van de nieuwe kolommen in de spreadsheet (Boekingen, Leden, Bonnetjes) blijft in orde."],"1.9.6":["Quaestor: Overzicht › Naar kas- en bankboek. Vink nagekeken betalingen aan en tik op Overnemen: ze komen vanzelf in je kas- of bankboek."],"1.9.5":["Bij Nog terug te betalen zie je meteen of de voorschieter nog een schuld heeft en hoeveel er verrekend wordt."],"1.9.4":["Quaestor: bij Inboeken en Aanpassen kies je wie betaalde, met dezelfde knoppen: Geld van de club of Iemand schoot het voor (uit de ledenlijst).","Bonnetjes van vroeger waarbij nog niet gekozen is wie betaalde, staan duidelijk aangeduid."],"1.9.3":["Bonnetje indienen: kies verplicht wie betaalde: geld van de club, of iemand uit de ledenlijst die het voorschoot. Zo hangt het voorschot altijd aan de juiste persoon."],"1.9.2":["Het scherm kan niet meer per ongeluk inzoomen of opzij schuiven. De onderste balk blijft boven de systeembalk van je gsm."],"1.9.1":["De app past weer op elk scherm, ook met grote letters op je gsm. Niets schuift nog opzij."],"1.9.0":["Je krijgt een melding als er een nieuwe versie is, met wat er nieuw is.","Bonnetjes: kies ook de subcategorie (activiteit). Wie zelf betaalde, kan zijn rekeningnummer meegeven.","Quaestor: foto's van bonnetjes en facturen komen op Google Drive, in de map die je kiest. Wat betaald is, verhuist naar het mapje Betaald.","Quaestor: facturen opladen (PDF of foto). De app leest leverancier, bedrag, vervaldatum, rekeningnummer en mededeling. Betalen en inboeken doe je later.","Quaestor: regels voor het kasboek en bankboek kopiëren vanuit Bonnen."],"1.8.5":["Het verslag past weer op de gsm."],"1.8.4":["De app springt niet meer naar boven tijdens het synchroniseren.","Rekeningnummers van leden bewaren (Quaestor).","De terugknop van je gsm of browser werkt in de app."]};document.documentElement.style.setProperty('--ver',`"Versie ${APP_LABEL}"`);
 const REGK='quaestor-clubs';
 let REG=null;try{REG=JSON.parse(localStorage.getItem(REGK)||'null')}catch(e){}
 if(!REG||!Array.isArray(REG.list)||!REG.list.length)REG={active:'c1',list:[{id:'c1',name:'',color:'#8b1e3f',helper:false}]};
@@ -1939,7 +1939,7 @@ function limCard(){const c=S.club,L=c.lim||{};return `<div class="card"><h2>Schu
 function setLim(s,v){if(role!=='q')return;const c=S.club;c.lim=Object.assign({},c.lim);const n=String(v).trim()===''?'':pamt(v);c.lim[s]=n==null?'':n;c.setDirty=true;save();queueSync();toast('Opgeslagen')}
 let OVH='';
 /* ---------- opmaak van de tabbladen ---------- */
-const FMT_V='12';
+const FMT_V='13';
 async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)return;const key=c.gid+'|'+FMT_V+'|'+c.color;if(!force&&(c.fmtK===key||(c.fmtFailK===key&&Date.now()-c.fmtFail<36e5)))return;
  const m=await api(`/${c.gid}?fields=sheets(properties(sheetId,title),bandedRanges(bandedRangeId),conditionalFormats(ranges))`),SH={};(m.sheets||[]).forEach(x=>SH[x.properties.title]=x);
  const rgb=h=>{h=String(h||'#8B1E3F').replace('#','');return{red:parseInt(h.slice(0,2),16)/255,green:parseInt(h.slice(2,4),16)/255,blue:parseInt(h.slice(4,6),16)/255}};
@@ -1958,18 +1958,19 @@ async function fmtSheets(force){const c=S.club;if(role!=='q'||!c.gid||!c.gok)ret
   if(!o.ov){fmt(G(id,0,1,0,o.w.length),{backgroundColor:AC,textFormat:{bold:true,foregroundColor:WH,fontSize:10},verticalAlignment:'MIDDLE',wrapStrategy:'CLIP'},'backgroundColor,textFormat,verticalAlignment,wrapStrategy');
    R.push({addBanding:{bandedRange:{range:G(id,0,null,0,o.w.length),rowProperties:{headerColor:AC,firstBandColor:WH,secondBandColor:ZG}}}})}
   Object.entries(o.num||{}).forEach(([j,f])=>fmt(G(id,1,null,+j,+j+1),{numberFormat:f},'numberFormat'));return id};
- let id=base(TAB_B,{w:[80,90,120,190,120,120,110,90,95,90,120,150,70,130,105,90],hide:[0,9,11,12],num:{1:DAT,7:EUR}});
- if(id!=null)R.push({setBasicFilter:{filter:{range:G(id,0,null,0,16)}}});
- if(id!=null){cond(G(id,1,null,0,15),formula('=$I2="Storno"'),{textFormat:{foregroundColor:GR,italic:true}});
+ let id=base(TAB_B,{w:[80,90,120,190,120,120,110,90,95,90,120,150,70,130,105,90,120],hide:[0,9,11,12],num:{1:DAT,7:EUR}});
+ if(id!=null)fmt(G(id,1,null,16,17),{horizontalAlignment:'CENTER'},'horizontalAlignment');
+ if(id!=null)R.push({setBasicFilter:{filter:{range:G(id,0,null,0,17)}}});
+ if(id!=null){cond(G(id,1,null,0,17),formula('=$I2="Storno"'),{textFormat:{foregroundColor:GR,italic:true}});
   cond(G(id,1,null,6,7),{type:'TEXT_EQ',values:[{userEnteredValue:M.schuld}]},{textFormat:{foregroundColor:AT,bold:true},backgroundColor:AM});
   cond(G(id,1,null,14,15),{type:'TEXT_EQ',values:[{userEnteredValue:'Ja'}]},{textFormat:{foregroundColor:GN,bold:true}})}
- if(id!=null)cond(G(id,1,null,0,16),formula('=$P2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}});
- id=base(TAB_L,{w:[160,130,140,150,120,90],hide:[4],num:{2:TXT}});if(id!=null)cond(G(id,1,null,0,6),formula('=$F2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}});
+ if(id!=null)cond(G(id,1,null,0,17),formula('=$P2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}});
+ id=base(TAB_L,{w:[160,130,140,150,120,90,190],hide:[4],num:{2:TXT,6:TXT}});if(id!=null)cond(G(id,1,null,0,7),formula('=$F2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}});
  const ph=SH[TAB_P]?Math.max(5,S.statuses.length+2):5;id=base(TAB_P,{w:[150,150].concat(Array(ph-2).fill(110)),num:Object.fromEntries(Array.from({length:ph-2},(_,i)=>[i+2,EUR]))});
- id=base(TAB_BN,{w:[80,90,150,90,260,200,130,150,100,90,140,90],hide:[0,7,9],num:{1:DAT,3:EUR}});
+ id=base(TAB_BN,{w:[80,90,150,90,260,200,130,150,100,90,140,90,120,80,150,110,95,170,180,110,95,120,90,95],hide:[0,7,9,21,22],num:{1:DAT,3:EUR,16:DAT,20:DAT}});
  if(id!=null){cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Nieuw'}]},{backgroundColor:AM,textFormat:{foregroundColor:AT,bold:true}});
   cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Ingeboekt'}]},{textFormat:{foregroundColor:GN,bold:true}});
-  cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Afgewezen'}]},{textFormat:{foregroundColor:GR,italic:true}});cond(G(id,1,null,0,12),formula('=$L2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}})}
+  cond(G(id,1,null,8,9),{type:'TEXT_EQ',values:[{userEnteredValue:'Afgewezen'}]},{textFormat:{foregroundColor:GR,italic:true}});cond(G(id,1,null,0,24),formula('=$L2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}})}
  id=base(TAB_A,{w:[80,90,130,150,160,150,110,280,90,90],hide:[0,5],num:{1:DAT}});if(id!=null)cond(G(id,1,null,0,10),formula('=$J2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}});
  id=base(TAB_KT,{w:[80,95,150,130,100,170,100,360,90],hide:[0,2],num:{1:DAT,4:EUR,5:EUR,6:EUR}});if(id!=null){cond(G(id,1,null,6,7),formula('=AND($G2<>"",$G2<>0)'),{textFormat:{foregroundColor:rgb('#B42318'),bold:true}});cond(G(id,1,null,0,9),formula('=$I2="Ja"'),{backgroundColor:TO,textFormat:{foregroundColor:TT}})}
  id=base(TAB_PT,{w:[80,90,140,120,130,95,160,90,170,90,150,110,200,90,90],hide:[0,9,10],num:{1:DAT,7:EUR}});
